@@ -1,0 +1,789 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<robot name="zhishu_robot_description">
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+  </joint>
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0.0105840663604119 -2.11178960268536E-05 0.171968380691249" rpy="0 0 0"/>
+      <mass value="11.9793854739169"/>
+      <inertia ixx="0.267920451400325" ixy="-0.000314932674231556" ixz="0.0034331217858401" iyy="0.200761728773841" iyz="-5.74641985699417E-05" izz="0.319752835778639"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/base_link.STL"/>
+      </geometry>
+      <material name="base_link_material_0">
+        <color rgba="0.752941176470588 0.752941176470588 0.752941176470588 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.009 0 0.180" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.540 0.420 0.360"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="waist_up_down_link">
+    <inertial>
+      <origin xyz="0.0014882 0.00079476 0.29807" rpy="0 0 0"/>
+      <mass value="1.6979"/>
+      <inertia ixx="0.027359" ixy="1.5758E-06" ixz="6.6657E-05" iyy="0.022449" iyz="0.00010637" izz="0.0092156"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/waist_up_down_link.STL"/>
+      </geometry>
+      <material name="waist_up_down_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.000002 0 0.268826" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.170 0.170 0.500"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="waist_up_down_joint" type="prismatic">
+    <origin xyz="-0.001 -0.00034236 0.29735" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="waist_up_down_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="0" upper="0.3" effort="500.0" velocity="0.2"/>
+  </joint>
+  <link name="waist_pitch_link">
+    <inertial>
+      <origin xyz="0.0092634 -1.4003E-05 0.24508" rpy="0 0 0"/>
+      <mass value="2.5658"/>
+      <inertia ixx="0.038733" ixy="-2.8897E-07" ixz="5.5823E-05" iyy="0.027464" iyz="7.8309E-07" izz="0.020531"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/waist_pitch_link.STL"/>
+      </geometry>
+      <material name="waist_pitch_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.01741 -0.000342 0.271365" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.210 0.240 0.540"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="waist_pitch_joint" type="revolute">
+    <origin xyz="0 0.00034236 0.47265" rpy="0 0 0"/>
+    <parent link="waist_up_down_link"/>
+    <child link="waist_pitch_link"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-0.7854" upper="0.2618" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="head_yaw_link">
+    <inertial>
+      <origin xyz="6.7569E-06 -0.013798 0.027294" rpy="0 0 0"/>
+      <mass value="0.025533"/>
+      <inertia ixx="2.4487E-05" ixy="-7.9261E-11" ixz="3.9028E-09" iyy="3.0652E-05" iyz="4.9467E-06" izz="1.6691E-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/head_yaw_link.STL"/>
+      </geometry>
+      <material name="head_yaw_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0.0025 0.04343" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.066173 0.0591 0.095677"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="head_yaw_joint" type="revolute">
+    <origin xyz="0.0011228 0 0.50076" rpy="0 0.22689 0"/>
+    <parent link="waist_pitch_link"/>
+    <child link="head_yaw_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.5236" upper="0.5236" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="head_pitch_link">
+    <inertial>
+      <origin xyz="-0.013322 0.019844 0.1149" rpy="0 0 0"/>
+      <mass value="0.88122"/>
+      <inertia ixx="0.0049898" ixy="-6.7229E-07" ixz="0.0014315" iyy="0.0042558" iyz="1.0938E-06" izz="0.0047652"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/head_pitch_link.STL"/>
+      </geometry>
+      <material name="head_pitch_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.012422 0.020658 0.115908" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.190 0.160 0.230"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="head_pitch_joint" type="revolute">
+    <origin xyz="0 -0.021 0.058" rpy="0 0 0"/>
+    <parent link="head_yaw_link"/>
+    <child link="head_pitch_link"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-0.349" upper="0.262" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="head_camera_link">
+    <inertial>
+      <origin xyz="-0.010536 0.00014031 0.0029053" rpy="0 0 0"/>
+      <mass value="0.060808"/>
+      <inertia ixx="4.1714E-05" ixy="1.6335E-08" ixz="8.6471E-09" iyy="3.5869E-06" iyz="2.6477E-09" izz="3.978E-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/head_camera_link.STL"/>
+      </geometry>
+      <material name="head_camera_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0234 0 0.016409" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.050736 0.106486 0.062755"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="head_camera_joint" type="fixed">
+    <origin xyz="0.0775 0.021 0.051533" rpy="0 0 0"/>
+    <parent link="head_pitch_link"/>
+    <child link="head_camera_link"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+  <link name="head_smart_speaker_link">
+    <inertial>
+      <origin xyz="-0.00033731 -2.3644E-07 -0.014905" rpy="0 0 0"/>
+      <mass value="0.26595"/>
+      <inertia ixx="0.00021865" ixy="-7.4563E-10" ixz="3.0442E-08" iyy="0.00021876" iyz="-9.1023E-11" izz="0.00040289"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/head_smart_speaker_link.STL"/>
+      </geometry>
+      <material name="head_smart_speaker_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.016197 0 -0.01515" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.148051 0.115608 0.033906"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="head_smart_speaker_joint" type="fixed">
+    <origin xyz="0.000145 0.02108 0.1093" rpy="0 0 0"/>
+    <parent link="head_pitch_link"/>
+    <child link="head_smart_speaker_link"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+  <link name="left_shoulder_pitch_link">
+    <inertial>
+      <origin xyz="-0.0045898 -0.00013978 -0.032066" rpy="1.570796327 0 -1.570796327"/>
+      <mass value="0.43703"/>
+      <inertia ixx="0.00085981" ixy="4.5354e-05" ixz="-5.5928e-06" iyy="0.00095707" iyz="0.00016999" izz="0.00088432"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.07" rpy="1.570796327 0 -1.570796327"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/left_shoulder_pitch_link.STL"/>
+      </geometry>
+      <material name="left_shoulder_pitch_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.000075 -0.003 -0.010009" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.100 0.120 0.105"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_shoulder_pitch_joint" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="left_arm_dh_base_link"/>
+    <child link="left_shoulder_pitch_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.0543" upper="0.90757" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="left_shoulder_roll_link">
+    <inertial>
+      <origin xyz="0.0010914 0.025605 -0.000914" rpy="0 -1.570796327 1.570796327"/>
+      <mass value="0.47459"/>
+      <inertia ixx="0.0012901" ixy="-2.8026e-05" ixz="1.4837e-06" iyy="0.00086041" iyz="4.079e-05" izz="0.0014348"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.058" rpy="0 -1.570796327 1.570796327"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/left_shoulder_roll_link.STL"/>
+      </geometry>
+      <material name="left_shoulder_roll_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.000006 0.025402 -0.001" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.090 0.125 0.090"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_shoulder_roll_joint" type="revolute">
+    <origin xyz="0 0 0" rpy="0 1.570796327 -1.570796327"/>
+    <parent link="left_shoulder_pitch_link"/>
+    <child link="left_shoulder_roll_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.43633" upper="1.4835" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="left_shoulder_yaw_link">
+    <inertial>
+      <origin xyz="0.008767919759 0.0009495830577 0.06592" rpy="0 0 -0.00023118"/>
+      <mass value="0.63884"/>
+      <inertia ixx="0.003144601381" ixy="3.011037284e-06" ixz="0.0002282804083" iyy="0.003348498619" iyz="-4.151677497e-05" izz="0.0011017"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.1785" rpy="0 0 -0.00023118"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/left_shoulder_yaw_link.STL"/>
+      </geometry>
+      <material name="left_shoulder_yaw_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.00952 0.000052 0.065758" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.100 0.085 0.190"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_shoulder_yaw_joint" type="revolute">
+    <origin xyz="0 0.28 0" rpy="-1.570796327 -1.570565147 3.141592654"/>
+    <parent link="left_shoulder_roll_link"/>
+    <child link="left_shoulder_yaw_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.0543" upper="3.0543" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="left_elbow_pitch_link">
+    <inertial>
+      <origin xyz="0.013849 0.05313 -0.001267" rpy="-1.570796327 0 3.141592654"/>
+      <mass value="0.39849"/>
+      <inertia ixx="0.00088239" ixy="-6.3121e-05" ixz="3.1708e-05" iyy="0.00054057" iyz="0.00012509" izz="0.00090946"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.037" rpy="-1.570796327 0 3.141592654"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/left_elbow_pitch_link.STL"/>
+      </geometry>
+      <material name="left_elbow_pitch_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.007268 0.045772 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.095 0.155 0.085"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_elbow_pitch_joint" type="revolute">
+    <origin xyz="0.02000044696 3.753080051e-07 0" rpy="-1.570796327 0 -3.141592654"/>
+    <parent link="left_shoulder_yaw_link"/>
+    <child link="left_elbow_pitch_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="0" upper="2.5307" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="left_wrist_yaw_link">
+    <inertial>
+      <origin xyz="-2.6976e-05 -0.0011875 -0.04033" rpy="3.141592654 0 3.141592654"/>
+      <mass value="0.20757"/>
+      <inertia ixx="0.00021935" ixy="-2.7726e-07" ixz="4.2974e-08" iyy="0.00020141" iyz="4.5131e-05" izz="0.00022149"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.074" rpy="3.141592654 0 3.141592654"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/left_wrist_yaw_link.STL"/>
+      </geometry>
+      <material name="left_wrist_yaw_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.000017 0.00425 -0.0225" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.070 0.080 0.090"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_wrist_yaw_joint" type="revolute">
+    <origin xyz="0.02 0.213 0" rpy="-1.570796327 0.00023118 0"/>
+    <parent link="left_elbow_pitch_link"/>
+    <child link="left_wrist_yaw_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.0543" upper="3.0543" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="left_wrist_pitch_link">
+    <inertial>
+      <origin xyz="0.02751 -0.00057849 0.000587" rpy="-1.570796327 0 1.570796327"/>
+      <mass value="0.2187"/>
+      <inertia ixx="0.00018749" ixy="1.5194e-05" ixz="1.7286e-05" iyy="0.00031253" iyz="-4.843e-06" izz="0.00030811"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.0365" rpy="-1.570796327 0 1.570796327"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/left_wrist_pitch_link.STL"/>
+      </geometry>
+      <material name="left_wrist_pitch_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.027495 0.003321 -0.001467" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.095 0.060 0.060"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_wrist_pitch_joint" type="revolute">
+    <origin xyz="0 0 0" rpy="0 -1.570796327 1.570796327"/>
+    <parent link="left_wrist_yaw_link"/>
+    <child link="left_wrist_pitch_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.309" upper="1.309" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="left_wrist_roll_link">
+    <inertial>
+      <origin xyz="0.024637 -0.00058956 0.001026" rpy="0 1.570796312 -3.141592654"/>
+      <mass value="0.12223"/>
+      <inertia ixx="7.1406e-05" ixy="1.5702e-06" ixz="2.2035e-05" iyy="0.00010803" iyz="-2.5553e-06" izz="0.00011206"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.034" rpy="0 1.570796312 -3.141592654"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/left_wrist_roll_link.STL"/>
+      </geometry>
+      <material name="left_wrist_roll_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.014509 0 -0.003" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.080 0.052 0.078"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_wrist_roll_joint" type="revolute">
+    <origin xyz="0.055 0 0" rpy="1.570796327 0 0"/>
+    <parent link="left_wrist_pitch_link"/>
+    <child link="left_wrist_roll_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.309" upper="1.309" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="L_hand_link">
+    <inertial>
+      <origin xyz="0.0073255 -0.010181 -0.087072" rpy="0 0 0"/>
+      <mass value="0.079329"/>
+      <inertia ixx="4.5604E-05" ixy="7.4099E-06" ixz="9.8585E-06" iyy="5.5133E-05" iyz="-1.1846E-05" izz="4.0782E-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/L_hand_link.STL"/>
+      </geometry>
+      <material name="L_hand_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.007116 -0.014156 -0.090" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.080 0.070 0.160"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="L_hand_joint" type="fixed">
+    <origin xyz="0.06 0 0" rpy="0 1.570796312 -3.141592654"/>
+    <parent link="left_wrist_roll_link"/>
+    <child link="L_hand_link"/>
+  </joint>
+  <link name="right_shoulder_pitch_link">
+    <inertial>
+      <origin xyz="0.0039313 0.010837 -0.024955" rpy="-1.570796327 0 -1.570796327"/>
+      <mass value="0.56132"/>
+      <inertia ixx="0.00092946" ixy="-4.5776e-05" ixz="-2.1835e-06" iyy="0.001091" iyz="0.00016998" izz="0.00095051"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.07" rpy="-1.570796327 0 -1.570796327"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/right_shoulder_pitch_link.STL"/>
+      </geometry>
+      <material name="right_shoulder_pitch_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.000075 -0.003 -0.010009" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.100 0.120 0.105"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_shoulder_pitch_joint" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="right_arm_dh_base_link"/>
+    <child link="right_shoulder_pitch_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.90757" upper="3.0543" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="right_shoulder_roll_link">
+    <inertial>
+      <origin xyz="-0.0011734 0.018602 -0.001004" rpy="0 -1.570796327 1.570796327"/>
+      <mass value="0.43248"/>
+      <inertia ixx="0.001262" ixy="2.8051e-05" ixz="-1.6868e-06" iyy="0.00080485" iyz="4.0927e-05" izz="0.0014071"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.058" rpy="0 -1.570796327 1.570796327"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/right_shoulder_roll_link.STL"/>
+      </geometry>
+      <material name="right_shoulder_roll_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.000006 0.024752 -0.001" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.090 0.125 0.090"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_shoulder_roll_joint" type="revolute">
+    <origin xyz="0 0 0" rpy="0 -1.570796327 1.570796327"/>
+    <parent link="right_shoulder_pitch_link"/>
+    <child link="right_shoulder_roll_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.4835" upper="0.43633" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="right_shoulder_yaw_link">
+    <inertial>
+      <origin xyz="0.0087679 0.00094959 0.06592" rpy="0 0 0"/>
+      <mass value="0.63884"/>
+      <inertia ixx="0.0031446" ixy="3.0111e-06" ixz="0.00022828" iyy="0.0033485" iyz="-4.1517e-05" izz="0.0011017"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.1785" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/right_shoulder_yaw_link.STL"/>
+      </geometry>
+      <material name="right_shoulder_yaw_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.00952 0.000052 0.065758" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.100 0.085 0.190"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_shoulder_yaw_joint" type="revolute">
+    <origin xyz="0 0.28 0" rpy="0 -1.570796327 1.570796327"/>
+    <parent link="right_shoulder_roll_link"/>
+    <child link="right_shoulder_yaw_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.0543" upper="3.0543" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="right_elbow_pitch_link">
+    <inertial>
+      <origin xyz="0.013849 0.05313 -0.001267" rpy="-1.570796327 0 3.141592654"/>
+      <mass value="0.39849"/>
+      <inertia ixx="0.00088239" ixy="-6.3121e-05" ixz="3.1708e-05" iyy="0.00054057" iyz="0.00012509" izz="0.00090946"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.037" rpy="-1.570796327 0 3.141592654"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/right_elbow_pitch_link.STL"/>
+      </geometry>
+      <material name="right_elbow_pitch_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.007268 0.045772 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.095 0.155 0.085"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_elbow_pitch_joint" type="revolute">
+    <origin xyz="0.02 0 0" rpy="-1.570796327 0 3.141592654"/>
+    <parent link="right_shoulder_yaw_link"/>
+    <child link="right_elbow_pitch_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="0" upper="2.5307" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="right_wrist_yaw_link">
+    <inertial>
+      <origin xyz="-2.7844e-05 -0.0011889 -0.040329" rpy="3.141592654 0 3.141592654"/>
+      <mass value="0.20758"/>
+      <inertia ixx="0.00021936" ixy="-2.8051e-07" ixz="4.6391e-08" iyy="0.00020141" iyz="4.5135e-05" izz="0.0002215"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.074" rpy="3.141592654 0 3.141592654"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/right_wrist_yaw_link.STL"/>
+      </geometry>
+      <material name="right_wrist_yaw_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.000017 0.00425 -0.0225" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.070 0.080 0.090"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_wrist_yaw_joint" type="revolute">
+    <origin xyz="0.02 0.213 0" rpy="-1.570796327 0 0"/>
+    <parent link="right_elbow_pitch_link"/>
+    <child link="right_wrist_yaw_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.0543" upper="3.0543" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="right_wrist_pitch_link">
+    <inertial>
+      <origin xyz="0.02751 -0.00057846 0.000587" rpy="-1.570796327 0 1.570796327"/>
+      <mass value="0.2187"/>
+      <inertia ixx="0.00018749" ixy="1.5194e-05" ixz="1.7286e-05" iyy="0.00031253" iyz="-4.8431e-06" izz="0.00030811"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.0365" rpy="-1.570796327 0 1.570796327"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/right_wrist_pitch_link.STL"/>
+      </geometry>
+      <material name="right_wrist_pitch_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.027495 0.003321 -0.001467" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.095 0.060 0.060"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_wrist_pitch_joint" type="revolute">
+    <origin xyz="0 0 0" rpy="0 -1.570796327 1.570796327"/>
+    <parent link="right_wrist_yaw_link"/>
+    <child link="right_wrist_pitch_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.309" upper="1.309" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="right_wrist_roll_link">
+    <inertial>
+      <origin xyz="0.024607 0.00059242 0.001253" rpy="0 1.570796327 -3.141592654"/>
+      <mass value="0.12162"/>
+      <inertia ixx="7.1411e-05" ixy="-1.5674e-06" ixz="2.2038e-05" iyy="0.00010803" iyz="2.561e-06" izz="0.00011205"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.034" rpy="0 1.570796327 -3.141592654"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/right_wrist_roll_link.STL"/>
+      </geometry>
+      <material name="right_wrist_roll_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.014509 0 -0.00125" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.080 0.052 0.078"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_wrist_roll_joint" type="revolute">
+    <origin xyz="0.055 0 0" rpy="1.570796327 0 0"/>
+    <parent link="right_wrist_pitch_link"/>
+    <child link="right_wrist_roll_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.309" upper="1.309" effort="100.0" velocity="1.0"/>
+  </joint>
+  <link name="R_hand_link">
+    <!-- <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.066293"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/L_hand_link.STL"/>
+      </geometry>
+      <material name="R_hand_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0071 0.0142 -0.090" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.080 0.070 0.160"/>
+      </geometry>
+    </collision> -->
+  </link>
+  <joint name="R_hand_joint" type="fixed">
+    <origin xyz="0.06 0 0" rpy="0 1.570796327 -3.141592654"/>
+    <parent link="right_wrist_roll_link"/>
+    <child link="R_hand_link"/>
+  </joint>
+  <link name="camera_link">
+    <inertial>
+      <origin xyz="-0.010536 -0.0001403 -0.0029053" rpy="0 0 0"/>
+      <mass value="0.060808"/>
+      <inertia ixx="4.1714E-05" ixy="-1.6334E-08" ixz="-8.6468E-09" iyy="3.5869E-06" iyz="2.6476E-09" izz="3.978E-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/camera_link.STL"/>
+      </geometry>
+      <material name="camera_link_material_0">
+        <color rgba="0.75294 0.75294 0.75294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0234 0 -0.016409" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.050736 0.106486 0.062755"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <origin xyz="0.11443 -0.00034219 0.043307" rpy="0 0.5236 0"/>
+    <parent link="waist_pitch_link"/>
+    <child link="camera_link"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+  <link name="left_wheel_link">
+    <inertial>
+      <origin xyz="-1.186E-08 0.051302 -9.695E-05" rpy="0 0 0"/>
+      <mass value="0.96576"/>
+      <inertia ixx="0.0020195" ixy="-5.7359E-10" ixz="-6.1697E-09" iyy="0.0036167" iyz="-7.0516E-08" izz="0.0020194"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/left_wheel_link.STL"/>
+      </geometry>
+      <material name="left_wheel_link_material_0">
+        <color rgba="0.22353 0.22353 0.22353 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0.03025 0" rpy="1.570796 0 0"/>
+      <geometry>
+        <cylinder radius="0.0858" length="0.13509"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_wheel_joint" type="continuous">
+    <origin xyz="0.015077 0.175 0.0825" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="left_wheel_link"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0" upper="0" effort="100.0" velocity="10.0"/>
+  </joint>
+  <link name="right_wheel_link">
+    <inertial>
+      <origin xyz="1.186E-08 -0.051302 -9.695E-05" rpy="0 0 0"/>
+      <mass value="0.96576"/>
+      <inertia ixx="0.0020195" ixy="-5.7359E-10" ixz="6.1697E-09" iyy="0.0036167" iyz="7.0516E-08" izz="0.0020194"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/right_wheel_link.STL"/>
+      </geometry>
+      <material name="right_wheel_link_material_0">
+        <color rgba="0.22353 0.22353 0.22353 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 -0.03025 0" rpy="1.570796 0 0"/>
+      <geometry>
+        <cylinder radius="0.0858" length="0.13509"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_wheel_joint" type="continuous">
+    <origin xyz="0.015077 -0.175 0.0825" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="right_wheel_link"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0" upper="0" effort="100.0" velocity="10.0"/>
+  </joint>
+  <link name="laser_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zhishu_robot_description/meshes/laser_link.STL"/>
+      </geometry>
+      <material name="laser_link_material_0">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.000342 -0.406555 -0.325257" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.084213 0.140201 0.042663"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="laser_joint" type="fixed">
+    <origin xyz="-0.194999999998694 -0.000342361741007648 0.54469999999952" rpy="0 0 1.5707963267949"/>
+    <parent link="base_link"/>
+    <child link="laser_link"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+  <link name="left_arm_dh_base_link"/>
+  <link name="right_arm_dh_base_link"/>
+  <joint name="left_arm_dh_base_joint" type="fixed">
+    <parent link="waist_pitch_link"/>
+    <child link="left_arm_dh_base_link"/>
+    <origin xyz="0.0068 0.225 0.386" rpy="0 1.570796327 1.570796327"/>
+  </joint>
+  <joint name="right_arm_dh_base_joint" type="fixed">
+    <parent link="waist_pitch_link"/>
+    <child link="right_arm_dh_base_link"/>
+    <origin xyz="0.0068 -0.225 0.386" rpy="0 -1.570796327 1.570796327"/>
+  </joint>
+</robot>
