@@ -98,7 +98,36 @@
                   <param name="initial_value">${initial_positions['gripper_left_finger_joint']}</param>
                 </state_interface>
             </joint>
-
+            <joint name="waist_up_down_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['waist_up_down_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="waist_pitch_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['waist_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="head_yaw_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['head_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="head_pitch_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['head_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wheel_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_wheel_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="right_wheel_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['right_wheel_joint']}</param>
+                </state_interface>
+            </joint>
         </ros2_control>
     </xacro:macro>
 </robot>

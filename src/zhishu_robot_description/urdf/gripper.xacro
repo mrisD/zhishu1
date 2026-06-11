@@ -66,11 +66,11 @@
         <limit effort="1000.0" velocity="1.0" lower="-0.06" upper="0.0"/>
     </joint>
 
-    <link name="left_gripper_tcp"/>
+    <link name="right_gripper_tcp"/>
 
-    <joint name="left_gripper_tcp_joint" type="fixed">
+    <joint name="right_gripper_tcp_joint" type="fixed">
         <parent link="gripper_base_link"/>
-        <child link="left_gripper_tcp"/>
+        <child link="right_gripper_tcp"/>
         <origin xyz="0 0 0.04" rpy="1.5708 0 0"/>
     </joint>
 

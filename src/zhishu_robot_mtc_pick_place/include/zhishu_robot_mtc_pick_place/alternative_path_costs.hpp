@@ -1,0 +1,7 @@
+#ifndef __ALTERNATIVE_PATH_COSTS_CPP__
+#define __ALTERNATIVE_PATH_COSTS_CPP__
+
+
+
+
+#endif // __ALTERNATIVE_PATH_COSTS_CPP__    

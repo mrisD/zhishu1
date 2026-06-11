@@ -1,0 +1,53 @@
+#pragma once
+
+#include <memory>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <numeric>
+#include <stdexcept>
+
+#include <rclcpp/rclcpp.hpp>
+#include <rcl_interfaces/msg/parameter_descriptor.hpp>
+
+#include <Eigen/Geometry>
+#include <tf2_eigen/tf2_eigen.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+
+#include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/vector3_stamped.hpp>
+#include <moveit_msgs/msg/collision_object.hpp>
+#include <moveit_msgs/msg/move_it_error_codes.hpp>
+#include <shape_msgs/msg/solid_primitive.hpp>
+
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
+
+#include <moveit/task_constructor/task.h>
+#include <moveit/task_constructor/container.h>
+#include <moveit/task_constructor/stages/current_state.h>
+#include <moveit/task_constructor/stages/move_to.h>
+#include <moveit/task_constructor/stages/connect.h>
+#include <moveit/task_constructor/stages/move_relative.h>
+#include <moveit/task_constructor/stages/generate_grasp_pose.h>
+#include <moveit/task_constructor/stages/generate_place_pose.h>
+#include <moveit/task_constructor/stages/compute_ik.h>
+#include <moveit/task_constructor/stages/modify_planning_scene.h>
+#include <moveit/task_constructor/solvers/pipeline_planner.h>
+#include <moveit/task_constructor/solvers/joint_interpolation.h>
+#include <moveit/task_constructor/solvers/cartesian_path.h>
+
+namespace mtc = moveit::task_constructor;
+
+class MTCTaskNode : public rclcpp::Node
+{
+public:
+  explicit MTCTaskNode(const rclcpp::NodeOptions &options);
+
+  void setupPlanningScene();
+  void doTask();
+
+private:
+  mtc::Task task_;
+  mtc::Task createTask();
+};
