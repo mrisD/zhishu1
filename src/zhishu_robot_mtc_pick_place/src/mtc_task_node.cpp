@@ -166,10 +166,15 @@ MTCTaskNode::MTCTaskNode(const rclcpp::NodeOptions& options)
   declare_parameter("cartesian_step_size", 0.005, "Step size for Cartesian planner");
 
   // Direction vector parameters
-  declare_parameter("approach_object_direction_z", 1.0, "Z component of approach object direction vector");
+  declare_parameter("approach_object_direction_x", 0.0, "X component of approach object direction vector");
+  declare_parameter("approach_object_direction_y", 1.0, "Y component of approach object direction vector");
+  declare_parameter("approach_object_direction_z", 0.0, "Z component of approach object direction vector");
   declare_parameter("lift_object_direction_z", 1.0, "Z component of lift object direction vector");
   declare_parameter("lower_object_direction_z", -1.0, "Z component of lower object direction vector");
-  declare_parameter("retreat_direction_z", -1.0, "Z component of retreat direction vector");
+  declare_parameter("retreat_direction_x", 0.0, "X component of retreat direction vector");
+  declare_parameter("retreat_direction_y", -1.0, "Y component of retreat direction vector");
+  declare_parameter("retreat_direction_z", 0.0, "Z component of retreat direction vector");
+
 
   // Other parameters
   declare_parameter("place_pose_z_offset_factor", 0.5, "Factor to multiply object height for place pose Z offset");
@@ -493,9 +498,13 @@ mtc::Task MTCTaskNode::createTask()
   auto cartesian_step_size = this->get_parameter("cartesian_step_size").as_double();
 
   // Direction vector parameters
+  auto approach_object_direction_x = this->get_parameter("approach_object_direction_x").as_double();
+  auto approach_object_direction_y = this->get_parameter("approach_object_direction_y").as_double();
   auto approach_object_direction_z = this->get_parameter("approach_object_direction_z").as_double();
   auto lift_object_direction_z = this->get_parameter("lift_object_direction_z").as_double();
   auto lower_object_direction_z = this->get_parameter("lower_object_direction_z").as_double();
+  auto retreat_direction_x = this->get_parameter("retreat_direction_x").as_double();  
+  auto retreat_direction_y = this->get_parameter("retreat_direction_y").as_double();
   auto retreat_direction_z = this->get_parameter("retreat_direction_z").as_double();
 
   // Other parameters
@@ -618,7 +627,9 @@ mtc::Task MTCTaskNode::createTask()
       // Define the direction that we want the gripper to move (i.e. z direction) from the gripper frame
       geometry_msgs::msg::Vector3Stamped vec;
       vec.header.frame_id = gripper_frame; // Set the frame for the vector
-      vec.vector.z = approach_object_direction_z; // Set the direction (in this case, along the z-axis of the gripper frame)
+      vec.vector.x = approach_object_direction_x;
+      vec.vector.y = approach_object_direction_y;
+      vec.vector.z = approach_object_direction_z;// Set the direction (in this case, along the z-axis of the gripper frame)
       stage->setDirection(vec);
       grasp->insert(std::move(stage));
     }
@@ -861,6 +872,8 @@ mtc::Task MTCTaskNode::createTask()
       stage->properties().set("marker_ns", "retreat");
       geometry_msgs::msg::Vector3Stamped vec;
       vec.header.frame_id = gripper_frame;
+      vec.vector.x = retreat_direction_x;
+      vec.vector.y = retreat_direction_y;
       vec.vector.z = retreat_direction_z;
       stage->setDirection(vec);
       place->insert(std::move(stage));
