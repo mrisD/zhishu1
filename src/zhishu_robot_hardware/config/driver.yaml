@@ -1,0 +1,55 @@
+ethercat_driver_node:
+  ros__parameters:
+    # Motor identity used by ROS topic prefix. Default topics are /drive3/xxx.
+    motor_name: drive3
+    topic_prefix: drive3
+    joint_name: joint3
+
+    # EtherCAT address. This address is also passed into every bottom-layer driver API.
+    # IgH slave_position is zero-based: Drive1=0, Drive2=1, Drive3=2.
+    master_index: 0
+    alias: 0
+    slave_position: 2
+
+    # From GH1_Servo_V1.2 ESI.
+    vendor_id: 2123400        # 0x00206688
+    product_code: 642265170   # 0x26483052
+
+    # CSP cycle. Match TwinCAT: 1 ms cycle with DC enabled.
+    cycle_ns: 1000000
+    enable_dc: true
+    assign_activate: 768      # 0x0300, Sync0 enabled
+
+    # DC reference clock. IgH slave_position is zero-based.
+    select_dc_reference_clock: true
+    dc_reference_alias: 0
+    dc_reference_slave_position: 0
+    sync0_shift_ns: 622620
+
+    # Use ESI CSP mode: 6060h=8, 60C2:01=1, 60C2:02=-3.
+    configure_sdo: true
+    mode_of_operation: 8
+
+    # Use PDO 1601/1A01: 6040+607A and 6041+6064.
+    configure_pdos: true
+
+    # Safety/startup. Node enables servo but holds actual position until a command arrives.
+    auto_enable: true
+    auto_fault_reset: true
+
+    # Motion profile generated in driver, then sent as CSP target position.
+    max_velocity_counts_s: 8000.0
+    max_accel_counts_s2: 20000.0
+    target_tolerance_counts: 20
+
+    # 17-bit encoder: 131072 counts/rev, so 90 deg = 32768 counts.
+    counts_per_rev: 131072.0
+
+    # For later ros2_control plugin, usually set this false to avoid duplicate /joint_states.
+    publish_joint_states: true
+
+    # Realtime options. Requires root or CAP_SYS_NICE.
+    enable_realtime: true
+    realtime_priority: 80
+
+    status_publish_hz: 20.0

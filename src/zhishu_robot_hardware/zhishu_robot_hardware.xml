@@ -1,0 +1,9 @@
+<library path="zhishu_robot_hardware">
+  <class name="es_motor_hardware/EsMotorHardwareInterface"
+         type="es_motor_hardware::EsMotorHardwareInterface" 
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      This is the hardware interface for the Zhishu robot.
+    </description>
+  </class>
+</library>  

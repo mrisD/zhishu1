@@ -6,7 +6,9 @@
         <ros2_control name="${name}" type="system">
             <hardware>
                 <!-- By default, set up controllers for simulation. This won't work on real hardware -->
-                <plugin>mock_components/GenericSystem</plugin>
+                <!-- <plugin>mock_components/GenericSystem</plugin> -->
+                <!-- <param name="calculate_dynamics">true</param> -->
+                <plugin>es_motor_hardware/EsMotorHardwareInterface</plugin>
             </hardware>
             <joint name="left_shoulder_pitch_joint">
                 <command_interface name="position"/>
