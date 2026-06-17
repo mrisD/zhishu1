@@ -796,14 +796,15 @@ private:
   void updateProfile(MotorContext & motor, double dt, int32_t actual_position, bool operation_enabled)
   {
     if (!operation_enabled || !motor.command_enable.load()) {
-      motor.cmd_position = static_cast<double>(actual_position);
-      motor.profile_velocity = 0.0;
-      if (!motor.have_goal.load()) {
+        motor.cmd_position = static_cast<double>(actual_position);
+        motor.profile_velocity = 0.0;
+
+        // 关键：未使能时持续刷新目标为当前实际位置，避免启动后去找 0 点
         motor.goal_counts.store(actual_position);
         motor.have_goal.store(true);
         motor.target_reached.store(true);
-      }
-      return;
+
+        return;
     }
 
     const double goal = static_cast<double>(motor.goal_counts.load());
