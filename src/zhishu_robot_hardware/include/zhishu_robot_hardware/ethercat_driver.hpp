@@ -35,7 +35,7 @@ struct MotorConfig
   bool configure_pdos = true;
   int8_t mode_of_operation = 8;  // CiA402 CSP
 
-  bool auto_enable = true;
+  bool auto_enable = false;
   bool auto_fault_reset = true;
 
   double max_velocity_counts_s = 8000.0;
@@ -114,6 +114,7 @@ public:
   bool setRelativeRadians(const MotorAddress & address, double delta_radians);
 
   bool setEnable(const MotorAddress & address, bool enable);
+  bool getEnabledStatus(const MotorAddress & address, bool & enable) const;
   bool requestFaultReset(const MotorAddress & address);
 
   bool getMotorState(const MotorAddress & address, MotorState & state) const;

@@ -20,7 +20,7 @@ def generate_launch_description():
         DeclareLaunchArgument('alias', default_value='0'),
         DeclareLaunchArgument('slave_position', default_value='2'),
         DeclareLaunchArgument('cycle_ns', default_value='1000000'),
-        DeclareLaunchArgument('auto_enable', default_value='true'),
+        DeclareLaunchArgument('auto_enable', default_value='false'),
         DeclareLaunchArgument('publish_joint_states', default_value='true'),
         DeclareLaunchArgument('max_velocity_counts_s', default_value='8000.0'),
         DeclareLaunchArgument('max_accel_counts_s2', default_value='20000.0'),

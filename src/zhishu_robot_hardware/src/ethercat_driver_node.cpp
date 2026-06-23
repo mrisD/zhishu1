@@ -107,7 +107,7 @@ public:
     motor_config.configure_sdo = declare_parameter<bool>("configure_sdo", true);
     motor_config.configure_pdos = declare_parameter<bool>("configure_pdos", true);
     motor_config.mode_of_operation = static_cast<int8_t>(declare_parameter<int>("mode_of_operation", 8));
-    motor_config.auto_enable = declare_parameter<bool>("auto_enable", true);
+    motor_config.auto_enable = declare_parameter<bool>("auto_enable", false);
     motor_config.auto_fault_reset = declare_parameter<bool>("auto_fault_reset", true);
     motor_config.max_velocity_counts_s = declare_parameter<double>("max_velocity_counts_s", 8000.0);
     motor_config.max_accel_counts_s2 = declare_parameter<double>("max_accel_counts_s2", 20000.0);

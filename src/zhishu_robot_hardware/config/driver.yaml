@@ -34,7 +34,7 @@ ethercat_driver_node:
     configure_pdos: true
 
     # Safety/startup. Node enables servo but holds actual position until a command arrives.
-    auto_enable: true
+    auto_enable: false
     auto_fault_reset: true
 
     # Motion profile generated in driver, then sent as CSP target position.

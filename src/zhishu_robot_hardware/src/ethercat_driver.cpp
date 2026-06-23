@@ -150,6 +150,7 @@ struct MotorContext
   double profile_velocity = 0.0;
   int fault_reset_counter = 0;
   bool first_cycle = true;
+  bool hold_latched_after_enable = false;
 
   uint8_t last_slave_al_state = 0xFF;
   bool last_slave_online = false;
@@ -344,6 +345,16 @@ public:
       return false;
     }
     motor->command_enable.store(enable);
+    return true;
+  }
+
+  bool getEnabledStatus(const MotorAddress & address, bool & enable) const
+  {
+    auto motor = findMotor(address);
+    if (!motor) {
+      return false;
+    }
+    enable = motor->command_enable.load();
     return true;
   }
 
@@ -796,18 +807,33 @@ private:
   void updateProfile(MotorContext & motor, double dt, int32_t actual_position, bool operation_enabled)
   {
     if (!operation_enabled || !motor.command_enable.load()) {
-        motor.cmd_position = static_cast<double>(actual_position);
-        motor.profile_velocity = 0.0;
+      motor.cmd_position = static_cast<double>(actual_position);
+      motor.profile_velocity = 0.0;
 
-        // 关键：未使能时持续刷新目标为当前实际位置，避免启动后去找 0 点
-        motor.goal_counts.store(actual_position);
-        motor.have_goal.store(true);
-        motor.target_reached.store(true);
+      // 未真正进入 OperationEnabled 前，只跟随当前位置，不执行旧目标
+      motor.goal_counts.store(actual_position);
+      motor.have_goal.store(true);
+      motor.target_reached.store(true);
+      motor.hold_latched_after_enable = false;
+      return;
+    }
 
-        return;
+    if (!motor.hold_latched_after_enable) {
+      // 第一次真正使能后，再用当前 PDO 实际位置锁存保持目标
+      // 防止启动瞬间 actual_position 读到 0 后，电机去归零
+      motor.cmd_position = static_cast<double>(actual_position);
+      motor.profile_velocity = 0.0;
+      motor.goal_counts.store(actual_position);
+      motor.have_goal.store(true);
+      motor.target_reached.store(true);
+      motor.hold_latched_after_enable = true;
+      return;
     }
 
     const double goal = static_cast<double>(motor.goal_counts.load());
+
+
+
     const double dist = goal - motor.cmd_position;
     const double abs_dist = std::abs(dist);
 
@@ -1109,7 +1135,11 @@ bool EthercatDriver::setEnable(const MotorAddress & address, bool enable)
   return impl_->setEnable(address, enable);
 }
 
-bool EthercatDriver::requestFaultReset(const MotorAddress & address)
+bool EthercatDriver::getEnabledStatus(const MotorAddress &address, bool &enable) const
+{
+    return impl_->getEnabledStatus(address, enable);
+}
+bool EthercatDriver::requestFaultReset(const MotorAddress &address)
 {
   return impl_->requestFaultReset(address);
 }
