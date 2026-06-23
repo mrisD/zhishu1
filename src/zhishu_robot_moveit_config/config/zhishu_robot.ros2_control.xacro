@@ -10,48 +10,8 @@
                 <!-- <param name="calculate_dynamics">true</param> -->
                 <plugin>es_motor_hardware/EsMotorHardwareInterface</plugin>
             </hardware>
-            <joint name="left_shoulder_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_shoulder_pitch_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_shoulder_roll_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_shoulder_roll_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_shoulder_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_shoulder_yaw_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_elbow_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_elbow_pitch_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_wrist_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_wrist_yaw_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_wrist_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_wrist_pitch_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_wrist_roll_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_wrist_roll_joint']}</param>
-                </state_interface>
-            </joint>
+
+            <!-- right_arm -->
             <joint name="right_shoulder_pitch_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
@@ -94,6 +54,52 @@
                   <param name="initial_value">${initial_positions['right_wrist_roll_joint']}</param>
                 </state_interface>
             </joint>
+
+            <!-- left_arm -->
+            <joint name="left_shoulder_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_shoulder_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_shoulder_roll_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_shoulder_roll_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_shoulder_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_shoulder_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_elbow_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_elbow_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wrist_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_wrist_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wrist_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_wrist_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wrist_roll_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_wrist_roll_joint']}</param>
+                </state_interface>
+            </joint>
+
+            
             <joint name="gripper_left_finger_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">

@@ -45,7 +45,7 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::on_configure
     motor_config.joint_name = "joint3";
     motor_config.address.master_index = 0;
     motor_config.address.alias = 0;
-    motor_config.address.slave_position = 2;
+    motor_config.address.slave_position = 3;
     motor_config.address.vendor_id = 0x00206688;
     motor_config.address.product_code = 0x26483052;
     motor_config.configure_sdo = true;

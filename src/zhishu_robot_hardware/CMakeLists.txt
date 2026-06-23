@@ -95,38 +95,6 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
   INSTALL_RPATH "/usr/local/etherlab/lib;/opt/etherlab/lib"
 )
 
-# Standalone EtherCAT driver node
-add_executable(ethercat_driver_node
-  src/ethercat_driver_node.cpp
-)
-
-target_include_directories(ethercat_driver_node
-  PRIVATE
-    ${ECRT_INCLUDE_DIR}
-)
-
-ament_target_dependencies(ethercat_driver_node
-  rclcpp
-  std_msgs
-  sensor_msgs
-)
-
-target_link_libraries(ethercat_driver_node
-  ${PROJECT_NAME}
-)
-
-# ethercat_driver_node is installed to:
-# install/zhishu_robot_hardware/lib/zhishu_robot_hardware/
-#
-# libzhishu_robot_hardware.so is installed to:
-# install/zhishu_robot_hardware/lib/
-#
-# Therefore $ORIGIN/.. lets the node find libzhishu_robot_hardware.so.
-set_target_properties(ethercat_driver_node PROPERTIES
-  BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR};/usr/local/etherlab/lib;/opt/etherlab/lib"
-  INSTALL_RPATH "\$ORIGIN/..;/usr/local/etherlab/lib;/opt/etherlab/lib"
-)
-
 pluginlib_export_plugin_description_file(
   hardware_interface
   zhishu_robot_hardware.xml
@@ -138,11 +106,6 @@ install(
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   RUNTIME DESTINATION bin
-)
-
-install(
-  TARGETS ethercat_driver_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
