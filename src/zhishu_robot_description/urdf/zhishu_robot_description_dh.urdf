@@ -75,7 +75,7 @@
     <collision>
       <origin xyz="0.01741 -0.000342 0.271365" rpy="0 0 0"/>
       <geometry>
-        <box size="0.210 0.240 0.540"/>
+        <box size="0.30 0.33 0.560"/>
       </geometry>
     </collision>
   </link>
@@ -485,7 +485,7 @@
     <origin xyz="0 0 0" rpy="0 -1.570796327 1.570796327"/>
     <parent link="right_shoulder_pitch_link"/>
     <child link="right_shoulder_roll_link"/>
-    <axis xyz="0 0 1"/>
+    <axis xyz="0 0 -1"/>
     <limit lower="-1.4835" upper="0.43633" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="right_shoulder_yaw_link">
@@ -514,7 +514,7 @@
     <origin xyz="0 0.28 0" rpy="0 -1.570796327 1.570796327"/>
     <parent link="right_shoulder_roll_link"/>
     <child link="right_shoulder_yaw_link"/>
-    <axis xyz="0 0 1"/>
+    <axis xyz="0 0 -1"/>
     <limit lower="-3.0543" upper="3.0543" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="right_elbow_pitch_link">
@@ -601,7 +601,7 @@
     <origin xyz="0 0 0" rpy="0 -1.570796327 1.570796327"/>
     <parent link="right_wrist_yaw_link"/>
     <child link="right_wrist_pitch_link"/>
-    <axis xyz="0 0 1"/>
+    <axis xyz="0 0 -1"/>
     <limit lower="-1.309" upper="1.309" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="right_wrist_roll_link">

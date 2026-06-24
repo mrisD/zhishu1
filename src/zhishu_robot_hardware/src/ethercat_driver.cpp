@@ -665,9 +665,7 @@ private:
   {
     if (domain_pd_ != nullptr && domain_ != nullptr && master_ != nullptr) {
       for (auto & motor : motors_) {
-        if (motor->offsets.control_word != 0U) {
-          EC_WRITE_U16(domain_pd_ + motor->offsets.control_word, 0x0006);
-        }
+        EC_WRITE_U16(domain_pd_ + motor->offsets.control_word, 0x0006);
       }
       ecrt_domain_queue(domain_);
       ecrt_master_send(master_);
