@@ -10,7 +10,7 @@
                 <!-- <param name="calculate_dynamics">true</param> -->
                 <plugin>es_motor_hardware/EsMotorHardwareInterface</plugin>
                 <!-- IgH EtherCAT / GH1 SERVOPACK defaults. Per-joint params below can override these. -->
-                <param name="cycle_ns">1000000</param>
+                <param name="cycle_ns">2000000</param>
                 <param name="enable_dc">true</param>
                 <param name="assign_activate">0x0300</param>
                 <param name="sync0_shift_ns">622620</param>

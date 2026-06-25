@@ -39,15 +39,15 @@ sudo cp /usr/local/etherlab/etc/sysconfig/ethercat /etc/sysconfig/ethercat
 配置 EtherCAT 网卡  
 ip -br link  
 找出连接 EtherCAT 电机驱动器的那个网口 MAC，例如：    
-cat /sys/class/net/enP1p1s0/address    
+cat /sys/class/net/enp0s31f6/address    
 enp0s31f6 f8:75:a4:c6:f9:e2   
 
 sudo vim /etc/sysconfig/ethercat  
 找到这两行，改成你的实际 MAC：  
-  MASTER0_DEVICE="enP1p1s0"  
+  MASTER0_DEVICE="enp0s31f6"  
   DEVICE_MODULES="generic"  
 上面方法失败了使用下面的：  
-配置 IgH 使用 enP1p1s0  
+配置 IgH 使用 enp0s31f6  
 执行：  
 sudo sed -i 's|^MASTER0_DEVICE=.*|MASTER0_DEVICE="f8:75:a4:c6:f9:e2"|' /usr/local/etherlab/etc/sysconfig/ethercat  
 sudo sed -i 's|^DEVICE_MODULES=.*|DEVICE_MODULES="generic"|' /usr/local/etherlab/etc/sysconfig/ethercat  
@@ -56,7 +56,6 @@ grep -E "MASTER0_DEVICE|DEVICE_MODULES" /usr/local/etherlab/etc/sysconfig/etherc
 应该看到：  
 MASTER0_DEVICE="enP1p1s0"  
 DEVICE_MODULES="generic"  
-
 
 
 添加 udev 权限规则  
@@ -72,3 +71,15 @@ sudo /etc/init.d/ethercat start
 检查状态：  
 sudo /etc/init.d/ethercat status  
 ls /dev/EtherCAT*  
+
+运行调试  
+实时权限修复  
+sudo groupadd realtime  
+sudo usermod -aG realtime $USER  
+然后创建实时权限配置：  
+sudo tee /etc/security/limits.d/99-realtime.conf > /dev/null <<EOF  
+@realtime soft rtprio 99  
+@realtime hard rtprio 99  
+@realtime soft memlock unlimited  
+@realtime hard memlock unlimited  
+EOF  
