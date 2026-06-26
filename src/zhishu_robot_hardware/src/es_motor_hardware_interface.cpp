@@ -336,7 +336,7 @@ bool EsMotorHardwareInterface::wait_for_all_motors_ready(std::vector<ethercat_dr
   const int expected_domain_wc = static_cast<int>(driver_config_.motors.size() * 3U);
   int stable_ready_cycles = 0;
 
-  for (int retry = 0; retry < 1200; ++retry) {  // 1200 * 25 ms = 30 s
+  for (int retry = 0; retry < 2400; ++retry) {  // 1200 * 25 ms = 30 s
     bool all_ready = true;
     bool domain_ready = false;
 
@@ -563,6 +563,12 @@ hardware_interface::return_type EsMotorHardwareInterface::
     return hardware_interface::return_type::OK;
   }
 
+  // 7 个电机、每个从站当前 PDO 工作计数为 3，所以满 WC 应为 21。
+  // EtherCAT 出现 WC 不满、SAFEOP、同步错误时，禁止继续追 MoveIt 下发的轨迹点，
+  // 先锁住真实当前位置，避免电机抖动、掉使能后恢复时突然跳动。
+  const int expected_domain_wc = static_cast<int>(driver_config_.motors.size() * 3U);
+  static rclcpp::Clock throttle_clock(RCL_STEADY_TIME);
+
   for (size_t joint_index = 0; joint_index < info_.joints.size(); ++joint_index) {
     const int motor_index = joint_to_motor_index_[joint_index];
     if (motor_index == kNoMotor) {
@@ -579,28 +585,96 @@ hardware_interface::return_type EsMotorHardwareInterface::
     const auto & motor = driver_config_.motors[static_cast<size_t>(motor_index)];
     ethercat_driver::MotorState state{};
     if (!driver_->getMotorState(motor.address, state)) {
+      if (std::isfinite(hw_positions_[joint_index])) {
+        hw_commands_[joint_index] = hw_positions_[joint_index];
+      }
+      RCLCPP_WARN_THROTTLE(
+        logger(), throttle_clock, 1000,
+        "getMotorState failed for joint '%s'. Holding last ros2_control position.",
+        info_.joints[joint_index].name.c_str());
       continue;
     }
 
-    const double actual_rad = counts_to_radians(state.actual_counts, motor, joint_index);
-    hw_positions_[joint_index] = actual_rad;
+    // status_word != 0 时才认为 actual_counts 有效；否则保持上一次位置，避免状态跳到 0。
+    double hold_rad = hw_positions_[joint_index];
+    if (!std::isfinite(hold_rad)) {
+      hold_rad = 0.0;
+    }
+    if (state.status_word != 0U) {
+      hold_rad = counts_to_radians(state.actual_counts, motor, joint_index);
+      hw_positions_[joint_index] = hold_rad;
+    }
 
     bool command_enable = false;
-    driver_->getEnabledStatus(motor.address, command_enable);
+    const bool enable_status_ok = driver_->getEnabledStatus(motor.address, command_enable);
+
+    const bool domain_ready =
+      state.ethercat_ok &&
+      state.domain_wc >= expected_domain_wc &&
+      state.domain_wc_state == 2;
+
+    const bool slave_ready =
+      state.slave_online &&
+      state.slave_operational &&
+      state.status_word != 0U;
+
+    const bool bus_ready = domain_ready && slave_ready;
+
+    // EtherCAT 不健康时：不接受控制器新命令，只把目标锁到当前真实位置。
+    // 对应你的 dmesg：WC 0/21、UNMATCHED/SKIPPED、SAFEOP、0x001A Synchronization error。
+    if (!bus_ready) {
+      hw_commands_[joint_index] = hold_rad;
+      if (state.status_word != 0U) {
+        driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
+      }
+
+      RCLCPP_WARN_THROTTLE(
+        logger(), throttle_clock, 1000,
+        "EtherCAT not ready for joint '%s': motor=%s slave_position=%u "
+        "ethercat_ok=%d online=%d op=%d status_word=0x%04X al=0x%02X "
+        "domain_wc=%d/%d wc_state=%d. Holding current position.",
+        info_.joints[joint_index].name.c_str(),
+        motor.name.c_str(),
+        motor.address.slave_position,
+        state.ethercat_ok,
+        state.slave_online,
+        state.slave_operational,
+        state.status_word,
+        state.slave_al_state,
+        state.domain_wc,
+        expected_domain_wc,
+        state.domain_wc_state);
+      continue;
+    }
 
     // 未真正进入 OperationEnabled 前，持续锁当前真实位置，不接受控制器默认 0。
-    if (!command_enable || !state.operation_enabled || !std::isfinite(hw_commands_[joint_index])) {
-      hw_commands_[joint_index] = actual_rad;
+    if (!enable_status_ok || !command_enable || !state.operation_enabled ||
+      !std::isfinite(hw_commands_[joint_index]))
+    {
+      hw_commands_[joint_index] = hold_rad;
       driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
+
+      RCLCPP_WARN_THROTTLE(
+        logger(), throttle_clock, 1000,
+        "Joint '%s' is not command-enabled yet: enable_status_ok=%d command_enable=%d "
+        "operation_enabled=%d status_word=0x%04X. Holding current position.",
+        info_.joints[joint_index].name.c_str(),
+        enable_status_ok,
+        command_enable,
+        state.operation_enabled,
+        state.status_word);
       continue;
     }
 
     const int32_t target_counts = radians_to_counts(hw_commands_[joint_index], motor, joint_index);
     if (!driver_->setAbsoluteTargetCounts(motor.address, target_counts)) {
-      static rclcpp::Clock throttle_clock(RCL_STEADY_TIME);
+      hw_commands_[joint_index] = hold_rad;
+      driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
+
       RCLCPP_WARN_THROTTLE(
         logger(), throttle_clock, 1000,
-        "setAbsoluteTargetCounts failed for joint '%s'.", info_.joints[joint_index].name.c_str());
+        "setAbsoluteTargetCounts failed for joint '%s'. Holding current position.",
+        info_.joints[joint_index].name.c_str());
     }
   }
 

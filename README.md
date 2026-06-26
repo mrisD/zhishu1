@@ -83,3 +83,36 @@ sudo tee /etc/security/limits.d/99-realtime.conf > /dev/null <<EOF
 @realtime soft memlock unlimited  
 @realtime hard memlock unlimited  
 EOF  
+
+假设实际网卡是 enp0s31f6，执行：  
+
+sudo nmcli dev set enp0s31f6 managed no  
+sudo ip link set enp0s31f6 up  
+
+然后关掉网卡省电和 offload：  
+
+sudo ethtool --set-eee enp0s31f6 eee off  
+
+sudo ethtool -K enp0s31f6  
+  tso off  
+  gso off  
+  gro off  
+  lro off  
+如果支持固定速率，设置为 100M 全双工：
+sudo ethtool -s enp0s31f6 speed 100 duplex full autoneg off
+
+然后再看：
+
+sudo dmesg -wT | grep -Ei "EtherCAT|Link state|TIMED OUT|UNMATCHED|SKIPPED|Synchronization"
+
+如果还出现：
+
+Link state of ecm0 changed to DOWN
+
+优先换网线、换 EtherCAT 首站端口、换电脑网卡，尤其不要用 USB 网卡。
+
+查询ethercat状态  
+watch -n 0.2 "ethercat slaves"  
+查询ethercat日志  
+sudo dmesg -wT | grep -Ei "EtherCAT|Link state|TIMED OUT|UNMATCHED|SKIPPED|Synchronization"  
+
