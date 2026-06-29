@@ -6,4 +6,12 @@
       This is the hardware interface for the Zhishu robot.
     </description>
   </class>
-</library>  
+  
+  <class name="left_es_motor_hardware/LeftEsMotorHardwareInterface"
+         type="left_es_motor_hardware::LeftEsMotorHardwareInterface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      Left arm EtherCAT hardware interface for the Zhishu robot. It maps left_* joints to EtherCAT slave positions 0..6.
+    </description>
+  </class>
+</library>

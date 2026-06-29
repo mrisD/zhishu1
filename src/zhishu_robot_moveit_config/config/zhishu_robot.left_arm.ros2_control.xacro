@@ -1,0 +1,143 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:macro name="zhishu_robot_left_arm_ros2_control" params="name initial_positions_file">
+        <xacro:property name="initial_positions" value="${load_yaml(initial_positions_file)['initial_positions']}"/>
+
+        <ros2_control name="${name}" type="system">
+            <hardware>
+                <!-- By default, set up controllers for simulation. This won't work on real hardware -->
+                <!-- <plugin>mock_components/GenericSystem</plugin> -->
+                <!-- <param name="calculate_dynamics">true</param> -->
+                <plugin>left_es_motor_hardware/LeftEsMotorHardwareInterface</plugin>
+                <!-- IgH EtherCAT / GH1 SERVOPACK defaults. Per-joint params below can override these. -->
+                <param name="cycle_ns">4000000</param>
+                <param name="enable_dc">true</param>
+                <param name="assign_activate">0x0300</param>
+                <param name="sync0_shift_ns">1000000</param>
+                <param name="select_dc_reference_clock">true</param>
+                <param name="dc_reference_alias">0</param>
+                <param name="dc_reference_slave_position">0</param>
+                <param name="enable_realtime">true</param>
+                <param name="realtime_priority">80</param>
+                <param name="master_index">0</param>
+                <param name="alias">0</param>
+                <param name="vendor_id">0x00206688</param>
+                <param name="product_code">0x26483052</param>
+                <param name="configure_sdo">true</param>
+                <param name="configure_pdos">true</param>
+                <param name="mode_of_operation">8</param>
+                <param name="auto_enable">false</param>
+                <param name="auto_fault_reset">true</param>
+                <param name="counts_per_rev">131072.0</param>
+                <param name="max_velocity_counts_s">8000.0</param>
+                <param name="max_accel_counts_s2">20000.0</param>
+                <param name="target_tolerance_counts">20</param>
+                <param name="joint_sign">1.0</param>
+                <param name="position_offset_rad">0.0</param>
+            </hardware>
+
+            <!-- left_arm -->
+            <joint name="left_shoulder_pitch_joint">
+                <param name="use_ethercat">true</param>
+                <param name="motor_name">left_arm_motor_0</param>
+                <param name="slave_position">0</param>
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_shoulder_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_shoulder_roll_joint">
+                <param name="use_ethercat">true</param>
+                <param name="motor_name">left_arm_motor_1</param>
+                <param name="slave_position">1</param>
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_shoulder_roll_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_shoulder_yaw_joint">
+                <param name="use_ethercat">true</param>
+                <param name="motor_name">left_arm_motor_2</param>
+                <param name="slave_position">2</param>
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_shoulder_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_elbow_pitch_joint">
+                <param name="use_ethercat">true</param>
+                <param name="motor_name">left_arm_motor_3</param>
+                <param name="slave_position">3</param>
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_elbow_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wrist_yaw_joint">
+                <param name="use_ethercat">true</param>
+                <param name="motor_name">left_arm_motor_4</param>
+                <param name="slave_position">4</param>
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_wrist_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wrist_pitch_joint">
+                <param name="use_ethercat">true</param>
+                <param name="motor_name">left_arm_motor_5</param>
+                <param name="slave_position">5</param>
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_wrist_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wrist_roll_joint">
+                <param name="use_ethercat">true</param>
+                <param name="motor_name">left_arm_motor_6</param>
+                <param name="slave_position">6</param>
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_wrist_roll_joint']}</param>
+                </state_interface>
+            </joint>
+
+
+            <joint name="gripper_left_finger_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['gripper_left_finger_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="waist_up_down_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['waist_up_down_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="waist_pitch_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['waist_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="head_yaw_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['head_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="head_pitch_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['head_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wheel_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_wheel_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="right_wheel_joint">
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['right_wheel_joint']}</param>
+                </state_interface>
+            </joint>
+        </ros2_control>
+    </xacro:macro>
+</robot>

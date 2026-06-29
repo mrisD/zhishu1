@@ -65,6 +65,7 @@ message(STATUS "Found IgH library: ${ECRT_LIBRARY}")
 # Main ros2_control hardware plugin library
 add_library(${PROJECT_NAME} SHARED
   src/es_motor_hardware_interface.cpp
+  src/left_es_motor_hardware_interface.cpp
   src/ethercat_driver.cpp
 )
 

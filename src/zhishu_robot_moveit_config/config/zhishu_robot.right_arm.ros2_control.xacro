@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="zhishu_robot_ros2_control" params="name initial_positions_file">
+    <xacro:macro name="zhishu_robot_right_arm_ros2_control" params="name initial_positions_file">
         <xacro:property name="initial_positions" value="${load_yaml(initial_positions_file)['initial_positions']}"/>
 
         <ros2_control name="${name}" type="system">
             <hardware>
                 <!-- By default, set up controllers for simulation. This won't work on real hardware -->
-                <!-- <plugin>mock_components/GenericSystem</plugin> -->
-                <!-- <param name="calculate_dynamics">true</param> -->
-                <plugin>es_motor_hardware/EsMotorHardwareInterface</plugin>
+                <plugin>mock_components/GenericSystem</plugin>
+                <param name="calculate_dynamics">true</param>
+                <!-- <plugin>es_motor_hardware/EsMotorHardwareInterface</plugin> -->
                 <!-- IgH EtherCAT / GH1 SERVOPACK defaults. Per-joint params below can override these. -->
                 <param name="cycle_ns">4000000</param>
                 <param name="enable_dc">true</param>
@@ -103,52 +103,10 @@
                 </state_interface>
             </joint>
 
-            <!-- left_arm -->
-            <joint name="left_shoulder_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_shoulder_pitch_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_shoulder_roll_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_shoulder_roll_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_shoulder_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_shoulder_yaw_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_elbow_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_elbow_pitch_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_wrist_yaw_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_wrist_yaw_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_wrist_pitch_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_wrist_pitch_joint']}</param>
-                </state_interface>
-            </joint>
-            <joint name="left_wrist_roll_joint">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <param name="initial_value">${initial_positions['left_wrist_roll_joint']}</param>
-                </state_interface>
-            </joint>
+            
 
             
-            <joint name="gripper_left_finger_joint">
+            <!-- <joint name="gripper_left_finger_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['gripper_left_finger_joint']}</param>
@@ -183,7 +141,7 @@
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['right_wheel_joint']}</param>
                 </state_interface>
-            </joint>
+            </joint> -->
         </ros2_control>
     </xacro:macro>
 </robot>

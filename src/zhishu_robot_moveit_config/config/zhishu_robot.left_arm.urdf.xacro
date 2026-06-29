@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="zhishu_robot">
+    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+
+    <!-- Import zhishu_robot urdf file -->
+    <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot.urdf.xacro" />
+
+    <!-- Left-arm EtherCAT control. This is the same target as the default zhishu_robot.urdf.xacro. -->
+    <xacro:include filename="zhishu_robot.left_arm.ros2_control.xacro" />
+
+    <xacro:zhishu_robot_left_arm_ros2_control name="LeftArmEtherCATSystem" initial_positions_file="$(arg initial_positions_file)"/>
+
+</robot>

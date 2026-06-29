@@ -255,7 +255,7 @@
     <origin xyz="0 0 0" rpy="0 1.570796327 -1.570796327"/>
     <parent link="left_shoulder_pitch_link"/>
     <child link="left_shoulder_roll_link"/>
-    <axis xyz="0 0 1"/>
+    <axis xyz="0 0 -1"/>
     <limit lower="-0.43633" upper="1.4835" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="left_shoulder_yaw_link">
@@ -284,7 +284,7 @@
     <origin xyz="0 0.28 0" rpy="-1.570796327 -1.570565147 3.141592654"/>
     <parent link="left_shoulder_roll_link"/>
     <child link="left_shoulder_yaw_link"/>
-    <axis xyz="0 0 1"/>
+    <axis xyz="0 0 -1"/>
     <limit lower="-3.0543" upper="3.0543" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="left_elbow_pitch_link">
@@ -371,7 +371,7 @@
     <origin xyz="0 0 0" rpy="0 -1.570796327 1.570796327"/>
     <parent link="left_wrist_yaw_link"/>
     <child link="left_wrist_pitch_link"/>
-    <axis xyz="0 0 1"/>
+    <axis xyz="0 0 -1"/>
     <limit lower="-1.309" upper="1.309" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="left_wrist_roll_link">

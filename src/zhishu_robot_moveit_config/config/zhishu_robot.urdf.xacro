@@ -6,9 +6,10 @@
     <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot.urdf.xacro" />
 
     <!-- Import control_xacro -->
-    <xacro:include filename="zhishu_robot.ros2_control.xacro" />
+    <xacro:include filename="zhishu_robot.left_arm.ros2_control.xacro" />
+    <xacro:include filename="zhishu_robot.right_arm.ros2_control.xacro" />
 
 
-    <xacro:zhishu_robot_ros2_control name="RightArmEtherCATSystem" initial_positions_file="$(arg initial_positions_file)"/>
-
+    <xacro:zhishu_robot_left_arm_ros2_control name="LeftArmEtherCATSystem" initial_positions_file="$(arg initial_positions_file)"/>
+    <xacro:zhishu_robot_right_arm_ros2_control name="RightArmEtherCATSystem" initial_positions_file="$(arg initial_positions_file)"/>
 </robot>

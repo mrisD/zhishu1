@@ -116,3 +116,9 @@ watch -n 0.2 "ethercat slaves"
 查询ethercat日志  
 sudo dmesg -wT | grep -Ei "EtherCAT|Link state|TIMED OUT|UNMATCHED|SKIPPED|Synchronization"  
 
+
+
+Gazobo仿真相关
+export IGN_GAZEBO_RESOURCE_PATH=/home/zhul/online/guohua_ws/src/zhishu_robot_gazebo/models
+
+echo "alias robot='bash /home/zhul/online/guohua_ws/src/zhishu_robot_bring/scripts/zhishu_robot_gazebo.sh'" >> ~/.bashrc && source ~/.bashrc
