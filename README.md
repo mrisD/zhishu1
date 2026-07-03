@@ -43,6 +43,7 @@ cat /sys/class/net/enp0s31f6/address
 格式如下
 enp0s31f6 f8:75:a4:c6:f9:e2   
 enP1p1s0 a0:28:33:80:56:21 左1口
+enx00e04c476648 00:e0:4c:47:66:48 USB
 
 sudo vim /etc/sysconfig/ethercat  
 找到这两行，改成你的实际 MAC：  
@@ -52,7 +53,7 @@ sudo vim /etc/sysconfig/ethercat
 上面方法如果不生效使用下面的方法：  
 配置 IgH 使用 enp0s31f6  
 执行：  
-sudo sed -i 's|^MASTER0_DEVICE=.*|MASTER0_DEVICE="a0:28:33:80:56:21"|' /usr/local/etherlab/etc/sysconfig/ethercat  
+sudo sed -i 's|^MASTER0_DEVICE=.*|MASTER0_DEVICE="enp0s31f6"|' /usr/local/etherlab/etc/sysconfig/ethercat  
 sudo sed -i 's|^DEVICE_MODULES=.*|DEVICE_MODULES="generic"|' /usr/local/etherlab/etc/sysconfig/ethercat  
 
 确认配置：  
@@ -91,14 +92,14 @@ EOF
 假设实际网卡是 enP1p1s0，执行：  
 
   
-sudo nmcli dev set enP1p1s0 managed no  
-sudo ip link set enP1p1s0 up  
+sudo nmcli dev set enp0s31f6 managed no  
+sudo ip link set enp0s31f6 up  
 
 然后关掉网卡省电和 offload：  
 
-sudo ethtool --set-eee enP1p1s0 eee off  
+sudo ethtool --set-eee enp0s31f6 eee off  
 
-sudo ethtool -K enP1p1s0 tso off gso off gro off lro off
+sudo ethtool -K enp0s31f6 tso off gso off gro off lro off
 
 如果支持固定速率，设置为 100M 全双工：
 sudo ethtool -s enP1p1s0 speed 100 duplex full autoneg off
@@ -116,17 +117,48 @@ Link state of ecm0 changed to DOWN
 查询ethercat状态  
 watch -n 0.2 "ethercat slaves"  
 查询ethercat日志  
+sudo dmesg -C
 sudo dmesg -wT | grep -Ei "EtherCAT|Link state|TIMED OUT|UNMATCHED|SKIPPED|Synchronization"  
+
+更换DDS  
+sudo apt install ros-humble-rmw-cyclonedds-cpp  
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp  
+gedit ~/.bashrc  
+  在调用ros2前加上  
+  export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+保存退出重新打开终端  
+查询版本 echo $RMW_IMPLEMENTATION
+
+安装rosdep工具  
+wget http://fishros.com/install -O fishros && . fishros  
+  [3]:一键安装:rosdep(小鱼的rosdepc,又快又好用)  
+安装完毕后执行
+  rosdep update
 
 
 安装依赖
 在src同级目录下执行 
 cd ~/guohua_ws  
+ 
 rosdep install --from-paths src --ignore-src -r -y --rosdistro humble --skip-keys "gazebo_ros ros_gz ros_gz_sim gz_ros2_control gz_ros2_control_demos"  
 
 
 
-Gazobo仿真相关
+Gazobo仿真相关配置
 export IGN_GAZEBO_RESOURCE_PATH=/home/zhul/online/guohua_ws/src/zhishu_robot_gazebo/models
 
 echo "alias robot='bash /home/zhul/online/guohua_ws/src/zhishu_robot_bring/scripts/zhishu_robot_gazebo.sh'" >> ~/.bashrc && source ~/.bashrc
+
+
+
+启动程序  
+sudo /etc/init.d/ethercat start 
+sudo nmcli dev set enp0s31f6 managed no  
+sudo ip addr flush dev enp0s31f6  
+sudo ip link set enp0s31f6 up  
+
+性能测试  
+stress-ng --cpu 0 --io 4 --vm 2 --vm-bytes 512M --timeout 120s  
+sudo cyclictest -S -p95 -m -i1000 -l100000 -q  
+时实性检测  
+cat /sys/kernel/realtime 1

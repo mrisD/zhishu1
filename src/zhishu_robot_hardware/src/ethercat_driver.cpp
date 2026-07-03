@@ -723,7 +723,7 @@ private:
     }
 
     ecrt_slave_config_sdo8(motor.sc, 0x6060, 0x00, static_cast<uint8_t>(motor.config.mode_of_operation));
-    ecrt_slave_config_sdo8(motor.sc, 0x60C2, 0x01, 0x04);
+    ecrt_slave_config_sdo8(motor.sc, 0x60C2, 0x01, 0x01);
     ecrt_slave_config_sdo8(motor.sc, 0x60C2, 0x02, 0xFD);  // -3 => 10^-3 s = 1 ms
     return true;
   }

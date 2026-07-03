@@ -18,7 +18,7 @@
                 <param name="dc_reference_alias">0</param>
                 <param name="dc_reference_slave_position">0</param>
                 <param name="enable_realtime">true</param>
-                <param name="realtime_priority">80</param>
+                <param name="realtime_priority">85</param>
                 <param name="master_index">0</param>
                 <param name="alias">0</param>
                 <param name="vendor_id">0x00206688</param>
