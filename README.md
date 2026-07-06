@@ -149,9 +149,11 @@ export IGN_GAZEBO_RESOURCE_PATH=/home/zhul/online/guohua_ws/src/zhishu_robot_gaz
 
 echo "alias robot='bash /home/zhul/online/guohua_ws/src/zhishu_robot_bring/scripts/zhishu_robot_gazebo.sh'" >> ~/.bashrc && source ~/.bashrc
 
+配置EtherCAT-OP--------------------------------------------
+TS     90 130   0 EtherCAT-OP  改成
+FF     90 130   0 EtherCAT-OP
 
-
-启动程序  
+启动程序--------------------------------------------------------    
 sudo /etc/init.d/ethercat start 
 sudo nmcli dev set enp0s31f6 managed no  
 sudo ip addr flush dev enp0s31f6  
@@ -161,4 +163,4 @@ sudo ip link set enp0s31f6 up
 stress-ng --cpu 0 --io 4 --vm 2 --vm-bytes 512M --timeout 120s  
 sudo cyclictest -S -p95 -m -i1000 -l100000 -q  
 时实性检测  
-cat /sys/kernel/realtime 1
+cat /sys/kernel/realtime 
