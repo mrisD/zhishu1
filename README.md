@@ -154,10 +154,18 @@ TS     90 130   0 EtherCAT-OP  改成
 FF     90 130   0 EtherCAT-OP
 
 启动程序--------------------------------------------------------    
-sudo /etc/init.d/ethercat start 
+
 sudo nmcli dev set enp0s31f6 managed no  
 sudo ip addr flush dev enp0s31f6  
 sudo ip link set enp0s31f6 up  
+
+
+关闭网卡节能和部分 offload 笔记本
+sudo ethtool --set-eee enp0s31f6 eee off 2>/dev/null || true
+sudo ethtool -s enp0s31f6 wol d 2>/dev/null || true
+sudo ethtool -K enp0s31f6 tso off gso off gro off lro off 2>/dev/null || true
+echo on | sudo tee /sys/class/net/enp0s31f6/device/power/control
+sudo /etc/init.d/ethercat start 
 
 性能测试  
 stress-ng --cpu 0 --io 4 --vm 2 --vm-bytes 512M --timeout 120s  

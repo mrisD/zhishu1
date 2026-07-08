@@ -53,12 +53,12 @@
     </group_state>
     <group_state name="left_arm_pose1" group="left_arm">
         <joint name="left_elbow_pitch_joint" value="0.7"/>
-        <joint name="left_shoulder_pitch_joint" value="0"/>
-        <joint name="left_shoulder_roll_joint" value="0"/>
-        <joint name="left_shoulder_yaw_joint" value="0"/>
-        <joint name="left_wrist_pitch_joint" value="0"/>
-        <joint name="left_wrist_roll_joint" value="0"/>
-        <joint name="left_wrist_yaw_joint" value="0"/>
+        <joint name="left_shoulder_pitch_joint" value="0.18"/>
+        <joint name="left_shoulder_roll_joint" value="-0.18"/>
+        <joint name="left_shoulder_yaw_joint" value="0.18"/>
+        <joint name="left_wrist_pitch_joint" value="0.18"/>
+        <joint name="left_wrist_roll_joint" value="0.18"/>
+        <joint name="left_wrist_yaw_joint" value="0.18"/>
     </group_state>
     <group_state name="right_arm_home" group="right_arm">
         <joint name="right_elbow_pitch_joint" value="0"/>
