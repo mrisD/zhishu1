@@ -147,7 +147,7 @@ rosdep install --from-paths src --ignore-src -r -y --rosdistro humble --skip-key
 Gazobo仿真相关配置
 export IGN_GAZEBO_RESOURCE_PATH=/home/zhul/online/guohua_ws/src/zhishu_robot_gazebo/models
 
-echo "alias robot='bash /home/zhul/online/guohua_ws/src/zhishu_robot_bring/scripts/zhishu_robot_gazebo.sh'" >> ~/.bashrc && source ~/.bashrc
+echo "alias robot='bash /home/zhul/online/guohua_ws/src/zhishu_robot_bringup/scripts/zhishu_robot_gazebo.sh'" >> ~/.bashrc && source ~/.bashrc
 
 配置EtherCAT-OP--------------------------------------------
 TS     90 130   0 EtherCAT-OP  改成
