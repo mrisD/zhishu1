@@ -101,13 +101,25 @@
                 </state_interface>
             </joint>
 
+            <joint name="left_gripper_left_finger_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                  <param name="initial_value">${initial_positions['left_gripper_left_finger_joint']}</param>
+                </state_interface>
+            </joint>
 
+
+            <!-- Keep both non-EtherCAT gripper command interfaces in one mock
+                 hardware component. GenericSystem on ROS 2 Humble receives the
+                 complete mode-switch request and rejects foreign gripper joints
+                 when the two grippers are split across different components. -->
             <joint name="gripper_left_finger_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['gripper_left_finger_joint']}</param>
                 </state_interface>
             </joint>
+            
             <joint name="waist_up_down_joint">
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['waist_up_down_joint']}</param>

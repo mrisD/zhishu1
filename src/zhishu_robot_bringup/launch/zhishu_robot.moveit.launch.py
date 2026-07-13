@@ -94,7 +94,12 @@ def generate_launch_description():
         output="screen",
     )
 
-
+    left_gripper_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["left_gripper_controller", "--controller-manager", "/controller_manager"],
+        output="screen",
+    )
 
     right_gripper_controller_spawner = Node(
         package="controller_manager",
@@ -149,13 +154,14 @@ def generate_launch_description():
                           on_exit=[dual_arm_controller_spawner])
         ),
         
-        # RegisterEventHandler(
-        #     OnProcessExit(target_action=left_arm_controller_spawner,
-        #                   on_exit=[right_arm_controller_spawner])
-        # ),
         
         RegisterEventHandler(
             OnProcessExit(target_action=dual_arm_controller_spawner,
+                          on_exit=[left_gripper_controller_spawner])
+        ),
+               
+        RegisterEventHandler(
+            OnProcessExit(target_action=left_gripper_controller_spawner,
                           on_exit=[right_gripper_controller_spawner])
         ),
 

@@ -404,6 +404,7 @@
     <limit lower="-1.309" upper="1.309" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="L_hand_link">
+    <!--
     <inertial>
       <origin xyz="0.0073255 -0.010181 -0.087072" rpy="0 0 0"/>
       <mass value="0.079329"/>
@@ -424,6 +425,7 @@
         <box size="0.080 0.070 0.160"/>
       </geometry>
     </collision>
+    -->
   </link>
   <joint name="L_hand_joint" type="fixed">
     <origin xyz="0.06 0 0" rpy="0 1.570796312 -3.141592654"/>

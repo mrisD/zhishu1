@@ -10,6 +10,8 @@ controller_manager:
     right_arm_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    left_gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
 
     right_gripper_controller:
       type: joint_trajectory_controller/JointTrajectoryController
@@ -79,6 +81,15 @@ right_gripper_controller:
   ros__parameters:
     joints:
       - gripper_left_finger_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+
+left_gripper_controller:
+  ros__parameters:
+    joints:
+      - left_gripper_left_finger_joint
     command_interfaces:
       - position
     state_interfaces:

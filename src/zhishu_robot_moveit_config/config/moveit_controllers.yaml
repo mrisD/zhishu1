@@ -7,6 +7,7 @@ moveit_simple_controller_manager:
     # - left_arm_controller
     # - right_arm_controller
     - dual_arm_controller
+    - left_gripper_controller
     - right_gripper_controller
 
   left_arm_controller:
@@ -52,6 +53,13 @@ moveit_simple_controller_manager:
       - right_wrist_yaw_joint
       - right_wrist_pitch_joint
       - right_wrist_roll_joint
+
+  left_gripper_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints:
+      - left_gripper_left_finger_joint
   right_gripper_controller:
     type: FollowJointTrajectory
     action_ns: follow_joint_trajectory

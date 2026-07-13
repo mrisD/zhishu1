@@ -2,6 +2,7 @@
 
 initial_positions:
   gripper_left_finger_joint: 0
+  left_gripper_left_finger_joint: 0
   left_elbow_pitch_joint: 0
   left_shoulder_pitch_joint: 0
   left_shoulder_roll_joint: 0

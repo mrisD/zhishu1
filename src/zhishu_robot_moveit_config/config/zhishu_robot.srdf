@@ -34,7 +34,17 @@
     <group name="both_arms">
         <group name="left_arm"/>
         <group name="right_arm"/>
-    </group>    
+    </group>
+    <group name="left_gripper">
+        <joint name="left_gripper_joint"/>
+        <joint name="left_gripper_left_finger_joint"/>
+        <joint name="left_gripper_right_finger_joint"/>
+        <joint name="left_gripper_tcp_joint"/>
+    </group>
+    <group name="left_arm_with_gripper">
+        <group name="left_arm"/>
+        <group name="left_gripper"/>
+    </group>
     <group name="right_gripper">
         <joint name="right_gripper_joint"/>
         <joint name="gripper_left_finger_joint"/>
@@ -114,6 +124,12 @@
         <joint name="right_wrist_pitch_joint" value="0"/>
         <joint name="right_wrist_roll_joint" value="0"/>
     </group_state>
+    <group_state name="left_gripper_opened" group="left_gripper">
+        <joint name="left_gripper_left_finger_joint" value="0"/>
+    </group_state>
+    <group_state name="left_gripper_closed" group="left_gripper">
+        <joint name="left_gripper_left_finger_joint" value="0.06"/>
+    </group_state>    
     <group_state name="right_gripper_opened" group="right_gripper">
         <joint name="gripper_left_finger_joint" value="0"/>
     </group_state>
@@ -123,6 +139,10 @@
     <!--END EFFECTOR: Purpose: Represent information about an end effector.-->
     <!-- <end_effector name="right_arm_eef" parent_link="R_hand_link" group="right_arm"/> -->
     <!-- <end_effector name="left_arm_hand" parent_link="L_hand_link" group="left_arm"/> -->
+    <end_effector name="left_arm_eef"
+              parent_link="L_hand_link"
+              group="left_gripper"
+              parent_group="left_arm"/>
     <end_effector name="right_arm_eef"
               parent_link="R_hand_link"
               group="right_gripper"
@@ -381,4 +401,16 @@
     <disable_collisions link1="right_wrist_pitch_link" link2="right_wrist_yaw_link" reason="Adjacent"/>
     <disable_collisions link1="right_wrist_roll_link" link2="right_wrist_yaw_link" reason="Always"/>
     <disable_collisions link1="waist_pitch_link" link2="waist_up_down_link" reason="Adjacent"/>
+
+    <disable_collisions link1="L_hand_link" link2="left_gripper_base_link" reason="Adjacent"/>
+    <disable_collisions link1="L_hand_link" link2="left_gripper_left_finger_link" reason="Never"/>
+    <disable_collisions link1="L_hand_link" link2="left_gripper_right_finger_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_left_finger_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_right_finger_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_wrist_roll_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_wrist_pitch_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_wrist_yaw_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_left_finger_link" link2="left_gripper_right_finger_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_left_finger_link" link2="left_wrist_roll_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_right_finger_link" link2="left_wrist_roll_link" reason="Never"/>
 </robot>
