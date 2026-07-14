@@ -47,19 +47,23 @@ enx00e04c476648 00:e0:4c:47:66:48 USB
 
 sudo vim /etc/sysconfig/ethercat  
 找到这两行，改成你的实际 MAC：  
-  MASTER0_DEVICE="enp0s31f6"  
+  MASTER0_DEVICE="enp0s31f6"（左手臂网卡）  
+  MASTER1_DEVICE="enp0s31f5"（右手臂网卡）     
   DEVICE_MODULES="generic"  
 
 上面方法如果不生效使用下面的方法：  
 配置 IgH 使用 enp0s31f6  
 执行：  
 sudo sed -i 's|^MASTER0_DEVICE=.*|MASTER0_DEVICE="enp0s31f6"|' /usr/local/etherlab/etc/sysconfig/ethercat  
+sudo sed -i 's|^MASTER1_DEVICE=.*|MASTER1_DEVICE="enp0s31f5"|' /usr/local/etherlab/etc/sysconfig/ethercat  
 sudo sed -i 's|^DEVICE_MODULES=.*|DEVICE_MODULES="generic"|' /usr/local/etherlab/etc/sysconfig/ethercat  
 
-确认配置：  
-grep -E "MASTER0_DEVICE|DEVICE_MODULES" /usr/local/etherlab/etc/sysconfig/ethercat  
+确认配置：   
+grep -nE '^[[:space:]]*(MASTER[0-9]+_(DEVICE|BACKUP)|DEVICE_MODULES)=' \
+  /usr/local/etherlab/etc/sysconfig/ethercat
 应该看到：  
 MASTER0_DEVICE="enP1p1s0"  
+MASTER1_DEVICE="enP1p1s1"  
 DEVICE_MODULES="generic"  
 
 

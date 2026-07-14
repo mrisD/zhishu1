@@ -252,7 +252,7 @@ bool EsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
       motor_config.name = get_local_or_global_param(joint.parameters, info_.hardware_parameters, "motor_name", joint.name);
       motor_config.joint_name = joint.name;
       motor_config.address.master_index = static_cast<unsigned int>(parse_u64(
-        get_local_or_global_param(joint.parameters, info_.hardware_parameters, "master_index", "0"), joint.name + ".master_index"));
+      get_local_or_global_param(joint.parameters, info_.hardware_parameters, "master_index", "1"), joint.name + ".master_index"));
       motor_config.address.alias = static_cast<uint16_t>(parse_u64(
         get_local_or_global_param(joint.parameters, info_.hardware_parameters, "alias", "0"), joint.name + ".alias"));
       motor_config.address.slave_position = slave_position;
