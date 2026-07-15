@@ -69,8 +69,6 @@ ament_target_dependencies(mtc_task_node
   tf2_eigen
   visualization_msgs
 )
-
-
 add_executable(dual_arm_crate_carry src/dual_arm_crate_carry.cpp)
 target_include_directories(dual_arm_crate_carry PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -95,7 +93,7 @@ ament_target_dependencies(dual_arm_crate_carry
 )
 
 install(TARGETS alternative_path_costs mtc_task_node dual_arm_crate_carry
-DESTINATION lib/${PROJECT_NAME}
+  DESTINATION lib/${PROJECT_NAME}
 )
 install (
   DIRECTORY launch

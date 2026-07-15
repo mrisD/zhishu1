@@ -52,6 +52,8 @@ public:
     declare_if_missing("move_x", 0.0);
     declare_if_missing("move_y", 0.0);
     declare_if_missing("move_z", 0.30);
+    // Vertical distance from each final grasp point to its overhead
+    // pregrasp/retreat point.
     declare_if_missing("pregrasp_clearance", 0.14);
     // Offset of the TCP centre from the side-wall centre. Zero puts the wall
     // exactly between the two fingers.
@@ -327,14 +329,22 @@ private:
     pipeline->setMaxAccelerationScalingFactor(get_parameter("acceleration_scaling").as_double());
     auto joint = std::make_shared<mtc::solvers::JointInterpolationPlanner>();
 
-    auto open_left = std::make_unique<mtc::stages::MoveTo>("open left gripper", joint);
-    open_left->setGroup("left_gripper");
-    open_left->setGoal("left_gripper_opened");
-    task.add(std::move(open_left));
-    auto open_right = std::make_unique<mtc::stages::MoveTo>("open right gripper", joint);
-    open_right->setGroup("right_gripper");
-    open_right->setGoal("right_gripper_opened");
-    task.add(std::move(open_right));
+    // auto open_left = std::make_unique<mtc::stages::MoveTo>("open left gripper", joint);
+    // open_left->setGroup("left_gripper");
+    // open_left->setGoal("left_gripper_opened");
+    // task.add(std::move(open_left));
+    // auto open_right = std::make_unique<mtc::stages::MoveTo>("open right gripper", joint);
+    // open_right->setGroup("right_gripper");
+    // open_right->setGoal("right_gripper_opened");
+    // task.add(std::move(open_right));
+
+    auto open_both =
+      std::make_unique<mtc::stages::MoveTo>("open both grippers simultaneously", joint);
+    open_both->setGroup("both_grippers");
+    open_both->setGoal(std::map<std::string, double>{
+      {"left_gripper_left_finger_joint", 0.0},
+      {"gripper_left_finger_joint", 0.0}});
+    task.add(std::move(open_both));
 
     const std::vector<double> p{
       get_parameter("crate_x").as_double(),
@@ -356,7 +366,7 @@ private:
       get_parameter("right_tcp_roll").as_double(),
       get_parameter("right_tcp_pitch").as_double(),
       get_parameter("right_tcp_yaw").as_double()};
-    const double pre = get_parameter("pregrasp_clearance").as_double();
+    const double pregrasp_height = get_parameter("pregrasp_clearance").as_double();
     const double grasp_center_offset = get_parameter("grasp_clearance").as_double();
     const double wall_thickness = get_parameter("wall_thickness").as_double();
     const double rim_grasp_depth = get_parameter("rim_grasp_depth").as_double();
@@ -367,6 +377,9 @@ private:
     }
     if (wall_thickness <= 0.0 || wall_thickness >= 0.12) {
       throw std::runtime_error("wall_thickness must be greater than 0 and less than 0.12 m");
+    }
+    if (pregrasp_height <= 0.0 || pregrasp_height > 0.50) {
+      throw std::runtime_error("pregrasp_clearance must be greater than 0 and at most 0.50 m");
     }
     if (std::abs(grasp_center_offset) > 0.5 * wall_thickness) {
       throw std::runtime_error(
@@ -392,18 +405,18 @@ private:
       seed.setToDefaultValues(both_arms, "both_arms_pose1");
     }
     seed.update();
-    const double half_y = 0.5 * s[1];
     RCLCPP_INFO(
       get_logger(),
       "Crate center=(%.3f, %.3f, %.3f), size=(%.3f, %.3f, %.3f), wall=%.3f, "
-      "pregrasp_y=+/- %.3f, rim grasp=(y +/- %.3f, z %.3f), "
+      "overhead pregrasp=(y +/- %.3f, z %.3f), rim grasp=(y +/- %.3f, z %.3f), "
       "gripper q=%.3f, move=(%.3f, %.3f, %.3f)",
       p[0], p[1], p[2], s[0], s[1], s[2], wall_thickness,
-      half_y + pre, grasp_y, grasp_z, gripper_contact_position,
+      grasp_y, grasp_z + pregrasp_height, grasp_y, grasp_z, gripper_contact_position,
       offset[0], offset[1], offset[2]);
     auto pre_goal = solveDualArmGoal(
-      makePose(p[0], p[1] + half_y + pre, grasp_z, left_rpy),
-      makePose(p[0], p[1] - half_y - pre, grasp_z, right_rpy), seed, task.getRobotModel());
+      makePose(p[0], p[1] + grasp_y, grasp_z + pregrasp_height, left_rpy),
+      makePose(p[0], p[1] - grasp_y, grasp_z + pregrasp_height, right_rpy),
+      seed, task.getRobotModel());      
     RCLCPP_INFO(get_logger(), "Pregrasp IK solved for both arms");
     for (const auto& joint : pre_goal) {
       seed.setVariablePosition(joint.first, joint.second);
@@ -445,12 +458,14 @@ private:
     }
     RCLCPP_INFO(
       get_logger(), "Synchronized carry IK solved for %zu dual-arm waypoints", carry_steps);
-
+    // After release, lift both TCPs vertically to the corresponding overhead
+    // points before restoring normal crate collision checking.
     auto retreat_goal = solveDualArmGoal(
-      makePose(p[0] + offset[0], p[1] + offset[1] + half_y + pre,
-               grasp_z + offset[2], left_rpy),
-      makePose(p[0] + offset[0], p[1] + offset[1] - half_y - pre,
-               grasp_z + offset[2], right_rpy), seed, task.getRobotModel());
+      makePose(p[0] + offset[0], p[1] + offset[1] + grasp_y,
+               grasp_z + offset[2] + pregrasp_height, left_rpy),
+      makePose(p[0] + offset[0], p[1] + offset[1] - grasp_y,
+               grasp_z + offset[2] + pregrasp_height, right_rpy),
+      seed, task.getRobotModel());
     RCLCPP_INFO(get_logger(), "Post-place retreat IK solved for both arms");
 
     std::vector<std::string> touch_links;
@@ -470,30 +485,30 @@ private:
     allow->allowCollisions("plastic_hollow_crate", touch_links, true);
     task.add(std::move(allow));
 
-    // The first large move is more stable with deterministic joint
-    // interpolation. OMPL sometimes finds a valid final pregrasp state but
-    // swings the wrist through the crate on the way there.
-    auto to_pre = std::make_unique<mtc::stages::MoveTo>("both arms to pregrasp", joint);
+    // The overhead pregrasp target is close to the crate. A direct joint-space
+    // interpolation from the current state can sweep a wrist or forearm
+    // through the crate, so let OMPL find a collision-free route to it.
+    auto to_pre = std::make_unique<mtc::stages::MoveTo>("both arms to pregrasp", pipeline);
+    to_pre->setTimeout(5.0);
     to_pre->setGroup("both_arms");
     to_pre->setGoal(pre_goal);
     task.add(std::move(to_pre));
 
     auto to_grasp =
       std::make_unique<mtc::stages::MoveTo>("both arms grasp upper side rims", pipeline);
+    to_grasp->setTimeout(5.0);
     to_grasp->setGroup("both_arms");
     to_grasp->setGoal(grasp_goal);
     task.add(std::move(to_grasp));
 
-    auto close_left = std::make_unique<mtc::stages::MoveTo>("close left gripper", joint);
-    close_left->setGroup("left_gripper");
-    close_left->setGoal(std::map<std::string, double>{
-      {"left_gripper_left_finger_joint", gripper_contact_position}});
-    task.add(std::move(close_left));
-    auto close_right = std::make_unique<mtc::stages::MoveTo>("close right gripper", joint);
-    close_right->setGroup("right_gripper");
-    close_right->setGoal(std::map<std::string, double>{
+
+    auto close_both =
+      std::make_unique<mtc::stages::MoveTo>("close both grippers simultaneously", joint);
+    close_both->setGroup("both_grippers");
+    close_both->setGoal(std::map<std::string, double>{
+      {"left_gripper_left_finger_joint", gripper_contact_position},
       {"gripper_left_finger_joint", gripper_contact_position}});
-    task.add(std::move(close_right));
+    task.add(std::move(close_both));
 
     // One rigid object can only have one parent link. Attach it to the left TCP;
     // the synchronized waypoints below keep the right TCP on the other wall.
@@ -510,14 +525,13 @@ private:
       task.add(std::move(carry));
     }
 
-    auto release_left = std::make_unique<mtc::stages::MoveTo>("release left gripper", joint);
-    release_left->setGroup("left_gripper");
-    release_left->setGoal("left_gripper_opened");
-    task.add(std::move(release_left));
-    auto release_right = std::make_unique<mtc::stages::MoveTo>("release right gripper", joint);
-    release_right->setGroup("right_gripper");
-    release_right->setGoal("right_gripper_opened");
-    task.add(std::move(release_right));
+    auto release_both =
+      std::make_unique<mtc::stages::MoveTo>("release both grippers simultaneously", joint);
+    release_both->setGroup("both_grippers");
+    release_both->setGoal(std::map<std::string, double>{
+      {"left_gripper_left_finger_joint", 0.0},
+      {"gripper_left_finger_joint", 0.0}});
+    task.add(std::move(release_both));
 
     auto detach = std::make_unique<mtc::stages::ModifyPlanningScene>("detach crate at destination");
     detach->detachObject("plastic_hollow_crate", "left_gripper_tcp");
@@ -526,6 +540,7 @@ private:
     // Keep contact collision allowed while both grippers move away from the
     // just-released side walls. Restore normal collision checking afterwards.
     auto retreat = std::make_unique<mtc::stages::MoveTo>("retreat both arms from placed crate", pipeline);
+    retreat->setTimeout(5.0);
     retreat->setGroup("both_arms");
     retreat->setGoal(retreat_goal);
     task.add(std::move(retreat));
@@ -535,7 +550,6 @@ private:
     task.add(std::move(forbid));
     return task;
   }
-
   mtc::Task task_;
 };
 

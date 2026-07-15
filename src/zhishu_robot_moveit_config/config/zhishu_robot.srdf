@@ -51,6 +51,10 @@
         <joint name="gripper_right_finger_joint"/>
         <joint name="right_gripper_tcp_joint"/>
     </group>
+    <group name="both_grippers">
+        <group name="left_gripper"/>
+        <group name="right_gripper"/>
+    </group>
     <group name="right_arm_with_gripper">
         <group name="right_arm"/>
         <group name="right_gripper"/>
