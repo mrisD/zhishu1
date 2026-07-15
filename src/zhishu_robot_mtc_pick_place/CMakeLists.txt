@@ -70,8 +70,32 @@ ament_target_dependencies(mtc_task_node
   visualization_msgs
 )
 
-install(TARGETS alternative_path_costs mtc_task_node
-  DESTINATION lib/${PROJECT_NAME}
+
+add_executable(dual_arm_crate_carry src/dual_arm_crate_carry.cpp)
+target_include_directories(dual_arm_crate_carry PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(dual_arm_crate_carry
+  rclcpp
+  moveit_task_constructor_core
+  moveit_task_constructor_msgs
+  moveit_ros_planning_interface
+  moveit_ros_planning
+  moveit_core
+  moveit_msgs
+  geometry_msgs
+  shape_msgs
+  std_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  tf2_eigen
+  visualization_msgs
+)
+
+install(TARGETS alternative_path_costs mtc_task_node dual_arm_crate_carry
+DESTINATION lib/${PROJECT_NAME}
 )
 install (
   DIRECTORY launch
