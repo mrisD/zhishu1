@@ -13,7 +13,7 @@
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <Eigen/Geometry>
-
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <map>
@@ -251,23 +251,60 @@ private:
     std::size_t collision_rejected_count = 0;
     const bool strict_collision_filter =
       get_parameter("strict_ik_collision_filter").as_bool();
+    struct MirrorJoint
+    {
+      const char* left_name;
+      const char* right_name;
+      double sign;
+    };
+    // Mirror relationship verified from the left/right URDF kinematic chains.
+    const MirrorJoint mirror_joints[] = {
+      {"left_shoulder_pitch_joint", "right_shoulder_pitch_joint", -1.0},
+      {"left_shoulder_roll_joint", "right_shoulder_roll_joint", -1.0},
+      {"left_shoulder_yaw_joint", "right_shoulder_yaw_joint", -1.0},
+      {"left_elbow_pitch_joint", "right_elbow_pitch_joint", 1.0},
+      {"left_wrist_yaw_joint", "right_wrist_yaw_joint", -1.0},
+      {"left_wrist_pitch_joint", "right_wrist_pitch_joint", 1.0},
+      {"left_wrist_roll_joint", "right_wrist_roll_joint", -1.0}};
+    constexpr double max_mirror_error = 0.10;
+    std::size_t symmetry_rejected_count = 0;    
     constexpr std::size_t max_ik_attempts = 80;
     for (std::size_t attempt = 0; attempt < max_ik_attempts; ++attempt) {
       moveit::core::RobotState candidate(seed);
       if (attempt > 0) {
+        // Randomize only one arm. The other arm is seeded from its exact
+        // mirror so both IK solvers stay on corresponding branches.
         candidate.setToRandomPositions(left);
-        candidate.setToRandomPositions(right);
       }
       candidate.update();
 
       if (!candidate.setFromIK(left, left_hand_pose, "L_hand_link", 0.15)) {
         continue;
       }
+      for (const auto& joint : mirror_joints) {
+        candidate.setVariablePosition(
+          joint.right_name,
+          joint.sign * candidate.getVariablePosition(joint.left_name));
+      }
+      candidate.update();
       if (!candidate.setFromIK(right, right_hand_pose, "R_hand_link", 0.15)) {
         continue;
       }
       candidate.update();
       ++ik_solved_count;
+      double mirror_error = 0.0;
+      for (const auto& joint : mirror_joints) {
+        const double expected =
+          joint.sign * candidate.getVariablePosition(joint.left_name);
+        mirror_error = std::max(
+          mirror_error,
+          std::abs(candidate.getVariablePosition(joint.right_name) - expected));
+      }
+      if (mirror_error > max_mirror_error) {
+        ++symmetry_rejected_count;
+        continue;
+      }
+
       if (!candidate.satisfiesBounds(both)) {
         continue;
       }
@@ -284,8 +321,11 @@ private:
       state = candidate;
       found_valid_state = true;
       RCLCPP_INFO(
-        get_logger(), "Found collision-free dual-arm IK branch on attempt %zu", attempt + 1);
-      break;
+        get_logger(),
+        "Found mirrored collision-free dual-arm IK branch on attempt %zu "
+        "(max joint mirror error=%.4f rad)",
+        attempt + 1, mirror_error);
+        break;
     }
 
     if (!found_valid_state && found_bounded_state && !strict_collision_filter) {
@@ -294,16 +334,19 @@ private:
       RCLCPP_WARN(
         get_logger(),
         "All bounded IK branches were rejected by the pre-filter "
-        "(dual IK solved=%zu, bounded=%zu, collision rejected=%zu). "
+        "(dual IK solved=%zu, symmetry rejected=%zu, bounded=%zu, "
+        "collision rejected=%zu). "
         "Using the first bounded IK branch so MTC can publish the task tree; "
         "set strict_ik_collision_filter:=true to restore hard rejection.",
-        ik_solved_count, bounded_count, collision_rejected_count);
+        ik_solved_count, symmetry_rejected_count, bounded_count,
+        collision_rejected_count);
     }
 
     if (!found_valid_state) {
       throw std::runtime_error(
         "No collision-free dual-arm IK branch found after 80 attempts (dual IK solved=" +
-        std::to_string(ik_solved_count) + ", bounded=" +
+        std::to_string(ik_solved_count) + ", symmetry rejected=" +
+        std::to_string(symmetry_rejected_count) + ", bounded=" +
         std::to_string(bounded_count) + ", collision rejected=" +
         std::to_string(collision_rejected_count) + ")");
     }
@@ -468,22 +511,19 @@ private:
       seed, task.getRobotModel());
     RCLCPP_INFO(get_logger(), "Post-place retreat IK solved for both arms");
 
-    std::vector<std::string> touch_links;
-    const auto* left_gripper = task.getRobotModel()->getJointModelGroup("left_gripper");
-    const auto* right_gripper = task.getRobotModel()->getJointModelGroup("right_gripper");
-    if (!left_gripper || !right_gripper) {
-      throw std::runtime_error("SRDF must contain left_gripper and right_gripper groups");
+    // Only the four finger links may touch the crate during grasping. Never
+    // disable collision checking for the gripper bases or TCP links, otherwise
+    // OMPL is allowed to route the complete gripper through a crate wall.
+    const std::vector<std::string> touch_links{
+      "left_gripper_left_finger_link",
+      "left_gripper_right_finger_link",
+      "gripper_left_finger_link",
+      "gripper_right_finger_link"};
+    for (const auto& link_name : touch_links) {
+      if (!task.getRobotModel()->getLinkModel(link_name)) {
+        throw std::runtime_error("Missing gripper touch link in robot model: " + link_name);
+      }
     }
-    touch_links.insert(touch_links.end(), left_gripper->getLinkModelNames().begin(), left_gripper->getLinkModelNames().end());
-    touch_links.insert(touch_links.end(), right_gripper->getLinkModelNames().begin(), right_gripper->getLinkModelNames().end());
-
-    // Permit the gripper links to be in contact with the crate before the
-    // approach move. With a rim/side grasp the fingertip collision boxes may
-    // touch the wall already at the pregrasp waypoint; if the permission is
-    // added after the approach, OMPL rejects the goal as GOAL_STATE_INVALID.
-    auto allow = std::make_unique<mtc::stages::ModifyPlanningScene>("allow gripper contact with crate");
-    allow->allowCollisions("plastic_hollow_crate", touch_links, true);
-    task.add(std::move(allow));
 
     // The overhead pregrasp target is close to the crate. A direct joint-space
     // interpolation from the current state can sweep a wrist or forearm
@@ -493,6 +533,14 @@ private:
     to_pre->setGroup("both_arms");
     to_pre->setGoal(pre_goal);
     task.add(std::move(to_pre));
+
+    // The complete route to the overhead pregrasp is collision checked. Only
+    // after reaching that clear pose may the fingers contact the side rims.
+    auto allow =
+      std::make_unique<mtc::stages::ModifyPlanningScene>("allow finger contact with crate");
+    allow->allowCollisions("plastic_hollow_crate", touch_links, true);
+    task.add(std::move(allow));
+
 
     auto to_grasp =
       std::make_unique<mtc::stages::MoveTo>("both arms grasp upper side rims", pipeline);
