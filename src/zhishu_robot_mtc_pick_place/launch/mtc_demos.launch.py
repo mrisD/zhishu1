@@ -90,6 +90,13 @@ def generate_launch_description():
         output="screen",
     )
 
+    dual_arm_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["dual_arm_controller", "--controller-manager", "/controller_manager"],
+        output="screen",
+    )
+
     left_gripper_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -148,7 +155,7 @@ def generate_launch_description():
             {"gripper_open_pose": "right_gripper_opened"},
             {"gripper_close_pose": "right_gripper_closed"},
             {"arm_home_pose": "right_arm_home"},
-            {"controller_names": ["right_arm_controller", "right_gripper_controller"]},
+            {"controller_names": ["dual_arm_controller", "right_gripper_controller"]},
 
             # Scene/object parameters. Tune these according to the real table/object pose.
             {"world_frame": "base_link"},
@@ -157,8 +164,11 @@ def generate_launch_description():
             {"object_type": "cylinder"},
             {"object_dimensions": [0.35, 0.0125]},
             # {"object_pose": [0.35, 0.35, 0.85, 0.0, 0.0, 0.0]},
-            {"object_pose": [0.36, -0.45, 0.76, 0.0, 0.0, 0.0]},
-            {"place_pose": [0.3, -0.65, 0.76, 0.0, 0.0, 0.0]},
+            # {"object_pose": [0.63, -0.06, 1.28, 0.0, 0.0, 0.0]},
+            # {"place_pose": [0.63, -0.2, 1.10, 0.0, 0.0, 0.0]},
+            {"object_pose": [0.634, -0.064, 1.28, 1.5708, 0.0, 0.0]},
+            # Z的数值加上了瓶子高度的一半，所以需要剪掉
+            {"place_pose": [0.634, -0.2, 1.1, 1.5708, 0.0, 0.0]},
 
             # # TCP offset from gripper_base_link to the grasp point between fingers.
             {"grasp_frame_transform": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, #TCP
@@ -194,22 +204,22 @@ def generate_launch_description():
         RegisterEventHandler(
             OnProcessExit(
                 target_action=joint_state_broadcaster_spawner,
-                on_exit=[left_arm_controller_spawner],
+                on_exit=[dual_arm_controller_spawner],
             )
         ),
 
-        RegisterEventHandler(
-            OnProcessExit(
-                target_action=left_arm_controller_spawner,
-                on_exit=[right_arm_controller_spawner],
-            )
-        ),
+        # RegisterEventHandler(
+        #     OnProcessExit(
+        #         target_action=left_arm_controller_spawner,
+        #         on_exit=[right_arm_controller_spawner],
+        #     )
+        # ),
 
 
 
         RegisterEventHandler(
             OnProcessExit(
-                target_action=right_arm_controller_spawner,
+                target_action=dual_arm_controller_spawner,
                 on_exit=[left_gripper_controller_spawner],
             )
         ),
