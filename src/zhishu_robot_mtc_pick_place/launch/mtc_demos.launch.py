@@ -171,8 +171,7 @@ def generate_launch_description():
             {"place_pose": [0.634, -0.2, 1.1, 1.5708, 0.0, 0.0]},
 
             # # TCP offset from gripper_base_link to the grasp point between fingers.
-            {"grasp_frame_transform": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, #TCP
-            # {"grasp_frame_transform": [0.0, 0.0, 0.06, 1.5708, 0.7854, 3.14]}, #TCP
+            {"grasp_frame_transform": [0.0, 0.0, 0.0, 0.0, 0.0, 1.5708]}, #TCP            # {"grasp_frame_transform": [0.0, 0.0, 0.06, 1.5708, 0.7854, 3.14]}, #TCP
 
             # Conservative first test.
             {"execute": False},
