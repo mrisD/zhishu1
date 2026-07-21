@@ -107,7 +107,7 @@ def generate_launch_description():
     move_group = Node(
         package="moveit_ros_move_group",
         executable="move_group",
-        name="move_group",
+        # name="move_group",
         output="screen",
         parameters=[
             moveit_params,
@@ -121,7 +121,7 @@ def generate_launch_description():
     rviz = Node(
         package="rviz2",
         executable="rviz2",
-        name="rviz2",
+        # name="rviz2",
         output="screen",
         arguments=["-d", rviz_config],
         parameters=[moveit_params, {"use_sim_time": False}],
@@ -135,7 +135,7 @@ def generate_launch_description():
     mtc_node = Node(
         package="zhishu_robot_mtc_pick_place",
         executable="dual_arm_crate_carry",
-        name="dual_arm_crate_carry",
+        # name="dual_arm_crate_carry",
         output="screen",
         parameters=[
             moveit_params,
@@ -222,7 +222,7 @@ def generate_launch_description():
         DeclareLaunchArgument("crate_y", default_value="0.0"),
         DeclareLaunchArgument("crate_z", default_value="0.6"),
         DeclareLaunchArgument("crate_size_x", default_value="0.20"),
-        DeclareLaunchArgument("crate_size_y", default_value="0.25"),
+        DeclareLaunchArgument("crate_size_y", default_value="0.35"),
         DeclareLaunchArgument("crate_size_z", default_value="0.20"),
         DeclareLaunchArgument("wall_thickness", default_value="0.01"),
         DeclareLaunchArgument("move_x", default_value="0.12"),
