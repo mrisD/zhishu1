@@ -93,30 +93,6 @@ sudo tee /etc/security/limits.d/99-realtime.conf > /dev/null <<EOF
 @realtime hard memlock unlimited  
 EOF  
 
-假设实际网卡是 enP1p1s0，执行：  
-
-  
-sudo nmcli dev set enp0s31f6 managed no  
-sudo ip link set enp0s31f6 up  
-
-然后关掉网卡省电和 offload：  
-
-sudo ethtool --set-eee enp0s31f6 eee off  
-
-sudo ethtool -K enp0s31f6 tso off gso off gro off lro off
-
-如果支持固定速率，设置为 100M 全双工：
-sudo ethtool -s enP1p1s0 speed 100 duplex full autoneg off
-
-然后再看：
-
-sudo dmesg -wT | grep -Ei "EtherCAT|Link state|TIMED OUT|UNMATCHED|SKIPPED|Synchronization"
-
-如果还出现：
-
-Link state of ecm0 changed to DOWN
-
-优先换网线、换 EtherCAT 首站端口、换电脑网卡，尤其不要用 USB 网卡。
 
 查询ethercat状态  
 watch -n 0.2 "ethercat slaves"  
@@ -133,14 +109,14 @@ gedit ~/.bashrc
 保存退出重新打开终端  
 查询版本 echo $RMW_IMPLEMENTATION
 
-安装rosdep工具  
+安装依赖  
+首先安装rosdep工具  
 wget http://fishros.com/install -O fishros && . fishros  
   [3]:一键安装:rosdep(小鱼的rosdepc,又快又好用)  
 安装完毕后执行
   rosdep update
 
 
-安装依赖
 在src同级目录下执行 
 cd ~/guohua_ws  
  
@@ -153,23 +129,6 @@ export IGN_GAZEBO_RESOURCE_PATH=/home/zhul/online/guohua_ws/src/zhishu_robot_gaz
 
 echo "alias robot='bash /home/zhul/online/guohua_ws/src/zhishu_robot_bringup/scripts/zhishu_robot_gazebo.sh'" >> ~/.bashrc && source ~/.bashrc
 
-配置EtherCAT-OP--------------------------------------------
-TS     90 130   0 EtherCAT-OP  改成
-FF     90 130   0 EtherCAT-OP
-
-启动程序--------------------------------------------------------    
-
-sudo nmcli dev set enp0s31f6 managed no  
-sudo ip addr flush dev enp0s31f6  
-sudo ip link set enp0s31f6 up  
-
-
-关闭网卡节能和部分 offload 笔记本
-sudo ethtool --set-eee enp0s31f6 eee off 2>/dev/null || true
-sudo ethtool -s enp0s31f6 wol d 2>/dev/null || true
-sudo ethtool -K enp0s31f6 tso off gso off gro off lro off 2>/dev/null || true
-echo on | sudo tee /sys/class/net/enp0s31f6/device/power/control
-sudo /etc/init.d/ethercat start 
 
 性能测试  
 stress-ng --cpu 0 --io 4 --vm 2 --vm-bytes 512M --timeout 120s  
