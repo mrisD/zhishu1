@@ -72,6 +72,10 @@ public:
     declare_if_missing("carry_steps", 15);
     declare_if_missing("execute", false);
     declare_if_missing("max_solutions", 5);
+    // Use a separate, lower speed for the first arm motion from the current
+    // robot state to the overhead pregrasp pose.
+    declare_if_missing("initial_velocity_scaling", 0.05);
+    declare_if_missing("initial_acceleration_scaling", 0.05);
     declare_if_missing("velocity_scaling", 0.20);
     declare_if_missing("acceleration_scaling", 0.20);
     // Keep this false by default so an over-conservative IK pre-filter cannot
@@ -366,10 +370,17 @@ private:
 
     auto current = std::make_unique<mtc::stages::CurrentState>("current state");
     task.add(std::move(current));
-
+    // Normal-speed planner used by the grasp, carry and retreat stages.
     auto pipeline = std::make_shared<mtc::solvers::PipelinePlanner>(shared_from_this());
     pipeline->setMaxVelocityScalingFactor(get_parameter("velocity_scaling").as_double());
     pipeline->setMaxAccelerationScalingFactor(get_parameter("acceleration_scaling").as_double());
+      // Slow planner used only for the first arm motion: current state -> pregrasp.
+    auto initial_pipeline =
+      std::make_shared<mtc::solvers::PipelinePlanner>(shared_from_this());
+    initial_pipeline->setMaxVelocityScalingFactor(
+      get_parameter("initial_velocity_scaling").as_double());
+    initial_pipeline->setMaxAccelerationScalingFactor(
+      get_parameter("initial_acceleration_scaling").as_double());
     auto joint = std::make_shared<mtc::solvers::JointInterpolationPlanner>();
 
     // auto open_left = std::make_unique<mtc::stages::MoveTo>("open left gripper", joint);
@@ -528,7 +539,8 @@ private:
     // The overhead pregrasp target is close to the crate. A direct joint-space
     // interpolation from the current state can sweep a wrist or forearm
     // through the crate, so let OMPL find a collision-free route to it.
-    auto to_pre = std::make_unique<mtc::stages::MoveTo>("both arms to pregrasp", pipeline);
+    // auto to_pre = std::make_unique<mtc::stages::MoveTo>("both arms to pregrasp", pipeline);
+    auto to_pre = std::make_unique<mtc::stages::MoveTo>("both arms to pregrasp", initial_pipeline);
     to_pre->setTimeout(5.0);
     to_pre->setGroup("both_arms");
     to_pre->setGoal(pre_goal);
