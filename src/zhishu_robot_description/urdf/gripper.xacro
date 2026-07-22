@@ -20,32 +20,32 @@
     <link name="gripper_left_finger_link">
         <visual>
             <geometry>
-                <box size="0.02 0.06 0.08"/>
+                <box size="0.02 0.06 0.20"/>
             </geometry>
-            <origin xyz="0 0 0.04" rpy="0 0 0"/>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
             <material name="light_green"/>
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.06 0.08"/>
+                <box size="0.02 0.06 0.20"/>
             </geometry>
-            <origin xyz="0 0 0.030" rpy="0 0 0"/>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
         </collision>
     </link>
 
     <link name="gripper_right_finger_link">
         <visual>
             <geometry>
-                <box size="0.02 0.06 0.08"/>
+                <box size="0.02 0.06 0.20"/>
             </geometry>
-            <origin xyz="0 0 0.04" rpy="0 0 0"/>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
             <material name="light_green"/>
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.06 0.08"/>
+                <box size="0.02 0.06 0.20"/>
             </geometry>
-            <origin xyz="0 0 0.030" rpy="0 0 0"/>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
         </collision>
     </link>
 
@@ -71,7 +71,7 @@
     <joint name="right_gripper_tcp_joint" type="fixed">
         <parent link="gripper_base_link"/>
         <child link="right_gripper_tcp"/>
-        <origin xyz="0 0 0.10" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0.12" rpy="1.5708 0 0"/>
     </joint>
     <!-- Left gripper: same geometry and kinematics as the right gripper, but with left_* names. -->
     <link name="left_gripper_base_link">
@@ -93,32 +93,32 @@
     <link name="left_gripper_left_finger_link">
         <visual>
             <geometry>
-                <box size="0.02 0.06 0.08"/>
+                <box size="0.02 0.06 0.20"/>
             </geometry>
-            <origin xyz="0 0 0.04" rpy="0 0 0"/>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
             <material name="light_green"/>
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.06 0.08"/>
+                <box size="0.02 0.06 0.20"/>
             </geometry>
-            <origin xyz="0 0 0.030" rpy="0 0 0"/>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
         </collision>
     </link>
 
     <link name="left_gripper_right_finger_link">
         <visual>
             <geometry>
-                <box size="0.02 0.06 0.08"/>
+                <box size="0.02 0.06 0.20"/>
             </geometry>
-            <origin xyz="0 0 0.04" rpy="0 0 0"/>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
             <material name="light_green"/>
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.06 0.08"/>
+                <box size="0.02 0.06 0.20"/>
             </geometry>
-            <origin xyz="0 0 0.030" rpy="0 0 0"/>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
         </collision>
     </link>
 
@@ -143,6 +143,6 @@
     <joint name="left_gripper_tcp_joint" type="fixed">
         <parent link="left_gripper_base_link"/>
         <child link="left_gripper_tcp"/>
-        <origin xyz="0 0 0.10" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0.12" rpy="1.5708 0 0"/>
     </joint>
 </robot>
