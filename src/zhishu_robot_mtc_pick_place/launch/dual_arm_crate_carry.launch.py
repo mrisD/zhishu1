@@ -228,7 +228,7 @@ def generate_launch_description():
         DeclareLaunchArgument("crate_x", default_value="0.42"),
         DeclareLaunchArgument("crate_y", default_value="0.0"),
         DeclareLaunchArgument("crate_z", default_value="0.6"),
-        DeclareLaunchArgument("crate_size_x", default_value="0.20"),
+        DeclareLaunchArgument("crate_size_x", default_value="0.17"),
         DeclareLaunchArgument("crate_size_y", default_value="0.35"),
         DeclareLaunchArgument("crate_size_z", default_value="0.20"),
         DeclareLaunchArgument("wall_thickness", default_value="0.01"),

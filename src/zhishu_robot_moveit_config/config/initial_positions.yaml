@@ -1,22 +1,41 @@
 # Default initial positions for zhishu_robot's ros2_control fake system
 
 initial_positions:
-  gripper_left_finger_joint: 0
-  left_gripper_left_finger_joint: 0
-  left_elbow_pitch_joint: 0
+  gripper_left_finger_joint: 0.06
+  left_gripper_left_finger_joint: 0.06
+   
   left_shoulder_pitch_joint: 0
   left_shoulder_roll_joint: 0
   left_shoulder_yaw_joint: 0
+  left_elbow_pitch_joint: 0
   left_wrist_pitch_joint: 0
   left_wrist_roll_joint: 0
   left_wrist_yaw_joint: 0
-  right_elbow_pitch_joint: 0
+  
   right_shoulder_pitch_joint: 0
   right_shoulder_roll_joint: 0
   right_shoulder_yaw_joint: 0
+  right_elbow_pitch_joint: 0
   right_wrist_pitch_joint: 0
   right_wrist_roll_joint: 0
   right_wrist_yaw_joint: 0
+
+  # left_shoulder_pitch_joint: -2.27
+  # left_shoulder_roll_joint: -0.296
+  # left_shoulder_yaw_joint: 2.320
+  # left_elbow_pitch_joint: 1.343
+  # left_wrist_pitch_joint: 0.977
+  # left_wrist_roll_joint: 0.663
+  # left_wrist_yaw_joint: 0.715
+  
+  # right_shoulder_pitch_joint: 2.27
+  # right_shoulder_roll_joint: 0.296
+  # right_shoulder_yaw_joint: -2.320
+  # right_elbow_pitch_joint: 1.343
+  # right_wrist_pitch_joint: 0.977
+  # right_wrist_roll_joint: 0.663
+  # right_wrist_yaw_joint: 0.715
+
   waist_up_down_joint: 0
   waist_pitch_joint: 0
   head_yaw_joint: 0

@@ -374,7 +374,7 @@ private:
     auto pipeline = std::make_shared<mtc::solvers::PipelinePlanner>(shared_from_this());
     pipeline->setMaxVelocityScalingFactor(get_parameter("velocity_scaling").as_double());
     pipeline->setMaxAccelerationScalingFactor(get_parameter("acceleration_scaling").as_double());
-      // Slow planner used only for the first arm motion: current state -> pregrasp.
+    // Reduced-speed planner for the startup approach stages.
     auto initial_pipeline =
       std::make_shared<mtc::solvers::PipelinePlanner>(shared_from_this());
     initial_pipeline->setMaxVelocityScalingFactor(
@@ -382,6 +382,16 @@ private:
     initial_pipeline->setMaxAccelerationScalingFactor(
       get_parameter("initial_acceleration_scaling").as_double());
     auto joint = std::make_shared<mtc::solvers::JointInterpolationPlanner>();
+
+    // Always normalize the dual-arm posture before entering the crate-carry
+    // sequence.  This named SRDF state is the first real motion of the task,
+    // so every subsequent IK/planning stage starts from a predictable posture.
+    auto to_crate_pre =
+      std::make_unique<mtc::stages::MoveTo>("move both arms to both_arms_crate_pre", initial_pipeline);
+    to_crate_pre->setTimeout(10.0);
+    to_crate_pre->setGroup("both_arms");
+    to_crate_pre->setGoal("both_arms_crate_pre");
+    task.add(std::move(to_crate_pre));
 
     // auto open_left = std::make_unique<mtc::stages::MoveTo>("open left gripper", joint);
     // open_left->setGroup("left_gripper");
@@ -456,7 +466,7 @@ private:
     seed.setToDefaultValues();
     const auto* both_arms = task.getRobotModel()->getJointModelGroup("both_arms");
     if (both_arms) {
-      seed.setToDefaultValues(both_arms, "both_arms_pose1");
+      seed.setToDefaultValues(both_arms, "both_arms_crate_pre");
     }
     seed.update();
     RCLCPP_INFO(
