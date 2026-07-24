@@ -36,7 +36,7 @@ Panels:
   - Class: moveit_task_constructor/Motion Planning Tasks
     Global Settings:
       Task View Settings:
-        Old task handling: Keep
+        Old task handling: Replace
         Show Computation Times: true
         Task Expansion: All Expanded
     Name: Motion Planning Tasks

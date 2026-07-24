@@ -189,6 +189,8 @@ hardware_interface::CallbackReturn LeftEsMotorHardwareInterface::
   joint_to_motor_index_.assign(info_.joints.size(), kNoMotor);
   joint_sign_.assign(info_.joints.size(), 1.0);
   joint_offset_rad_.assign(info_.joints.size(), 0.0);
+  joint_snap_lower_limit_rad_.assign(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_snap_upper_limit_rad_.assign(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
   if (!build_driver_config_from_ros2_control_info()) {
     return hardware_interface::CallbackReturn::ERROR;
@@ -220,6 +222,14 @@ bool LeftEsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
       get_string_param(info_.hardware_parameters, "enable_realtime", "true"), "enable_realtime");
     driver_config_.realtime_priority = static_cast<int>(parse_i64(
       get_string_param(info_.hardware_parameters, "realtime_priority", "80"), "realtime_priority"));
+
+    joint_limit_snap_tolerance_rad_ = parse_double(
+      get_string_param(info_.hardware_parameters, "joint_limit_snap_tolerance_rad", "0.005"),
+      "joint_limit_snap_tolerance_rad");
+    if (joint_limit_snap_tolerance_rad_ < 0.0) {
+      RCLCPP_ERROR(logger(), "joint_limit_snap_tolerance_rad must be >= 0, got %.9f.", joint_limit_snap_tolerance_rad_);
+      return false;
+    }
 
     for (size_t joint_index = 0; joint_index < info_.joints.size(); ++joint_index) {
       const auto & joint = info_.joints[joint_index];
@@ -287,6 +297,23 @@ bool LeftEsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
       joint_offset_rad_[joint_index] = parse_double(
         get_local_or_global_param(joint.parameters, info_.hardware_parameters, "position_offset_rad", "0.0"), joint.name + ".position_offset_rad");
 
+      if (has_param(joint.parameters, "snap_lower_limit_rad")) {
+        joint_snap_lower_limit_rad_[joint_index] = parse_double(
+          get_string_param(joint.parameters, "snap_lower_limit_rad", "0.0"), joint.name + ".snap_lower_limit_rad");
+      }
+      if (has_param(joint.parameters, "snap_upper_limit_rad")) {
+        joint_snap_upper_limit_rad_[joint_index] = parse_double(
+          get_string_param(joint.parameters, "snap_upper_limit_rad", "0.0"), joint.name + ".snap_upper_limit_rad");
+      }
+      if (std::isfinite(joint_snap_lower_limit_rad_[joint_index]) &&
+          std::isfinite(joint_snap_upper_limit_rad_[joint_index]) &&
+          joint_snap_lower_limit_rad_[joint_index] > joint_snap_upper_limit_rad_[joint_index])
+      {
+        RCLCPP_ERROR(
+          logger(), "Joint '%s' has snap_lower_limit_rad > snap_upper_limit_rad.", joint.name.c_str());
+        return false;
+      }
+
       if (std::abs(joint_sign_[joint_index]) < 1e-9) {
         RCLCPP_ERROR(logger(), "Joint '%s' has invalid joint_sign=0.", joint.name.c_str());
         return false;
@@ -297,6 +324,18 @@ bool LeftEsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
         "EtherCAT joint mapping: joint=%s motor=%s slave_position=%u counts_per_rev=%.1f sign=%.1f offset_rad=%.6f",
         joint.name.c_str(), motor_config.name.c_str(), motor_config.address.slave_position,
         motor_config.counts_per_rev, joint_sign_[joint_index], joint_offset_rad_[joint_index]);
+
+      if (std::isfinite(joint_snap_lower_limit_rad_[joint_index]) ||
+          std::isfinite(joint_snap_upper_limit_rad_[joint_index]))
+      {
+        RCLCPP_INFO(
+          logger(),
+          "Joint limit snap enabled: joint=%s lower=%.6f upper=%.6f tolerance=%.6f rad",
+          joint.name.c_str(),
+          joint_snap_lower_limit_rad_[joint_index],
+          joint_snap_upper_limit_rad_[joint_index],
+          joint_limit_snap_tolerance_rad_);
+      }
     }
 
     if (driver_config_.motors.empty()) {
@@ -513,8 +552,30 @@ double LeftEsMotorHardwareInterface::counts_to_radians(
   const ethercat_driver::MotorConfig & motor,
   size_t joint_index) const
 {
-  return joint_sign_[joint_index] * (static_cast<double>(counts) / motor.counts_per_rev * kTwoPi) +
-         joint_offset_rad_[joint_index];
+  double position =
+    joint_sign_[joint_index] * (static_cast<double>(counts) / motor.counts_per_rev * kTwoPi) +
+    joint_offset_rad_[joint_index];
+
+  // Only absorb tiny *out-of-range* encoder/zero-point errors. In-range values are
+  // left untouched, and a real violation larger than the tolerance remains visible
+  // to ros2_control / MoveIt instead of being silently hidden.
+  if (joint_limit_snap_tolerance_rad_ > 0.0) {
+    const double lower = joint_snap_lower_limit_rad_[joint_index];
+    if (std::isfinite(lower) && position < lower &&
+        position >= lower - joint_limit_snap_tolerance_rad_)
+    {
+      position = lower;
+    }
+
+    const double upper = joint_snap_upper_limit_rad_[joint_index];
+    if (std::isfinite(upper) && position > upper &&
+        position <= upper + joint_limit_snap_tolerance_rad_)
+    {
+      position = upper;
+    }
+  }
+
+  return position;
 }
 
 int32_t LeftEsMotorHardwareInterface::radians_to_counts(

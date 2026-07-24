@@ -34,6 +34,9 @@
                 <param name="target_tolerance_counts">20</param>
                 <param name="joint_sign">1.0</param>
                 <param name="position_offset_rad">0.0</param>
+                <!-- Only snap tiny reported-position excursions that are just outside
+                     an explicitly configured physical joint limit. 0.005 rad ~= 0.286 deg. -->
+                <param name="joint_limit_snap_tolerance_rad">0.005</param>
             </hardware>
 
             <!-- left_arm -->
@@ -66,6 +69,8 @@
             </joint>
             <joint name="left_elbow_pitch_joint">
                 <param name="use_ethercat">true</param>
+                <!-- URDF lower limit is 0 rad. Absorb only tiny negative encoder zero errors. -->
+                <param name="snap_lower_limit_rad">0.0</param>
                 <param name="motor_name">left_arm_motor_3</param>
                 <param name="slave_position">3</param>
                 <command_interface name="position"/>

@@ -54,6 +54,14 @@ private:
     std::vector<int> joint_to_motor_index_;
     std::vector<double> joint_sign_;
     std::vector<double> joint_offset_rad_;
+
+    // Optional reporting-side limit snap. This only clamps tiny encoder/zero-point
+    // excursions that are just outside a configured physical joint boundary.
+    // It does not clamp normal in-range motion or large true limit violations.
+    std::vector<double> joint_snap_lower_limit_rad_;
+    std::vector<double> joint_snap_upper_limit_rad_;
+    double joint_limit_snap_tolerance_rad_ = 0.005;
+
     bool activated_ = false;
 
 
