@@ -9,14 +9,14 @@
     <joint name="left_gripper_joint" type="fixed">
         <parent link="L_hand_link" />
         <child link="left_gripper_base_link" />
-        <origin xyz="0 0 0" rpy="0 3.14159 0" />
+        <origin xyz="0 0 0" rpy="0 3.14159 1.570796327" />
     </joint>
 
 
     <joint name="right_gripper_joint" type="fixed">
         <parent link="R_hand_link" />
         <child link="gripper_base_link" />
-        <origin xyz="0 0 0" rpy="0 3.14159 0" />
+        <origin xyz="0 0 0" rpy="0 3.14159 -1.570796327" />
     </joint>
 
     <xacro:include filename="$(find zhishu_robot_description)/urdf/gazebo_sim_ros2_control.urdf.xacro" />

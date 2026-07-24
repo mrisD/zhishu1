@@ -1,0 +1,589 @@
+ros2 launch zhishu_robot_mtc_pick_place dual_arm_crate_carry.launch.py 
+[INFO] [launch]: All log files can be found below /home/dky/.ros/log/2026-07-24-14-48-46-909668-tegra-ubuntu-67714
+[INFO] [launch]: Default logging verbosity is set to INFO
+Using load_yaml() directly is deprecated. Use xacro.load_yaml() instead.
+Using load_yaml() directly is deprecated. Use xacro.load_yaml() instead.
+[INFO] [static_transform_publisher-1]: process started with pid [67721]
+[INFO] [robot_state_publisher-2]: process started with pid [67723]
+[INFO] [ros2_control_node-3]: process started with pid [67725]
+[INFO] [spawner-4]: process started with pid [67727]
+[static_transform_publisher-1] [WARN] [1784875727.771877709] []: Old-style arguments are deprecated; see --help for new-style arguments
+[static_transform_publisher-1] [INFO] [1784875727.781839308] [world_to_base_tf]: Spinning until stopped - publishing transform
+[static_transform_publisher-1] translation: ('0.000000', '0.000000', '0.000000')
+[static_transform_publisher-1] rotation: ('0.000000', '0.000000', '0.000000', '1.000000')
+[static_transform_publisher-1] from 'world' to 'base_footprint'
+[ros2_control_node-3] [WARN] [1784875727.833671981] [controller_manager]: [Deprecated] Passing the robot description parameter directly to the control_manager node is deprecated. Use '~/robot_description' topic from 'robot_state_publisher' instead.
+[ros2_control_node-3] [INFO] [1784875727.835305906] [resource_manager]: Loading hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875727.836520182] [resource_manager]: Initialize hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875727.836644374] [resource_manager]: Successful initialization of hardware 'LeftArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875727.836687095] [resource_manager]: Loading hardware 'RightArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875727.837982715] [resource_manager]: Initialize hardware 'RightArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875727.838806845] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_shoulder_pitch_joint motor=right_arm_motor_0 slave_position=0 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875727.838879581] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_shoulder_roll_joint motor=right_arm_motor_1 slave_position=1 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875727.838907837] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_shoulder_yaw_joint motor=right_arm_motor_2 slave_position=2 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875727.838931870] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_elbow_pitch_joint motor=right_arm_motor_3 slave_position=3 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875727.838937886] [EsMotorHardwareInterface]: Joint limit snap enabled: joint=right_elbow_pitch_joint lower=0.000000 upper=nan tolerance=0.005000 rad
+[ros2_control_node-3] [INFO] [1784875727.838960094] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_wrist_yaw_joint motor=right_arm_motor_4 slave_position=4 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875727.838981214] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_wrist_pitch_joint motor=right_arm_motor_5 slave_position=5 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875727.839001694] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_wrist_roll_joint motor=right_arm_motor_6 slave_position=6 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875727.839015614] [EsMotorHardwareInterface]: Configured 7 EtherCAT motors for ROS 2 Humble ros2_control.
+[ros2_control_node-3] [INFO] [1784875727.839025310] [resource_manager]: Successful initialization of hardware 'RightArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875727.839212318] [resource_manager]: 'configure' hardware 'RightArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875727.839226558] [EsMotorHardwareInterface]: Hardware configured. EtherCAT will start in on_activate().
+[ros2_control_node-3] [INFO] [1784875727.839236574] [resource_manager]: Successful 'configure' of hardware 'RightArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875727.839246655] [resource_manager]: 'activate' hardware 'RightArmEtherCATSystem' 
+[robot_state_publisher-2] [INFO] [1784875727.848815868] [robot_state_publisher]: got segment L_hand_link
+[robot_state_publisher-2] [INFO] [1784875727.849136285] [robot_state_publisher]: got segment R_hand_link
+[robot_state_publisher-2] [INFO] [1784875727.849163293] [robot_state_publisher]: got segment base_footprint
+[robot_state_publisher-2] [INFO] [1784875727.849175677] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-2] [INFO] [1784875727.849184189] [robot_state_publisher]: got segment camera_link
+[robot_state_publisher-2] [INFO] [1784875727.849191933] [robot_state_publisher]: got segment gripper_base_link
+[robot_state_publisher-2] [INFO] [1784875727.849199869] [robot_state_publisher]: got segment gripper_left_finger_link
+[robot_state_publisher-2] [INFO] [1784875727.849208445] [robot_state_publisher]: got segment gripper_right_finger_link
+[robot_state_publisher-2] [INFO] [1784875727.849216157] [robot_state_publisher]: got segment head_camera_link
+[robot_state_publisher-2] [INFO] [1784875727.849223806] [robot_state_publisher]: got segment head_pitch_link
+[robot_state_publisher-2] [INFO] [1784875727.849231614] [robot_state_publisher]: got segment head_smart_speaker_link
+[robot_state_publisher-2] [INFO] [1784875727.849238878] [robot_state_publisher]: got segment head_yaw_link
+[robot_state_publisher-2] [INFO] [1784875727.849246654] [robot_state_publisher]: got segment laser_link
+[robot_state_publisher-2] [INFO] [1784875727.849254046] [robot_state_publisher]: got segment left_arm_dh_base_link
+[robot_state_publisher-2] [INFO] [1784875727.849262110] [robot_state_publisher]: got segment left_elbow_pitch_link
+[robot_state_publisher-2] [INFO] [1784875727.849269662] [robot_state_publisher]: got segment left_gripper_base_link
+[robot_state_publisher-2] [INFO] [1784875727.849277214] [robot_state_publisher]: got segment left_gripper_left_finger_link
+[robot_state_publisher-2] [INFO] [1784875727.849284766] [robot_state_publisher]: got segment left_gripper_right_finger_link
+[robot_state_publisher-2] [INFO] [1784875727.849292510] [robot_state_publisher]: got segment left_gripper_tcp
+[robot_state_publisher-2] [INFO] [1784875727.849300126] [robot_state_publisher]: got segment left_shoulder_pitch_link
+[robot_state_publisher-2] [INFO] [1784875727.849307838] [robot_state_publisher]: got segment left_shoulder_roll_link
+[robot_state_publisher-2] [INFO] [1784875727.849315390] [robot_state_publisher]: got segment left_shoulder_yaw_link
+[robot_state_publisher-2] [INFO] [1784875727.849323102] [robot_state_publisher]: got segment left_wheel_link
+[robot_state_publisher-2] [INFO] [1784875727.849330782] [robot_state_publisher]: got segment left_wrist_pitch_link
+[robot_state_publisher-2] [INFO] [1784875727.849338046] [robot_state_publisher]: got segment left_wrist_roll_link
+[robot_state_publisher-2] [INFO] [1784875727.849345406] [robot_state_publisher]: got segment left_wrist_yaw_link
+[robot_state_publisher-2] [INFO] [1784875727.849353630] [robot_state_publisher]: got segment right_arm_dh_base_link
+[robot_state_publisher-2] [INFO] [1784875727.849361246] [robot_state_publisher]: got segment right_elbow_pitch_link
+[robot_state_publisher-2] [INFO] [1784875727.849368414] [robot_state_publisher]: got segment right_gripper_tcp
+[robot_state_publisher-2] [INFO] [1784875727.849375614] [robot_state_publisher]: got segment right_shoulder_pitch_link
+[robot_state_publisher-2] [INFO] [1784875727.849382942] [robot_state_publisher]: got segment right_shoulder_roll_link
+[robot_state_publisher-2] [INFO] [1784875727.849389854] [robot_state_publisher]: got segment right_shoulder_yaw_link
+[robot_state_publisher-2] [INFO] [1784875727.849397310] [robot_state_publisher]: got segment right_wheel_link
+[robot_state_publisher-2] [INFO] [1784875727.849406046] [robot_state_publisher]: got segment right_wrist_pitch_link
+[robot_state_publisher-2] [INFO] [1784875727.849413342] [robot_state_publisher]: got segment right_wrist_roll_link
+[robot_state_publisher-2] [INFO] [1784875727.849420670] [robot_state_publisher]: got segment right_wrist_yaw_link
+[robot_state_publisher-2] [INFO] [1784875727.849428190] [robot_state_publisher]: got segment waist_pitch_link
+[robot_state_publisher-2] [INFO] [1784875727.849435678] [robot_state_publisher]: got segment waist_up_down_link
+[ros2_control_node-3] ethercat_driver: init_master OK, master=1
+[ros2_control_node-3] ethercat_driver: configure_slave OK, motors=7
+[ros2_control_node-3] ethercat_driver: configure_pdo OK, RxPDO=0x1601 TxPDO=0x1A01
+[ros2_control_node-3] ethercat_driver: activate_master OK master=1 motors=7 cycle=2000000 ns DC=on assign=0x0300 sync0_shift=1000000 ns ref_alias=0 ref_position=0
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_0' address master=1 alias=0 position=0 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_1' address master=1 alias=0 position=1 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_2' address master=1 alias=0 position=2 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_3' address master=1 alias=0 position=3 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_4' address master=1 alias=0 position=4 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_5' address master=1 alias=0 position=5 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_6' address master=1 alias=0 position=6 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=0 wc_state=0
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_0' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_1' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_2' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_3' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_4' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_5' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_6' online=1 op=0 al=0x02
+[spawner-4] [INFO] [1784875728.225643184] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=3 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_0' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=6 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_1' online=1 op=0 al=0x04
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_1' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=9 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_2' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=12 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_3' online=1 op=0 al=0x04
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=18 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_3' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_4' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_5' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x08 link=1 | domain wc=21 wc_state=2
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_6' online=1 op=1 al=0x08
+[ros2_control_node-3] [INFO] [1784875751.097746710] [EsMotorHardwareInterface]: Activated joint 'right_shoulder_pitch_joint' on slave_position=0, hold at 0.000096 rad / 0.01 deg.
+[ros2_control_node-3] [INFO] [1784875751.097933142] [EsMotorHardwareInterface]: Activated joint 'right_shoulder_roll_joint' on slave_position=1, hold at 0.000000 rad / 0.00 deg.
+[ros2_control_node-3] [INFO] [1784875751.097957270] [EsMotorHardwareInterface]: Activated joint 'right_shoulder_yaw_joint' on slave_position=2, hold at -0.000767 rad / -0.04 deg.
+[ros2_control_node-3] [INFO] [1784875751.097973943] [EsMotorHardwareInterface]: Activated joint 'right_elbow_pitch_joint' on slave_position=3, hold at 0.000096 rad / 0.01 deg.
+[ros2_control_node-3] [INFO] [1784875751.097989079] [EsMotorHardwareInterface]: Activated joint 'right_wrist_yaw_joint' on slave_position=4, hold at 0.000096 rad / 0.01 deg.
+[ros2_control_node-3] [INFO] [1784875751.098003223] [EsMotorHardwareInterface]: Activated joint 'right_wrist_pitch_joint' on slave_position=5, hold at 0.000479 rad / 0.03 deg.
+[ros2_control_node-3] [INFO] [1784875751.098017623] [EsMotorHardwareInterface]: Activated joint 'right_wrist_roll_joint' on slave_position=6, hold at -0.000096 rad / -0.01 deg.
+[ros2_control_node-3] [INFO] [1784875751.098098519] [resource_manager]: Successful 'activate' of hardware 'RightArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875751.098151223] [resource_manager]: 'configure' hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875751.098174967] [resource_manager]: Successful 'configure' of hardware 'LeftArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875751.098218263] [resource_manager]: 'activate' hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875751.098234999] [resource_manager]: Successful 'activate' of hardware 'LeftArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875751.109092505] [controller_manager]: update rate is 500 Hz
+[ros2_control_node-3] [INFO] [1784875751.109215289] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-3] [INFO] [1784875751.112450467] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 50.
+[ros2_control_node-3] [INFO] [1784875751.263938999] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[spawner-4] [INFO] [1784875751.283074066] [spawner_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[ros2_control_node-3] [INFO] [1784875751.285740154] [controller_manager]: Configuring controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1784875751.286038267] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[spawner-4] [INFO] [1784875751.311286441] [spawner_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[INFO] [spawner-4]: process has finished cleanly [pid 67727]
+[INFO] [spawner-5]: process started with pid [67859]
+[ros2_control_node-3] [INFO] [1784875752.101474992] [controller_manager]: Loading controller 'dual_arm_controller'
+[ros2_control_node-3] [WARN] [1784875752.145851129] [dual_arm_controller]: [Deprecated]: "allow_nonzero_velocity_at_trajectory_end" is set to true. The default behavior will change to false.
+[spawner-5] [INFO] [1784875752.172497995] [spawner_dual_arm_controller]: Loaded dual_arm_controller
+[ros2_control_node-3] [INFO] [1784875752.174140017] [controller_manager]: Configuring controller 'dual_arm_controller'
+[ros2_control_node-3] [INFO] [1784875752.175106676] [dual_arm_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-3] [INFO] [1784875752.175211732] [dual_arm_controller]: Command interfaces are [position] and state interfaces are [position].
+[ros2_control_node-3] [INFO] [1784875752.175364756] [dual_arm_controller]: Using 'splines' interpolation method.
+[ros2_control_node-3] [INFO] [1784875752.176444248] [dual_arm_controller]: Controller state will be published at 50.00 Hz.
+[ros2_control_node-3] [INFO] [1784875752.185230227] [dual_arm_controller]: Goals with partial set of joints are allowed
+[ros2_control_node-3] [INFO] [1784875752.185330739] [dual_arm_controller]: Action status changes will be monitored at 20.00 Hz.
+[spawner-5] [INFO] [1784875752.199490111] [spawner_dual_arm_controller]: Configured and activated dual_arm_controller
+[INFO] [spawner-5]: process has finished cleanly [pid 67859]
+[INFO] [spawner-6]: process started with pid [67882]
+[ros2_control_node-3] [INFO] [1784875752.926407426] [controller_manager]: Loading controller 'left_gripper_controller'
+[ros2_control_node-3] [WARN] [1784875752.931546034] [left_gripper_controller]: [Deprecated]: "allow_nonzero_velocity_at_trajectory_end" is set to true. The default behavior will change to false.
+[spawner-6] [INFO] [1784875752.953880343] [spawner_left_gripper_controller]: Loaded left_gripper_controller
+[ros2_control_node-3] [INFO] [1784875752.955434172] [controller_manager]: Configuring controller 'left_gripper_controller'
+[ros2_control_node-3] [INFO] [1784875752.955769661] [left_gripper_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-3] [INFO] [1784875752.955821693] [left_gripper_controller]: Command interfaces are [position] and state interfaces are [position].
+[ros2_control_node-3] [INFO] [1784875752.955847677] [left_gripper_controller]: Using 'splines' interpolation method.
+[ros2_control_node-3] [INFO] [1784875752.956253950] [left_gripper_controller]: Controller state will be published at 50.00 Hz.
+[ros2_control_node-3] [INFO] [1784875752.961993168] [left_gripper_controller]: Action status changes will be monitored at 20.00 Hz.
+[spawner-6] [INFO] [1784875752.973056178] [spawner_left_gripper_controller]: Configured and activated left_gripper_controller
+[INFO] [spawner-6]: process has finished cleanly [pid 67882]
+[INFO] [spawner-7]: process started with pid [67905]
+[ros2_control_node-3] [INFO] [1784875753.866454294] [controller_manager]: Loading controller 'right_gripper_controller'
+[ros2_control_node-3] [WARN] [1784875753.878313083] [right_gripper_controller]: [Deprecated]: "allow_nonzero_velocity_at_trajectory_end" is set to true. The default behavior will change to false.
+[spawner-7] [INFO] [1784875753.902199621] [spawner_right_gripper_controller]: Loaded right_gripper_controller
+[ros2_control_node-3] [INFO] [1784875753.913863945] [controller_manager]: Configuring controller 'right_gripper_controller'
+[ros2_control_node-3] [INFO] [1784875753.914284170] [right_gripper_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-3] [INFO] [1784875753.914337514] [right_gripper_controller]: Command interfaces are [position] and state interfaces are [position].
+[ros2_control_node-3] [INFO] [1784875753.914363914] [right_gripper_controller]: Using 'splines' interpolation method.
+[ros2_control_node-3] [INFO] [1784875753.914851116] [right_gripper_controller]: Controller state will be published at 50.00 Hz.
+[ros2_control_node-3] [INFO] [1784875753.922344771] [right_gripper_controller]: Action status changes will be monitored at 20.00 Hz.
+[spawner-7] [INFO] [1784875753.933183908] [spawner_right_gripper_controller]: Configured and activated right_gripper_controller
+[INFO] [spawner-7]: process has finished cleanly [pid 67905]
+[INFO] [move_group-8]: process started with pid [67928]
+[move_group-8] [INFO] [1784875754.649725734] [moveit_rdf_loader.rdf_loader]: Loaded robot model in 0.055804 seconds
+[move_group-8] [INFO] [1784875754.649891175] [moveit_robot_model.robot_model]: Loading robot model 'zhishu_robot'...
+[move_group-8] [INFO] [1784875754.649913607] [moveit_robot_model.robot_model]: No root/virtual joint specified in SRDF. Assuming fixed joint
+[move_group-8] [INFO] [1784875754.688855871] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Publishing maintained planning scene on 'monitored_planning_scene'
+[move_group-8] [INFO] [1784875754.689220512] [moveit.ros_planning_interface.moveit_cpp]: Listening to 'joint_states' for joint states
+[move_group-8] [INFO] [1784875754.689926050] [moveit_ros.current_state_monitor]: Listening to joint states on topic 'joint_states'
+[move_group-8] [INFO] [1784875754.690605285] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Listening to '/attached_collision_object' for attached collision objects
+[move_group-8] [INFO] [1784875754.690639461] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Starting planning scene monitor
+[move_group-8] [INFO] [1784875754.691633608] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Listening to '/planning_scene'
+[move_group-8] [INFO] [1784875754.691665864] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Starting world geometry update monitor for collision objects, attached objects, octomap updates.
+[move_group-8] [INFO] [1784875754.692211082] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Listening to 'collision_object'
+[move_group-8] [INFO] [1784875754.692731627] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Listening to 'planning_scene_world' for planning scene world geometry
+[move_group-8] [WARN] [1784875754.695267123] [moveit.ros.occupancy_map_monitor.middleware_handle]: Resolution not specified for Octomap. Assuming resolution = 0.1 instead
+[move_group-8] [ERROR] [1784875754.695309651] [moveit.ros.occupancy_map_monitor.middleware_handle]: No 3D sensor plugin(s) defined for octomap updates
+[move_group-8] [INFO] [1784875754.696375990] [moveit.ros_planning_interface.moveit_cpp]: Loading planning pipeline 'ompl'
+[move_group-8] [INFO] [1784875754.728234041] [moveit.ros_planning.planning_pipeline]: Using planning interface 'OMPL'
+[move_group-8] [INFO] [1784875754.737671638] [moveit_ros.add_time_optimal_parameterization]: Param 'ompl.path_tolerance' was not set. Using default value: 0.100000
+[move_group-8] [INFO] [1784875754.737743734] [moveit_ros.add_time_optimal_parameterization]: Param 'ompl.resample_dt' was not set. Using default value: 0.100000
+[move_group-8] [INFO] [1784875754.737752726] [moveit_ros.add_time_optimal_parameterization]: Param 'ompl.min_angle_change' was not set. Using default value: 0.001000
+[move_group-8] [INFO] [1784875754.737836598] [moveit_ros.fix_workspace_bounds]: Param 'ompl.default_workspace_bounds' was not set. Using default value: 10.000000
+[move_group-8] [INFO] [1784875754.737867350] [moveit_ros.fix_start_state_bounds]: Param 'ompl.start_state_max_bounds_error' was set to 0.100000
+[move_group-8] [INFO] [1784875754.737876342] [moveit_ros.fix_start_state_bounds]: Param 'ompl.start_state_max_dt' was not set. Using default value: 0.500000
+[move_group-8] [INFO] [1784875754.737893942] [moveit_ros.fix_start_state_collision]: Param 'ompl.start_state_max_dt' was not set. Using default value: 0.500000
+[move_group-8] [INFO] [1784875754.737903734] [moveit_ros.fix_start_state_collision]: Param 'ompl.jiggle_fraction' was set to 0.050000
+[move_group-8] [INFO] [1784875754.737948407] [moveit_ros.fix_start_state_collision]: Param 'ompl.max_sampling_attempts' was not set. Using default value: 100
+[move_group-8] [INFO] [1784875754.737970743] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Add Time Optimal Parameterization'
+[move_group-8] [INFO] [1784875754.737981975] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Resolve constraint frames to robot links'
+[move_group-8] [INFO] [1784875754.737986423] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Fix Workspace Bounds'
+[move_group-8] [INFO] [1784875754.737990455] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Fix Start State Bounds'
+[move_group-8] [INFO] [1784875754.737994039] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Fix Start State In Collision'
+[move_group-8] [INFO] [1784875754.737998007] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Fix Start State Path Constraints'
+[move_group-8] [INFO] [1784875754.740652799] [moveit.ros_planning_interface.moveit_cpp]: Loading planning pipeline 'pilz_industrial_motion_planner'
+[move_group-8] [INFO] [1784875754.749002265] [moveit.pilz_industrial_motion_planner.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-8] [INFO] [1784875754.767823155] [moveit.pilz_industrial_motion_planner]: Available plugins: pilz_industrial_motion_planner/PlanningContextLoaderCIRC pilz_industrial_motion_planner/PlanningContextLoaderLIN pilz_industrial_motion_planner/PlanningContextLoaderPTP 
+[move_group-8] [INFO] [1784875754.767887507] [moveit.pilz_industrial_motion_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderCIRC
+[move_group-8] [INFO] [1784875754.770665052] [moveit.pilz_industrial_motion_planner]: Registered Algorithm [CIRC]
+[move_group-8] [INFO] [1784875754.770715100] [moveit.pilz_industrial_motion_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderLIN
+[move_group-8] [INFO] [1784875754.772304737] [moveit.pilz_industrial_motion_planner]: Registered Algorithm [LIN]
+[move_group-8] [INFO] [1784875754.772344865] [moveit.pilz_industrial_motion_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderPTP
+[move_group-8] [INFO] [1784875754.773748645] [moveit.pilz_industrial_motion_planner]: Registered Algorithm [PTP]
+[move_group-8] [INFO] [1784875754.773817989] [moveit.ros_planning.planning_pipeline]: Using planning interface 'Pilz Industrial Motion Planner'
+[move_group-8] [INFO] [1784875754.816663785] [moveit.plugins.moveit_simple_controller_manager]: Added FollowJointTrajectory controller for dual_arm_controller
+[move_group-8] [INFO] [1784875754.818458351] [moveit.plugins.moveit_simple_controller_manager]: Added FollowJointTrajectory controller for left_gripper_controller
+[move_group-8] [INFO] [1784875754.820385749] [moveit.plugins.moveit_simple_controller_manager]: Added FollowJointTrajectory controller for right_gripper_controller
+[move_group-8] [INFO] [1784875754.820813494] [moveit.plugins.moveit_simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1784875754.820938231] [moveit.plugins.moveit_simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1784875754.821536824] [moveit_ros.trajectory_execution_manager]: Trajectory execution is managing controllers
+[move_group-8] [INFO] [1784875754.821563992] [move_group.move_group]: MoveGroup debug mode is ON
+[move_group-8] [INFO] [1784875754.855090432] [move_group.move_group]: 
+[move_group-8] 
+[move_group-8] ********************************************************
+[move_group-8] * MoveGroup using: 
+[move_group-8] *     - ApplyPlanningSceneService
+[move_group-8] *     - ClearOctomapService
+[move_group-8] *     - ExecuteTaskSolution
+[move_group-8] *     - CartesianPathService
+[move_group-8] *     - ExecuteTrajectoryAction
+[move_group-8] *     - GetPlanningSceneService
+[move_group-8] *     - KinematicsService
+[move_group-8] *     - MoveAction
+[move_group-8] *     - MotionPlanService
+[move_group-8] *     - QueryPlannersService
+[move_group-8] *     - StateValidationService
+[move_group-8] ********************************************************
+[move_group-8] 
+[move_group-8] [INFO] [1784875754.855192448] [moveit_move_group_capabilities_base.move_group_context]: MoveGroup context using planning plugin ompl_interface/OMPLPlanner
+[move_group-8] [INFO] [1784875754.855206592] [moveit_move_group_capabilities_base.move_group_context]: MoveGroup context initialization complete
+[move_group-8] Loading 'move_group/ApplyPlanningSceneService'...
+[move_group-8] Loading 'move_group/ClearOctomapService'...
+[move_group-8] Loading 'move_group/ExecuteTaskSolutionCapability'...
+[move_group-8] Loading 'move_group/MoveGroupCartesianPathService'...
+[move_group-8] Loading 'move_group/MoveGroupExecuteTrajectoryAction'...
+[move_group-8] Loading 'move_group/MoveGroupGetPlanningSceneService'...
+[move_group-8] Loading 'move_group/MoveGroupKinematicsService'...
+[move_group-8] Loading 'move_group/MoveGroupMoveAction'...
+[move_group-8] Loading 'move_group/MoveGroupPlanService'...
+[move_group-8] Loading 'move_group/MoveGroupQueryPlannersService'...
+[move_group-8] Loading 'move_group/MoveGroupStateValidationService'...
+[move_group-8] 
+[move_group-8] You can start planning now!
+[move_group-8] 
+[INFO] [rviz2-9]: process started with pid [67998]
+[rviz2-9] [INFO] [1784875758.881679163] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-9] [INFO] [1784875758.882108860] [rviz2]: OpenGl version: 4.6 (GLSL 4.6)
+[rviz2-9] [INFO] [1784875758.949428268] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-9] Warning: class_loader.impl: SEVERE WARNING!!! A namespace collision has occurred with plugin factory for class rviz_default_plugins::displays::InteractiveMarkerDisplay. New factory will OVERWRITE existing one. This situation occurs when libraries containing plugins are directly linked against an executable (the one running right now generating this message). Please separate plugins out into their own library or just don't link against the library and use either class_loader::ClassLoader/MultiLibraryClassLoader to open.
+[rviz2-9]          at line 253 in /opt/ros/humble/include/class_loader/class_loader/class_loader_core.hpp
+[rviz2-9] [INFO] [1784875759.244084951] [moveit_rdf_loader.rdf_loader]: Loaded robot model in 0.0450106 seconds
+[rviz2-9] [INFO] [1784875759.244259384] [moveit_robot_model.robot_model]: Loading robot model 'zhishu_robot'...
+[rviz2-9] [INFO] [1784875759.244293336] [moveit_robot_model.robot_model]: No root/virtual joint specified in SRDF. Assuming fixed joint
+[INFO] [dual_arm_crate_carry-10]: process started with pid [68034]
+[dual_arm_crate_carry-10] [INFO] [1784875764.817616825] [dual_arm_crate_carry]: Adding the hollow crate to the planning scene
+[dual_arm_crate_carry-10] [INFO] [1784875765.025220631] [dual_arm_crate_carry]: Creating dual-arm MTC stages and solving grasp IK
+[dual_arm_crate_carry-10] [INFO] [1784875765.107568628] [moveit_rdf_loader.rdf_loader]: Loaded robot model in 0.0697864 seconds
+[dual_arm_crate_carry-10] [INFO] [1784875765.107657109] [moveit_robot_model.robot_model]: Loading robot model 'zhishu_robot'...
+[dual_arm_crate_carry-10] [INFO] [1784875765.107673621] [moveit_robot_model.robot_model]: No root/virtual joint specified in SRDF. Assuming fixed joint
+[dual_arm_crate_carry-10] [INFO] [1784875765.132377793] [dual_arm_crate_carry]: Crate center=(0.420, 0.000, 0.600), size=(0.170, 0.350, 0.200), wall=0.010, overhead pregrasp=(y +/- 0.170, z 0.820), rim grasp=(y +/- 0.170, z 0.680), gripper q=0.055, move=(0.120, 0.000, 0.280)
+[rviz2-9] [ERROR] [1784875766.342250728] [moveit_ros_visualization.motion_planning_frame]: Action server: /recognize_objects not available
+[dual_arm_crate_carry-10] [FATAL] [1784875777.186571212] [dual_arm_crate_carry]: No collision-free dual-arm IK branch found after 80 attempts (dual IK solved=0, symmetry rejected=0, bounded=0, collision rejected=0)
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[dual_arm_crate_carry-10] [INFO] [1784875794.464248578] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[robot_state_publisher-2] [INFO] [1784875794.464245249] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[static_transform_publisher-1] [INFO] [1784875794.464259394] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[rviz2-9] [INFO] [1784875794.464277922] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1784875794.464313218] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1784875794.464589859] [controller_manager]: Shutdown request received....
+[ros2_control_node-3] [INFO] [1784875794.464748131] [controller_manager]: Shutting down all controllers in the controller manager.
+[ros2_control_node-3] [INFO] [1784875794.464798627] [controller_manager]: Deactivating controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1784875794.464891875] [controller_manager]: Shutting down controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1784875794.465453061] [controller_manager]: Deactivating controller 'dual_arm_controller'
+[ros2_control_node-3] [INFO] [1784875794.465545061] [controller_manager]: Shutting down controller 'dual_arm_controller'
+[ros2_control_node-3] [INFO] [1784875794.465579558] [controller_manager]: Deactivating controller 'left_gripper_controller'
+[ros2_control_node-3] [INFO] [1784875794.465610694] [controller_manager]: Shutting down controller 'left_gripper_controller'
+[ros2_control_node-3] [INFO] [1784875794.465634662] [controller_manager]: Deactivating controller 'right_gripper_controller'
+[ros2_control_node-3] [INFO] [1784875794.465661126] [controller_manager]: Shutting down controller 'right_gripper_controller'
+[ros2_control_node-3] [INFO] [1784875794.465698182] [resource_manager]: 'deactivate' hardware 'RightArmEtherCATSystem' 
+[move_group-8] [INFO] [1784875794.464364866] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1784875794.517883685] [resource_manager]: Successful 'deactivate' of hardware 'RightArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875794.517967749] [resource_manager]: 'shutdown' hardware 'RightArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875794.517988037] [resource_manager]: Successful 'shutdown' of hardware 'RightArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875794.518017285] [resource_manager]: 'deactivate' hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875794.518031846] [resource_manager]: Successful 'deactivate' of hardware 'LeftArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875794.518040422] [resource_manager]: 'shutdown' hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875794.518050406] [resource_manager]: Successful 'shutdown' of hardware 'LeftArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875794.518066758] [controller_manager]: Shutting down the controller manager.
+[move_group-8] [INFO] [1784875794.521362768] [moveit.ros_planning_interface.moveit_cpp]: Deleting MoveItCpp
+[move_group-8] [INFO] [1784875794.522344307] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Stopped publishing maintained planning scene.
+[move_group-8] [INFO] [1784875794.524640698] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Stopping world geometry monitor
+[move_group-8] [INFO] [1784875794.525769181] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Stopping planning scene monitor
+[move_group-8] Warning: class_loader.ClassLoader: SEVERE WARNING!!! Attempting to unload library while objects created by this loader exist in the heap! You should delete your objects before attempting to unload the library or destroying the ClassLoader. The library will NOT be unloaded.
+[move_group-8]          at line 127 in ./src/class_loader.cpp
+[INFO] [static_transform_publisher-1]: process has finished cleanly [pid 67721]
+[INFO] [dual_arm_crate_carry-10]: process has finished cleanly [pid 68034]
+[INFO] [robot_state_publisher-2]: process has finished cleanly [pid 67723]
+[INFO] [move_group-8]: process has finished cleanly [pid 67928]
+[move_group-8] 
+[INFO] [ros2_control_node-3]: process has finished cleanly [pid 67725]
+[INFO] [rviz2-9]: process has finished cleanly [pid 67998]
+dky@tegra-ubuntu:~/Documents/guohua_ws$ colcon build
+Starting >>> zhishu_robot_description
+Starting >>> zhishu_robot_hardware
+Starting >>> zhishu_robot_bringup
+Starting >>> zhishu_robot_gazebo
+Starting >>> zhishu_robot_mtc_pick_place
+Finished <<< zhishu_robot_description [0.30s]                                  
+Finished <<< zhishu_robot_bringup [0.28s]                                      
+Finished <<< zhishu_robot_gazebo [0.29s]
+Finished <<< zhishu_robot_mtc_pick_place [0.34s]                            
+Finished <<< zhishu_robot_hardware [0.42s]
+Starting >>> zhishu_robot_moveit_config
+Finished <<< zhishu_robot_moveit_config [0.22s]                  
+
+Summary: 6 packages finished [1.14s]
+dky@tegra-ubuntu:~/Documents/guohua_ws$ ros2 launch zhishu_robot_mtc_pick_place dual_arm_crate_carry.launch.py 
+[INFO] [launch]: All log files can be found below /home/dky/.ros/log/2026-07-24-14-50-45-113426-tegra-ubuntu-68673
+[INFO] [launch]: Default logging verbosity is set to INFO
+Using load_yaml() directly is deprecated. Use xacro.load_yaml() instead.
+Using load_yaml() directly is deprecated. Use xacro.load_yaml() instead.
+[INFO] [static_transform_publisher-1]: process started with pid [68683]
+[INFO] [robot_state_publisher-2]: process started with pid [68685]
+[INFO] [ros2_control_node-3]: process started with pid [68687]
+[INFO] [spawner-4]: process started with pid [68689]
+[static_transform_publisher-1] [WARN] [1784875845.969869091] []: Old-style arguments are deprecated; see --help for new-style arguments
+[static_transform_publisher-1] [INFO] [1784875845.982875050] [world_to_base_tf]: Spinning until stopped - publishing transform
+[static_transform_publisher-1] translation: ('0.000000', '0.000000', '0.000000')
+[static_transform_publisher-1] rotation: ('0.000000', '0.000000', '0.000000', '1.000000')
+[static_transform_publisher-1] from 'world' to 'base_footprint'
+[robot_state_publisher-2] [INFO] [1784875846.037459118] [robot_state_publisher]: got segment L_hand_link
+[robot_state_publisher-2] [INFO] [1784875846.037735471] [robot_state_publisher]: got segment R_hand_link
+[robot_state_publisher-2] [INFO] [1784875846.037758383] [robot_state_publisher]: got segment base_footprint
+[robot_state_publisher-2] [INFO] [1784875846.037769039] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-2] [INFO] [1784875846.037777871] [robot_state_publisher]: got segment camera_link
+[robot_state_publisher-2] [INFO] [1784875846.037785903] [robot_state_publisher]: got segment gripper_base_link
+[robot_state_publisher-2] [INFO] [1784875846.037794191] [robot_state_publisher]: got segment gripper_left_finger_link
+[robot_state_publisher-2] [INFO] [1784875846.037802351] [robot_state_publisher]: got segment gripper_right_finger_link
+[robot_state_publisher-2] [INFO] [1784875846.037809999] [robot_state_publisher]: got segment head_camera_link
+[robot_state_publisher-2] [INFO] [1784875846.037817967] [robot_state_publisher]: got segment head_pitch_link
+[robot_state_publisher-2] [INFO] [1784875846.037826735] [robot_state_publisher]: got segment head_smart_speaker_link
+[robot_state_publisher-2] [INFO] [1784875846.037834959] [robot_state_publisher]: got segment head_yaw_link
+[robot_state_publisher-2] [INFO] [1784875846.037843151] [robot_state_publisher]: got segment laser_link
+[robot_state_publisher-2] [INFO] [1784875846.037851087] [robot_state_publisher]: got segment left_arm_dh_base_link
+[robot_state_publisher-2] [INFO] [1784875846.037858831] [robot_state_publisher]: got segment left_elbow_pitch_link
+[robot_state_publisher-2] [INFO] [1784875846.037866223] [robot_state_publisher]: got segment left_gripper_base_link
+[robot_state_publisher-2] [INFO] [1784875846.037873359] [robot_state_publisher]: got segment left_gripper_left_finger_link
+[robot_state_publisher-2] [INFO] [1784875846.037880591] [robot_state_publisher]: got segment left_gripper_right_finger_link
+[robot_state_publisher-2] [INFO] [1784875846.037887631] [robot_state_publisher]: got segment left_gripper_tcp
+[robot_state_publisher-2] [INFO] [1784875846.037894991] [robot_state_publisher]: got segment left_shoulder_pitch_link
+[robot_state_publisher-2] [INFO] [1784875846.037902351] [robot_state_publisher]: got segment left_shoulder_roll_link
+[robot_state_publisher-2] [INFO] [1784875846.037909583] [robot_state_publisher]: got segment left_shoulder_yaw_link
+[robot_state_publisher-2] [INFO] [1784875846.037917232] [robot_state_publisher]: got segment left_wheel_link
+[robot_state_publisher-2] [INFO] [1784875846.037924816] [robot_state_publisher]: got segment left_wrist_pitch_link
+[robot_state_publisher-2] [INFO] [1784875846.037931984] [robot_state_publisher]: got segment left_wrist_roll_link
+[robot_state_publisher-2] [INFO] [1784875846.037939568] [robot_state_publisher]: got segment left_wrist_yaw_link
+[robot_state_publisher-2] [INFO] [1784875846.037947216] [robot_state_publisher]: got segment right_arm_dh_base_link
+[robot_state_publisher-2] [INFO] [1784875846.037954672] [robot_state_publisher]: got segment right_elbow_pitch_link
+[robot_state_publisher-2] [INFO] [1784875846.037961840] [robot_state_publisher]: got segment right_gripper_tcp
+[robot_state_publisher-2] [INFO] [1784875846.037969328] [robot_state_publisher]: got segment right_shoulder_pitch_link
+[robot_state_publisher-2] [INFO] [1784875846.037976688] [robot_state_publisher]: got segment right_shoulder_roll_link
+[robot_state_publisher-2] [INFO] [1784875846.037984144] [robot_state_publisher]: got segment right_shoulder_yaw_link
+[robot_state_publisher-2] [INFO] [1784875846.037991280] [robot_state_publisher]: got segment right_wheel_link
+[robot_state_publisher-2] [INFO] [1784875846.037999664] [robot_state_publisher]: got segment right_wrist_pitch_link
+[robot_state_publisher-2] [INFO] [1784875846.038007056] [robot_state_publisher]: got segment right_wrist_roll_link
+[robot_state_publisher-2] [INFO] [1784875846.038014256] [robot_state_publisher]: got segment right_wrist_yaw_link
+[robot_state_publisher-2] [INFO] [1784875846.038021616] [robot_state_publisher]: got segment waist_pitch_link
+[robot_state_publisher-2] [INFO] [1784875846.038029200] [robot_state_publisher]: got segment waist_up_down_link
+[ros2_control_node-3] [WARN] [1784875846.044087522] [controller_manager]: [Deprecated] Passing the robot description parameter directly to the control_manager node is deprecated. Use '~/robot_description' topic from 'robot_state_publisher' instead.
+[ros2_control_node-3] [INFO] [1784875846.045134949] [resource_manager]: Loading hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875846.047505196] [resource_manager]: Initialize hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875846.047734605] [resource_manager]: Successful initialization of hardware 'LeftArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875846.047803853] [resource_manager]: Loading hardware 'RightArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875846.050298325] [resource_manager]: Initialize hardware 'RightArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875846.051653721] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_shoulder_pitch_joint motor=right_arm_motor_0 slave_position=0 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875846.051747129] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_shoulder_roll_joint motor=right_arm_motor_1 slave_position=1 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875846.051791545] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_shoulder_yaw_joint motor=right_arm_motor_2 slave_position=2 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875846.051816473] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_elbow_pitch_joint motor=right_arm_motor_3 slave_position=3 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875846.051823193] [EsMotorHardwareInterface]: Joint limit snap enabled: joint=right_elbow_pitch_joint lower=0.000000 upper=nan tolerance=0.005000 rad
+[ros2_control_node-3] [INFO] [1784875846.051846841] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_wrist_yaw_joint motor=right_arm_motor_4 slave_position=4 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875846.051868153] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_wrist_pitch_joint motor=right_arm_motor_5 slave_position=5 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875846.051888826] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_wrist_roll_joint motor=right_arm_motor_6 slave_position=6 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-3] [INFO] [1784875846.051904634] [EsMotorHardwareInterface]: Configured 7 EtherCAT motors for ROS 2 Humble ros2_control.
+[ros2_control_node-3] [INFO] [1784875846.051954874] [resource_manager]: Successful initialization of hardware 'RightArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875846.052177882] [resource_manager]: 'configure' hardware 'RightArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875846.052192442] [EsMotorHardwareInterface]: Hardware configured. EtherCAT will start in on_activate().
+[ros2_control_node-3] [INFO] [1784875846.052204155] [resource_manager]: Successful 'configure' of hardware 'RightArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875846.052213819] [resource_manager]: 'activate' hardware 'RightArmEtherCATSystem' 
+[ros2_control_node-3] ethercat_driver: init_master OK, master=1
+[ros2_control_node-3] ethercat_driver: configure_slave OK, motors=7
+[ros2_control_node-3] ethercat_driver: configure_pdo OK, RxPDO=0x1601 TxPDO=0x1A01
+[ros2_control_node-3] ethercat_driver: activate_master OK master=1 motors=7 cycle=2000000 ns DC=on assign=0x0300 sync0_shift=1000000 ns ref_alias=0 ref_position=0
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_0' address master=1 alias=0 position=0 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_1' address master=1 alias=0 position=1 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_2' address master=1 alias=0 position=2 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_3' address master=1 alias=0 position=3 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_4' address master=1 alias=0 position=4 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_5' address master=1 alias=0 position=5 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_6' address master=1 alias=0 position=6 vendor=0x00206688 product=0x26483052
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=0 wc_state=0
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_0' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_1' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_2' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_3' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_4' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_5' online=1 op=0 al=0x02
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_6' online=1 op=0 al=0x02
+[spawner-4] [INFO] [1784875846.451282347] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=3 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_0' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=6 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_1' online=1 op=0 al=0x04
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_1' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=9 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_2' online=1 op=0 al=0x04
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_2' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=12 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_3' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=18 wc_state=1
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_4' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_5' online=1 op=0 al=0x04
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=21 wc_state=2
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_5' online=1 op=1 al=0x08
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_6' online=1 op=0 al=0x04
+[ros2_control_node-3] ethercat_driver: master slaves=7 al=0x08 link=1 | domain wc=21 wc_state=2
+[ros2_control_node-3] ethercat_driver: motor 'right_arm_motor_6' online=1 op=1 al=0x08
+[ros2_control_node-3] [INFO] [1784875869.322965252] [EsMotorHardwareInterface]: Activated joint 'right_shoulder_pitch_joint' on slave_position=0, hold at 0.000144 rad / 0.01 deg.
+[ros2_control_node-3] [INFO] [1784875869.323161573] [EsMotorHardwareInterface]: Activated joint 'right_shoulder_roll_joint' on slave_position=1, hold at 0.000000 rad / 0.00 deg.
+[ros2_control_node-3] [INFO] [1784875869.323185029] [EsMotorHardwareInterface]: Activated joint 'right_shoulder_yaw_joint' on slave_position=2, hold at -0.000767 rad / -0.04 deg.
+[ros2_control_node-3] [INFO] [1784875869.323200325] [EsMotorHardwareInterface]: Activated joint 'right_elbow_pitch_joint' on slave_position=3, hold at 0.000096 rad / 0.01 deg.
+[ros2_control_node-3] [INFO] [1784875869.323215589] [EsMotorHardwareInterface]: Activated joint 'right_wrist_yaw_joint' on slave_position=4, hold at 0.000096 rad / 0.01 deg.
+[ros2_control_node-3] [INFO] [1784875869.323229541] [EsMotorHardwareInterface]: Activated joint 'right_wrist_pitch_joint' on slave_position=5, hold at 0.000575 rad / 0.03 deg.
+[ros2_control_node-3] [INFO] [1784875869.323242949] [EsMotorHardwareInterface]: Activated joint 'right_wrist_roll_joint' on slave_position=6, hold at -0.000096 rad / -0.01 deg.
+[ros2_control_node-3] [INFO] [1784875869.323325349] [resource_manager]: Successful 'activate' of hardware 'RightArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875869.323382245] [resource_manager]: 'configure' hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875869.323405605] [resource_manager]: Successful 'configure' of hardware 'LeftArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875869.323450662] [resource_manager]: 'activate' hardware 'LeftArmEtherCATSystem' 
+[ros2_control_node-3] [INFO] [1784875869.323468038] [resource_manager]: Successful 'activate' of hardware 'LeftArmEtherCATSystem'
+[ros2_control_node-3] [INFO] [1784875869.330420602] [controller_manager]: update rate is 500 Hz
+[ros2_control_node-3] [INFO] [1784875869.330542171] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-3] [INFO] [1784875869.333515300] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 50.
+[ros2_control_node-3] [WARN] [1784875869.336503949] [EsMotorHardwareInterface]: Joint 'right_shoulder_pitch_joint' is not command-enabled yet: enable_status_ok=1 command_enable=1 operation_enabled=0 status_word=0x1221. Holding current position.
+[ros2_control_node-3] [INFO] [1784875869.489792439] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[spawner-4] [INFO] [1784875869.504166050] [spawner_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[ros2_control_node-3] [INFO] [1784875869.505376934] [controller_manager]: Configuring controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1784875869.505536230] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[spawner-4] [INFO] [1784875869.528450795] [spawner_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[INFO] [spawner-4]: process has finished cleanly [pid 68689]
+[INFO] [spawner-5]: process started with pid [68956]
+[ros2_control_node-3] [INFO] [1784875870.273419552] [controller_manager]: Loading controller 'dual_arm_controller'
+[ros2_control_node-3] [WARN] [1784875870.307008517] [dual_arm_controller]: [Deprecated]: "allow_nonzero_velocity_at_trajectory_end" is set to true. The default behavior will change to false.
+[spawner-5] [INFO] [1784875870.330693483] [spawner_dual_arm_controller]: Loaded dual_arm_controller
+[ros2_control_node-3] [INFO] [1784875870.332271504] [controller_manager]: Configuring controller 'dual_arm_controller'
+[ros2_control_node-3] [INFO] [1784875870.333070835] [dual_arm_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-3] [INFO] [1784875870.333173427] [dual_arm_controller]: Command interfaces are [position] and state interfaces are [position].
+[ros2_control_node-3] [INFO] [1784875870.333257203] [dual_arm_controller]: Using 'splines' interpolation method.
+[ros2_control_node-3] [INFO] [1784875870.334171446] [dual_arm_controller]: Controller state will be published at 50.00 Hz.
+[ros2_control_node-3] [INFO] [1784875870.342847568] [dual_arm_controller]: Goals with partial set of joints are allowed
+[ros2_control_node-3] [INFO] [1784875870.342977744] [dual_arm_controller]: Action status changes will be monitored at 20.00 Hz.
+[spawner-5] [INFO] [1784875870.357858397] [spawner_dual_arm_controller]: Configured and activated dual_arm_controller
+[INFO] [spawner-5]: process has finished cleanly [pid 68956]
+[INFO] [spawner-6]: process started with pid [68985]
+[ros2_control_node-3] [INFO] [1784875871.137164408] [controller_manager]: Loading controller 'left_gripper_controller'
+[ros2_control_node-3] [WARN] [1784875871.146706677] [left_gripper_controller]: [Deprecated]: "allow_nonzero_velocity_at_trajectory_end" is set to true. The default behavior will change to false.
+[spawner-6] [INFO] [1784875871.173309220] [spawner_left_gripper_controller]: Loaded left_gripper_controller
+[ros2_control_node-3] [INFO] [1784875871.174804009] [controller_manager]: Configuring controller 'left_gripper_controller'
+[ros2_control_node-3] [INFO] [1784875871.175006537] [left_gripper_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-3] [INFO] [1784875871.175042121] [left_gripper_controller]: Command interfaces are [position] and state interfaces are [position].
+[ros2_control_node-3] [INFO] [1784875871.175062153] [left_gripper_controller]: Using 'splines' interpolation method.
+[ros2_control_node-3] [INFO] [1784875871.175439338] [left_gripper_controller]: Controller state will be published at 50.00 Hz.
+[ros2_control_node-3] [INFO] [1784875871.181655133] [left_gripper_controller]: Action status changes will be monitored at 20.00 Hz.
+[spawner-6] [INFO] [1784875871.193417888] [spawner_left_gripper_controller]: Configured and activated left_gripper_controller
+[INFO] [spawner-6]: process has finished cleanly [pid 68985]
+[INFO] [spawner-7]: process started with pid [69014]
+[ros2_control_node-3] [INFO] [1784875871.971783800] [controller_manager]: Loading controller 'right_gripper_controller'
+[ros2_control_node-3] [WARN] [1784875871.979116430] [right_gripper_controller]: [Deprecated]: "allow_nonzero_velocity_at_trajectory_end" is set to true. The default behavior will change to false.
+[spawner-7] [INFO] [1784875872.005633950] [spawner_right_gripper_controller]: Loaded right_gripper_controller
+[ros2_control_node-3] [INFO] [1784875872.007100674] [controller_manager]: Configuring controller 'right_gripper_controller'
+[ros2_control_node-3] [INFO] [1784875872.007305027] [right_gripper_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-3] [INFO] [1784875872.007342467] [right_gripper_controller]: Command interfaces are [position] and state interfaces are [position].
+[ros2_control_node-3] [INFO] [1784875872.007363875] [right_gripper_controller]: Using 'splines' interpolation method.
+[ros2_control_node-3] [INFO] [1784875872.007733668] [right_gripper_controller]: Controller state will be published at 50.00 Hz.
+[ros2_control_node-3] [INFO] [1784875872.013090580] [right_gripper_controller]: Action status changes will be monitored at 20.00 Hz.
+[spawner-7] [INFO] [1784875872.023661395] [spawner_right_gripper_controller]: Configured and activated right_gripper_controller
+[INFO] [spawner-7]: process has finished cleanly [pid 69014]
+[INFO] [move_group-8]: process started with pid [69043]
+[move_group-8] [INFO] [1784875872.731957849] [moveit_rdf_loader.rdf_loader]: Loaded robot model in 0.0539928 seconds
+[move_group-8] [INFO] [1784875872.732112506] [moveit_robot_model.robot_model]: Loading robot model 'zhishu_robot'...
+[move_group-8] [INFO] [1784875872.732132762] [moveit_robot_model.robot_model]: No root/virtual joint specified in SRDF. Assuming fixed joint
+[move_group-8] [INFO] [1784875872.766138080] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Publishing maintained planning scene on 'monitored_planning_scene'
+[move_group-8] [INFO] [1784875872.766763617] [moveit.ros_planning_interface.moveit_cpp]: Listening to 'joint_states' for joint states
+[move_group-8] [INFO] [1784875872.767499236] [moveit_ros.current_state_monitor]: Listening to joint states on topic 'joint_states'
+[move_group-8] [INFO] [1784875872.768041509] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Listening to '/attached_collision_object' for attached collision objects
+[move_group-8] [INFO] [1784875872.768069797] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Starting planning scene monitor
+[move_group-8] [INFO] [1784875872.769020136] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Listening to '/planning_scene'
+[move_group-8] [INFO] [1784875872.769049736] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Starting world geometry update monitor for collision objects, attached objects, octomap updates.
+[move_group-8] [INFO] [1784875872.769411273] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Listening to 'collision_object'
+[move_group-8] [INFO] [1784875872.769786987] [moveit_ros.planning_scene_monitor.planning_scene_monitor]: Listening to 'planning_scene_world' for planning scene world geometry
+[move_group-8] [WARN] [1784875872.772573971] [moveit.ros.occupancy_map_monitor.middleware_handle]: Resolution not specified for Octomap. Assuming resolution = 0.1 instead
+[move_group-8] [ERROR] [1784875872.772618291] [moveit.ros.occupancy_map_monitor.middleware_handle]: No 3D sensor plugin(s) defined for octomap updates
+[move_group-8] [INFO] [1784875872.773482582] [moveit.ros_planning_interface.moveit_cpp]: Loading planning pipeline 'ompl'
+[move_group-8] [INFO] [1784875872.800753063] [moveit.ros_planning.planning_pipeline]: Using planning interface 'OMPL'
+[move_group-8] [INFO] [1784875872.809237632] [moveit_ros.add_time_optimal_parameterization]: Param 'ompl.path_tolerance' was not set. Using default value: 0.100000
+[move_group-8] [INFO] [1784875872.809284737] [moveit_ros.add_time_optimal_parameterization]: Param 'ompl.resample_dt' was not set. Using default value: 0.100000
+[move_group-8] [INFO] [1784875872.809293761] [moveit_ros.add_time_optimal_parameterization]: Param 'ompl.min_angle_change' was not set. Using default value: 0.001000
+[move_group-8] [INFO] [1784875872.809348513] [moveit_ros.fix_workspace_bounds]: Param 'ompl.default_workspace_bounds' was not set. Using default value: 10.000000
+[move_group-8] [INFO] [1784875872.809373409] [moveit_ros.fix_start_state_bounds]: Param 'ompl.start_state_max_bounds_error' was set to 0.100000
+[move_group-8] [INFO] [1784875872.809382369] [moveit_ros.fix_start_state_bounds]: Param 'ompl.start_state_max_dt' was not set. Using default value: 0.500000
+[move_group-8] [INFO] [1784875872.809397921] [moveit_ros.fix_start_state_collision]: Param 'ompl.start_state_max_dt' was not set. Using default value: 0.500000
+[move_group-8] [INFO] [1784875872.809405569] [moveit_ros.fix_start_state_collision]: Param 'ompl.jiggle_fraction' was set to 0.050000
+[move_group-8] [INFO] [1784875872.809438497] [moveit_ros.fix_start_state_collision]: Param 'ompl.max_sampling_attempts' was not set. Using default value: 100
+[move_group-8] [INFO] [1784875872.809457889] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Add Time Optimal Parameterization'
+[move_group-8] [INFO] [1784875872.809466401] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Resolve constraint frames to robot links'
+[move_group-8] [INFO] [1784875872.809470465] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Fix Workspace Bounds'
+[move_group-8] [INFO] [1784875872.809474977] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Fix Start State Bounds'
+[move_group-8] [INFO] [1784875872.809479009] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Fix Start State In Collision'
+[move_group-8] [INFO] [1784875872.809483169] [moveit.ros_planning.planning_pipeline]: Using planning request adapter 'Fix Start State Path Constraints'
+[move_group-8] [INFO] [1784875872.811555495] [moveit.ros_planning_interface.moveit_cpp]: Loading planning pipeline 'pilz_industrial_motion_planner'
+[move_group-8] [INFO] [1784875872.818783517] [moveit.pilz_industrial_motion_planner.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-8] [INFO] [1784875872.832645190] [moveit.pilz_industrial_motion_planner]: Available plugins: pilz_industrial_motion_planner/PlanningContextLoaderCIRC pilz_industrial_motion_planner/PlanningContextLoaderLIN pilz_industrial_motion_planner/PlanningContextLoaderPTP 
+[move_group-8] [INFO] [1784875872.832695687] [moveit.pilz_industrial_motion_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderCIRC
+[move_group-8] [INFO] [1784875872.835365487] [moveit.pilz_industrial_motion_planner]: Registered Algorithm [CIRC]
+[move_group-8] [INFO] [1784875872.835404751] [moveit.pilz_industrial_motion_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderLIN
+[move_group-8] [INFO] [1784875872.836653874] [moveit.pilz_industrial_motion_planner]: Registered Algorithm [LIN]
+[move_group-8] [INFO] [1784875872.836680915] [moveit.pilz_industrial_motion_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderPTP
+[move_group-8] [INFO] [1784875872.837801110] [moveit.pilz_industrial_motion_planner]: Registered Algorithm [PTP]
+[move_group-8] [INFO] [1784875872.837860982] [moveit.ros_planning.planning_pipeline]: Using planning interface 'Pilz Industrial Motion Planner'
+[move_group-8] [INFO] [1784875872.881931098] [moveit.plugins.moveit_simple_controller_manager]: Added FollowJointTrajectory controller for dual_arm_controller
+[move_group-8] [INFO] [1784875872.883695007] [moveit.plugins.moveit_simple_controller_manager]: Added FollowJointTrajectory controller for left_gripper_controller
+[move_group-8] [INFO] [1784875872.885266916] [moveit.plugins.moveit_simple_controller_manager]: Added FollowJointTrajectory controller for right_gripper_controller
+[move_group-8] [INFO] [1784875872.885688357] [moveit.plugins.moveit_simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1784875872.885806757] [moveit.plugins.moveit_simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1784875872.886358663] [moveit_ros.trajectory_execution_manager]: Trajectory execution is managing controllers
+[move_group-8] [INFO] [1784875872.886388743] [move_group.move_group]: MoveGroup debug mode is ON
+[move_group-8] [INFO] [1784875872.919837387] [move_group.move_group]: 
+[move_group-8] 
+[move_group-8] ********************************************************
+[move_group-8] * MoveGroup using: 
+[move_group-8] *     - ApplyPlanningSceneService
+[move_group-8] *     - ClearOctomapService
+[move_group-8] *     - ExecuteTaskSolution
+[move_group-8] *     - CartesianPathService
+[move_group-8] *     - ExecuteTrajectoryAction
+[move_group-8] *     - GetPlanningSceneService
+[move_group-8] *     - KinematicsService
+[move_group-8] *     - MoveAction
+[move_group-8] *     - MotionPlanService
+[move_group-8] *     - QueryPlannersService
+[move_group-8] *     - StateValidationService
+[move_group-8] ********************************************************
+[move_group-8] 
+[move_group-8] [INFO] [1784875872.919941772] [moveit_move_group_capabilities_base.move_group_context]: MoveGroup context using planning plugin ompl_interface/OMPLPlanner
+[move_group-8] [INFO] [1784875872.919957132] [moveit_move_group_capabilities_base.move_group_context]: MoveGroup context initialization complete
+[move_group-8] Loading 'move_group/ApplyPlanningSceneService'...
+[move_group-8] Loading 'move_group/ClearOctomapService'...
+[move_group-8] Loading 'move_group/ExecuteTaskSolutionCapability'...
+[move_group-8] Loading 'move_group/MoveGroupCartesianPathService'...
+[move_group-8] Loading 'move_group/MoveGroupExecuteTrajectoryAction'...
+[move_group-8] Loading 'move_group/MoveGroupGetPlanningSceneService'...
+[move_group-8] Loading 'move_group/MoveGroupKinematicsService'...
+[move_group-8] Loading 'move_group/MoveGroupMoveAction'...
+[move_group-8] Loading 'move_group/MoveGroupPlanService'...
+[move_group-8] Loading 'move_group/MoveGroupQueryPlannersService'...
+[move_group-8] Loading 'move_group/MoveGroupStateValidationService'...
+[move_group-8] 
+[move_group-8] You can start planning now!
+[move_group-8] 
+[INFO] [rviz2-9]: process started with pid [69093]
+[rviz2-9] [INFO] [1784875876.719941160] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-9] [INFO] [1784875876.720300521] [rviz2]: OpenGl version: 4.6 (GLSL 4.6)
+[rviz2-9] [INFO] [1784875876.772763206] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-9] Warning: class_loader.impl: SEVERE WARNING!!! A namespace collision has occurred with plugin factory for class rviz_default_plugins::displays::InteractiveMarkerDisplay. New factory will OVERWRITE existing one. This situation occurs when libraries containing plugins are directly linked against an executable (the one running right now generating this message). Please separate plugins out into their own library or just don't link against the library and use either class_loader::ClassLoader/MultiLibraryClassLoader to open.
+[rviz2-9]          at line 253 in /opt/ros/humble/include/class_loader/class_loader/class_loader_core.hpp
+[rviz2-9] [INFO] [1784875877.052460393] [moveit_rdf_loader.rdf_loader]: Loaded robot model in 0.0445911 seconds
+[rviz2-9] [INFO] [1784875877.052623818] [moveit_robot_model.robot_model]: Loading robot model 'zhishu_robot'...
+[rviz2-9] [INFO] [1784875877.052657162] [moveit_robot_model.robot_model]: No root/virtual joint specified in SRDF. Assuming fixed joint
+[INFO] [dual_arm_crate_carry-10]: process started with pid [69157]
+[dual_arm_crate_carry-10] [INFO] [1784875882.919964180] [dual_arm_crate_carry]: Adding the hollow crate to the planning scene
+[dual_arm_crate_carry-10] [INFO] [1784875883.128732642] [dual_arm_crate_carry]: Creating dual-arm MTC stages and solving grasp IK
+[dual_arm_crate_carry-10] [INFO] [1784875883.219169136] [moveit_rdf_loader.rdf_loader]: Loaded robot model in 0.0749154 seconds
+[dual_arm_crate_carry-10] [INFO] [1784875883.219256144] [moveit_robot_model.robot_model]: Loading robot model 'zhishu_robot'...
+[dual_arm_crate_carry-10] [INFO] [1784875883.219273136] [moveit_robot_model.robot_model]: No root/virtual joint specified in SRDF. Assuming fixed joint
+[dual_arm_crate_carry-10] [INFO] [1784875883.246128545] [dual_arm_crate_carry]: Crate center=(0.420, 0.000, 0.600), size=(0.170, 0.350, 0.200), wall=0.010, overhead pregrasp=(y +/- 0.170, z 0.820), rim grasp=(y +/- 0.170, z 0.680), gripper q=0.055, move=(0.120, 0.000, 0.280)
+[rviz2-9] [ERROR] [1784875884.072623746] [moveit_ros_visualization.motion_planning_frame]: Action server: /recognize_objects not available
+[dual_arm_crate_carry-10] [FATAL] [1784875895.310272158] [dual_arm_crate_carry]: No collision-free dual-arm IK branch found after 80 attempts (dual IK solved=0, symmetry rejected=0, bounded=0, collision rejected=0)
+
