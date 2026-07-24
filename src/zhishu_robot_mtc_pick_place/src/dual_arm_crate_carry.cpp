@@ -383,11 +383,29 @@ private:
       get_parameter("initial_acceleration_scaling").as_double());
     auto joint = std::make_shared<mtc::solvers::JointInterpolationPlanner>();
 
-    // Always normalize the dual-arm posture before entering the crate-carry
-    // sequence.  This named SRDF state is the first real motion of the task,
-    // so every subsequent IK/planning stage starts from a predictable posture.
+    // Use deterministic joint-space interpolation for the startup transition.
+    // The robot is expected to start from both_arms_home.  Splitting the motion
+    // through an explicit safe waypoint prevents OMPL/RRTConnect from choosing
+    // a different random route on each launch.
+    auto startup_joint = std::make_shared<mtc::solvers::JointInterpolationPlanner>();
+    startup_joint->setMaxVelocityScalingFactor(
+      get_parameter("initial_velocity_scaling").as_double());
+    startup_joint->setMaxAccelerationScalingFactor(
+      get_parameter("initial_acceleration_scaling").as_double());
+    // Use relatively dense waypoints so collision checking along the fixed
+    // interpolation is more conservative than the default coarse spacing.
+    startup_joint->setProperty("max_step", 0.05);
+
+    auto to_crate_safe =
+      std::make_unique<mtc::stages::MoveTo>(
+        "move both arms to both_arms_crate_safe", startup_joint);
+    to_crate_safe->setGroup("both_arms");
+    to_crate_safe->setGoal("both_arms_crate_safe");
+    task.add(std::move(to_crate_safe));
+
     auto to_crate_pre =
-      std::make_unique<mtc::stages::MoveTo>("move both arms to both_arms_crate_pre", initial_pipeline);
+      std::make_unique<mtc::stages::MoveTo>(
+        "move both arms to both_arms_crate_pre", startup_joint);
     to_crate_pre->setTimeout(10.0);
     to_crate_pre->setGroup("both_arms");
     to_crate_pre->setGoal("both_arms_crate_pre");

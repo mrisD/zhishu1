@@ -146,38 +146,43 @@
         <joint name="right_wrist_pitch_joint" value="0"/>
         <joint name="right_wrist_roll_joint" value="0"/>
     </group_state>
-    <group_state name="both_arms_crate_pre222" group="both_arms">
-        <joint name="left_elbow_pitch_joint" value="1.343"/>
-        <joint name="left_shoulder_pitch_joint" value="-2.27"/>
-        <joint name="left_shoulder_roll_joint" value="-0.296"/>
-        <joint name="left_shoulder_yaw_joint" value="2.320"/>
-        <joint name="left_wrist_pitch_joint" value="0.977"/>
-        <joint name="left_wrist_roll_joint" value="0.663"/>
-        <joint name="left_wrist_yaw_joint" value="0.715"/>
-        <joint name="right_elbow_pitch_joint" value="1.343"/>
-        <joint name="right_shoulder_pitch_joint" value="2.27"/>
-        <joint name="right_shoulder_roll_joint" value="0.296"/>
-        <joint name="right_shoulder_yaw_joint" value="-2.320"/>
-        <joint name="right_wrist_pitch_joint" value="0.977"/>
-        <joint name="right_wrist_roll_joint" value="0.663"/>
-        <joint name="right_wrist_yaw_joint" value="0.715"/>
+    <group_state name="both_arms_crate_safe" group="both_arms">
+        <!-- Left arm: 30°, -25°, -18°, 120°, 2°, 0°, 0° -->
+        <joint name="left_shoulder_pitch_joint" value="0.523599"/>
+        <joint name="left_shoulder_roll_joint" value="-0.436300"/>
+        <joint name="left_shoulder_yaw_joint" value="-0.314159"/>
+        <joint name="left_elbow_pitch_joint" value="2.094395"/>
+        <joint name="left_wrist_yaw_joint" value="0.034907"/>
+        <joint name="left_wrist_pitch_joint" value="0.000000"/>
+        <joint name="left_wrist_roll_joint" value="0.000000"/>
+
+        <!-- Right arm: -30°, 25°, 18°, 120°, 0°, 0°, 0° -->
+        <joint name="right_shoulder_pitch_joint" value="-0.523599"/>
+        <joint name="right_shoulder_roll_joint" value="0.436300"/>
+        <joint name="right_shoulder_yaw_joint" value="0.314159"/>
+        <joint name="right_elbow_pitch_joint" value="2.094395"/>
+        <joint name="right_wrist_yaw_joint" value="0.000000"/>
+        <joint name="right_wrist_pitch_joint" value="0.000000"/>
+        <joint name="right_wrist_roll_joint" value="0.000000"/>
     </group_state>
     <group_state name="both_arms_crate_pre" group="both_arms">
-        <joint name="left_shoulder_pitch_joint" value="-2.443461"/>
-        <joint name="left_shoulder_roll_joint" value="-0.279253"/>
-        <joint name="left_shoulder_yaw_joint" value="2.408554"/>
-        <joint name="left_elbow_pitch_joint" value="1.431170"/>
-        <joint name="left_wrist_yaw_joint" value="-1.099557"/>
-        <joint name="left_wrist_pitch_joint" value="0.645772"/>
-        <joint name="left_wrist_roll_joint" value="0.767945"/>
+        <!-- Left arm: 30°, -25°, -18°, 120°, 2°, 0°, 0° -->
+        <joint name="left_shoulder_pitch_joint" value="0.523599"/>
+        <joint name="left_shoulder_roll_joint" value="-0.436300"/>
+        <joint name="left_shoulder_yaw_joint" value="-0.314159"/>
+        <joint name="left_elbow_pitch_joint" value="2.094395"/>
+        <joint name="left_wrist_yaw_joint" value="0.034907"/>
+        <joint name="left_wrist_pitch_joint" value="0.000000"/>
+        <joint name="left_wrist_roll_joint" value="0.000000"/>
 
-        <joint name="right_shoulder_pitch_joint" value="2.443461"/>
-        <joint name="right_shoulder_roll_joint" value="0.279253"/>
-        <joint name="right_shoulder_yaw_joint" value="-2.408554"/>
-        <joint name="right_elbow_pitch_joint" value="1.431170"/>
-        <joint name="right_wrist_yaw_joint" value="1.099557"/>
-        <joint name="right_wrist_pitch_joint" value="0.645772"/>
-        <joint name="right_wrist_roll_joint" value="-0.767945"/>
+        <!-- Right arm: -30°, 25°, 18°, 120°, 0°, 0°, 0° -->
+        <joint name="right_shoulder_pitch_joint" value="-0.523599"/>
+        <joint name="right_shoulder_roll_joint" value="0.436300"/>
+        <joint name="right_shoulder_yaw_joint" value="0.314159"/>
+        <joint name="right_elbow_pitch_joint" value="2.094395"/>
+        <joint name="right_wrist_yaw_joint" value="0.000000"/>
+        <joint name="right_wrist_pitch_joint" value="0.000000"/>
+        <joint name="right_wrist_roll_joint" value="0.000000"/>
     </group_state>
     <group_state name="left_gripper_opened" group="left_gripper">
         <joint name="left_gripper_left_finger_joint" value="0"/>
