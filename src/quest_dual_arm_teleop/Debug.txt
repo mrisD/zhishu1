@@ -1,0 +1,181 @@
+一、停止旧的 ROS 2 程序
+先把以前启动的 MoveIt、MTC、Servo 等终端全部按 Ctrl+C 停止。
+刷新 ROS 2 节点缓存：
+ros2 daemon stop
+ros2 daemon start
+检查是否还有旧节点：
+ros2 node list | grep -E "move_group|servo|quest|controller_manager|robot_state_publisher"
+此时最好没有输出。
+本次只能启动 quest_dual_arm_teleop.launch.py
+
+二、编译最新版源码
+
+三、连接 Quest，并重新安装当前 APK
+Quest 开启开发者模式，用 USB 连接电脑，在头显中允许 USB 调试。
+检查：adb devices
+必须是：3487C10J1205LL    device
+不能是 unauthorized 或 no permissions。
+安装你这次上传的 APK。如果 APK 在当前目录：（）
+adb install -r './QuestDualArmTeleop(1).apk'
+从你的日志看，APK 包名是：
+com.UnityTechnologies.com.unity.template.urpblank
+
+四、建立 USB 端口反向映射
+每次 Quest 重新连接或重启后，都建议重新执行：
+adb reverse --remove tcp:5005
+adb reverse tcp:5005 tcp:5005
+adb reverse --list
+第二条命令只返回：5005
+adb reverse --list 应包含：tcp:5005 tcp:5005
+APK 内已经设置为：
+Host = 127.0.0.1
+Port = 5005
+SendRate = 72 Hz
+因此不需要查电脑局域网 IP。
+
+五、启动 ROS 2 遥操作系统
+终端1：
+cd ~/文档/test2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+ros2 launch quest_dual_arm_teleop \
+  quest_dual_arm_teleop.launch.py \
+  launch_rviz:=true \
+  tcp_port:=5005
+  
+  等待终端出现类似：
+    Configured and activated left_arm_controller
+    Configured and activated right_arm_controller
+    Quest dual-arm teleop listening on 0.0.0.0:5005
+    
+检查端口：
+    ss -lntp | grep ':5005'
+    
+应看到 LISTEN。
+六、检查控制器和 Servo
+新开终端2：
+检查控制器：ros2 control list_controllers
+不能有激活的：dual_arm_controller
+继续确认左右臂参数：
+ros2 param get /left_arm_controller joints
+ros2 param get /left_arm_controller command_interfaces
+
+ros2 param get /right_arm_controller joints
+ros2 param get /right_arm_controller command_interfaces
+左右臂都应该有7个关节，并且：command_interfaces = [position]
+启动 Servo。虽然启动文件会自动调用一次，但这里再确认一次：
+ros2 service call /left_servo/start_servo \
+  std_srvs/srv/Trigger "{}"
+
+ros2 service call /right_servo/start_servo \
+  std_srvs/srv/Trigger "{}"
+应返回：success=true
+检查状态：
+新终端1
+ros2 topic echo /left_servo/status
+新终端2
+ros2 topic echo /right_servo/status
+状态为：data: 0  表示正常。检查完按 Ctrl+C。
+七、先让虚拟双臂进入 Servo 初始姿态
+全零位姿接近奇异点，不适合直接进行笛卡尔 Servo 控制。
+运行：
+ros2 launch quest_dual_arm_teleop \
+  move_to_servo_ready.launch.py
+ 
+ 预期出现：
+ Plan succeeded. Executing...
+Reached both_arms_servo_ready successfully.
+同时观察 RViz，左右机械臂应该移动到弯曲且相对安全的初始姿态。
+如果这一步失败，暂时不要操作 Quest。
+
+八、不连接 Quest，先验证 Servo 链路
+先测试左臂关节控制：
+ros2 run quest_dual_arm_teleop servo_joint_smoke_test.py \
+  --arm left \
+  --joint elbow_pitch \
+  --speed 0.05 \
+  --duration 1.0
+再测试左臂笛卡尔运动：
+ros2 run quest_dual_arm_teleop servo_smoke_test.py \
+  --arm left \
+  --axis linear_x \
+  --speed 0.01 \
+  --duration 1.0
+然后测试右臂：
+ros2 run quest_dual_arm_teleop servo_smoke_test.py \
+  --arm right \
+  --axis linear_x \
+  --speed 0.01 \
+  --duration 1.0
+九、真正启动 Quest 应用
+确保 ROS 2 的 5005 服务已经启动，然后运行：
+adb shell am force-stop \
+  com.UnityTechnologies.com.unity.template.urpblank
+
+adb shell monkey \
+  -p com.UnityTechnologies.com.unity.template.urpblank \
+  -c android.intent.category.LAUNCHER \
+  1
+戴上 Quest，确认应用已经进入前台。
+检查应用进程：
+adb shell pidof \
+  com.UnityTechnologies.com.unity.template.urpblank
+如果输出一串数字，说明应用正在运行。
+ROS 启动终端应该出现：
+Quest client connected from ...
+
+十、验证 Quest 数据
+先检查连接状态：
+
+ros2 topic echo --once /quest/connected
+必须得到：data: true
+检查左右手柄频率：
+timeout 5s ros2 topic hz /quest/left_controller/pose
+timeout 5s ros2 topic hz /quest/right_controller/pose
+两侧应接近：average rate: 72 稍有波动正常。
+检查侧握键运行：
+ros2 topic echo /quest/left_controller/deadman
+不按侧握键：data: false
+按住左手柄侧面的 Grip 键：data: true
+右手柄检查：ros2 topic echo /quest/right_controller/deadman
+注意：当前程序使用的是侧握 Grip 键，不是食指 Trigger 扳机键。Trigger 数据虽然被读取，但目前没有用于控制。
+
+十一、第一次手柄控制
+按下面顺序进行：
+1.手柄保持不动。
+2.按住左手柄 Grip。
+3.等待约1秒。
+4.将左手柄缓慢移动2～3厘米。
+5.观察 RViz 左臂。
+6.松开 Grip，左臂必须立即停止。
+7.再用同样方式测试右臂。
+8.最后才同时按住两个 Grip 测试双臂。
+坐标映射为：
+手柄向前  → 机械臂沿 base_link +X
+手柄向右  → 机械臂沿 base_link -Y
+手柄向上  → 机械臂沿 base_link +Z
+当前限制是：
+最大线速度：0.06 m/s
+最大角速度：0.30 rad/s
+Grip 阈值：0.65
+断连超时：0.15 s
+
+十二、联机期间的监控命令
+检查 Servo 是否收到手柄命令：
+ros2 topic hz /left_servo/delta_twist_cmds
+按住左 Grip 并移动手柄时，应该出现频率；松开后停止持续发布。
+检查 Servo 是否向控制器输出轨迹：
+ros2 topic hz /left_arm_controller/joint_trajectory
+右臂对应：
+ros2 topic hz /right_servo/delta_twist_cmds
+ros2 topic hz /right_arm_controller/joint_trajectory
+
+
+停止顺序
+先松开两个 Grip，然后执行：
+adb shell am force-stop \
+  com.UnityTechnologies.com.unity.template.urpblank
+确认：ros2 topic echo --once /quest/connected
+变为：data: false
+最后在 ROS 2 启动终端按 Ctrl+C。

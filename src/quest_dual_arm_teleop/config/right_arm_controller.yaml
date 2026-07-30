@@ -1,0 +1,19 @@
+/**:
+  ros__parameters:
+    joints:
+      - right_shoulder_pitch_joint
+      - right_shoulder_roll_joint
+      - right_shoulder_yaw_joint
+      - right_elbow_pitch_joint
+      - right_wrist_yaw_joint
+      - right_wrist_pitch_joint
+      - right_wrist_roll_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    open_loop_control: false
+    allow_nonzero_velocity_at_trajectory_end: true
