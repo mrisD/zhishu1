@@ -36,6 +36,10 @@ def generate_launch_description():
     strict_ik_collision_filter = LaunchConfiguration("strict_ik_collision_filter")
     initial_velocity_scaling = LaunchConfiguration("initial_velocity_scaling")
     initial_acceleration_scaling = LaunchConfiguration("initial_acceleration_scaling")
+    planning_attempts = LaunchConfiguration("planning_attempts")
+    task_attempts = LaunchConfiguration("task_attempts")
+    stage_timeout = LaunchConfiguration("stage_timeout")
+    state_wait_timeout = LaunchConfiguration("state_wait_timeout")
     moveit_config_package = "zhishu_robot_moveit_config"
     moveit_share = get_package_share_directory(moveit_config_package)
     controllers_yaml = os.path.join(
@@ -170,6 +174,15 @@ def generate_launch_description():
                 ),
                 "execute": ParameterValue(execute, value_type=bool),
                 "max_solutions": 5,
+                "planning_attempts": ParameterValue(
+                    planning_attempts, value_type=int
+                ),
+                "task_attempts": ParameterValue(task_attempts, value_type=int),
+                "stage_timeout": ParameterValue(stage_timeout, value_type=float),
+                "state_wait_timeout": ParameterValue(
+                    state_wait_timeout, value_type=float
+                ),
+                "planner_id": "RRTConnectkConfigDefault",
                 "initial_velocity_scaling": ParameterValue(
                     initial_velocity_scaling, value_type=float
                 ),
@@ -214,8 +227,8 @@ def generate_launch_description():
             target_action=move_group,
             on_start=[
                 TimerAction(period=3.0, actions=[rviz]),
-                # Give move_group time to advertise /get_planning_scene and
-                # receive the first complete joint state before MTC starts.
+                # Reduce startup contention. The MTC node also performs a
+                # bounded readiness check instead of relying on this delay.
                 TimerAction(period=8.0, actions=[mtc_node]),
             ],
         )
@@ -248,6 +261,12 @@ def generate_launch_description():
         DeclareLaunchArgument("strict_ik_collision_filter", default_value="false"),
         DeclareLaunchArgument("initial_velocity_scaling", default_value="0.25"),
         DeclareLaunchArgument("initial_acceleration_scaling", default_value="0.25"),
+        # PipelinePlanner defaults to one attempt. Multiple OMPL attempts plus
+        # complete-task retries make the stochastic dual-arm plan robust.
+        DeclareLaunchArgument("planning_attempts", default_value="8"),
+        DeclareLaunchArgument("task_attempts", default_value="3"),
+        DeclareLaunchArgument("stage_timeout", default_value="15.0"),
+        DeclareLaunchArgument("state_wait_timeout", default_value="30.0"),
         static_tf,
         robot_state_publisher,
         ros2_control,

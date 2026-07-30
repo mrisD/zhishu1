@@ -1,5 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 
+#include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit/robot_state/robot_state.h>
@@ -72,6 +73,14 @@ public:
     declare_if_missing("carry_steps", 15);
     declare_if_missing("execute", false);
     declare_if_missing("max_solutions", 5);
+    // PipelinePlanner defaults to one sampling-planner attempt.  This task
+    // contains several dual-arm OMPL stages, so one unlucky RRT seed must not
+    // fail the whole task.
+    declare_if_missing("planning_attempts", 8);
+    declare_if_missing("task_attempts", 3);
+    declare_if_missing("stage_timeout", 15.0);
+    declare_if_missing("state_wait_timeout", 30.0);
+    declare_if_missing("planner_id", std::string("RRTConnectkConfigDefault"));
     // Use a separate, lower speed for the first arm motion from the current
     // robot state to the overhead pregrasp pose.
     declare_if_missing("initial_velocity_scaling", 0.05);
@@ -86,26 +95,63 @@ public:
 
   void run()
   {
+    waitForCurrentRobotState();
     RCLCPP_INFO(get_logger(), "Adding the hollow crate to the planning scene");
     addHollowCrate();
-    RCLCPP_INFO(get_logger(), "Creating dual-arm MTC stages and solving grasp IK");
-    task_ = createTask();
-    try {
-      task_.init();
-    } catch (const mtc::InitStageException& e) {
-      RCLCPP_ERROR(get_logger(), "MTC initialization failed: %s", e.what());
-      return;
+
+    const auto max_solutions_parameter = get_parameter("max_solutions").as_int();
+    const auto task_attempts_parameter = get_parameter("task_attempts").as_int();
+    if (max_solutions_parameter < 1 || max_solutions_parameter > 100) {
+      throw std::runtime_error("max_solutions must be between 1 and 100");
+    }
+    if (task_attempts_parameter < 1 || task_attempts_parameter > 10) {
+      throw std::runtime_error("task_attempts must be between 1 and 10");
+    }
+    const auto max_solutions = static_cast<std::size_t>(max_solutions_parameter);
+    const auto task_attempts = static_cast<std::size_t>(task_attempts_parameter);
+
+    bool planned = false;
+    for (std::size_t attempt = 1; attempt <= task_attempts; ++attempt) {
+      RCLCPP_INFO(
+        get_logger(),
+        "Creating and planning dual-arm MTC task (task attempt %zu/%zu)",
+        attempt, task_attempts);
+      try {
+        task_ = createTask();
+        // Task::plan() initializes the task internally. Calling init()
+        // separately initializes every stage twice.
+        const auto result = task_.plan(max_solutions);
+        if (result && task_.numSolutions() > 0) {
+          planned = true;
+          break;
+        }
+        RCLCPP_WARN(
+          get_logger(),
+          "MTC task attempt %zu/%zu failed (MoveIt error code %d)",
+          attempt, task_attempts, result.val);
+      } catch (const mtc::InitStageException& e) {
+        RCLCPP_ERROR(
+          get_logger(), "MTC initialization failed on attempt %zu/%zu: %s",
+          attempt, task_attempts, e.what());
+      } catch (const std::exception& e) {
+        RCLCPP_WARN(
+          get_logger(), "MTC task attempt %zu/%zu failed while generating goals: %s",
+          attempt, task_attempts, e.what());
+      }
     }
 
-    const auto max_solutions = static_cast<std::size_t>(get_parameter("max_solutions").as_int());
-    if (!task_.plan(max_solutions) || task_.numSolutions() == 0) {
-      RCLCPP_ERROR(get_logger(), "No dual-arm crate-carry solution found");
+    if (!planned) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "No dual-arm crate-carry solution found after %zu complete task attempts",
+        task_attempts);
       task_.printState();
       return;
     }
 
     task_.introspection().publishSolution(*task_.solutions().front());
-    RCLCPP_INFO(get_logger(), "Planning succeeded. The hollow crate moves by 0.30 m.");
+    RCLCPP_INFO(
+      get_logger(), "Planning succeeded with %zu solution(s)", task_.numSolutions());
 
     if (get_parameter("execute").as_bool()) {
       const auto result = task_.execute(*task_.solutions().front());
@@ -118,6 +164,46 @@ public:
   }
 
 private:
+  void waitForCurrentRobotState()
+  {
+    const double timeout = get_parameter("state_wait_timeout").as_double();
+    if (timeout <= 0.0 || timeout > 300.0) {
+      throw std::runtime_error(
+        "state_wait_timeout must be greater than 0 and at most 300 seconds");
+    }
+
+    RCLCPP_INFO(
+      get_logger(),
+      "Waiting up to %.1f s for a complete both_arms joint state",
+      timeout);
+    moveit::planning_interface::MoveGroupInterface move_group(
+      shared_from_this(), "both_arms", std::shared_ptr<tf2_ros::Buffer>(),
+      rclcpp::Duration::from_seconds(timeout));
+    const auto state = move_group.getCurrentState(timeout);
+    if (!state) {
+      throw std::runtime_error(
+        "Timed out waiting for a complete both_arms joint state. "
+        "Check joint_state_broadcaster and /joint_states before planning.");
+    }
+
+    const auto* group = state->getJointModelGroup("both_arms");
+    if (!group) {
+      throw std::runtime_error("Robot model does not contain the both_arms group");
+    }
+    std::vector<double> positions;
+    state->copyJointGroupPositions(group, positions);
+    if (positions.empty() ||
+        !std::all_of(positions.begin(), positions.end(), [](double value) {
+          return std::isfinite(value);
+        })) {
+      throw std::runtime_error(
+        "Received an incomplete or non-finite both_arms joint state");
+    }
+    RCLCPP_INFO(
+      get_logger(), "Complete current state received for %zu arm joints",
+      positions.size());
+  }
+
   static geometry_msgs::msg::Pose makePose(
     double x, double y, double z, const std::vector<double>& rpy)
   {
@@ -370,13 +456,30 @@ private:
 
     auto current = std::make_unique<mtc::stages::CurrentState>("current state");
     task.add(std::move(current));
+    const auto planning_attempts_parameter = get_parameter("planning_attempts").as_int();
+    const double stage_timeout = get_parameter("stage_timeout").as_double();
+    if (planning_attempts_parameter < 1 || planning_attempts_parameter > 100) {
+      throw std::runtime_error("planning_attempts must be between 1 and 100");
+    }
+    if (stage_timeout <= 0.0 || stage_timeout > 300.0) {
+      throw std::runtime_error(
+        "stage_timeout must be greater than 0 and at most 300 seconds");
+    }
+    const auto planning_attempts =
+      static_cast<unsigned int>(planning_attempts_parameter);
+    const auto planner_id = get_parameter("planner_id").as_string();
+
     // Normal-speed planner used by the grasp, carry and retreat stages.
     auto pipeline = std::make_shared<mtc::solvers::PipelinePlanner>(shared_from_this());
+    pipeline->setPlannerId(planner_id);
+    pipeline->setProperty("num_planning_attempts", planning_attempts);
     pipeline->setMaxVelocityScalingFactor(get_parameter("velocity_scaling").as_double());
     pipeline->setMaxAccelerationScalingFactor(get_parameter("acceleration_scaling").as_double());
     // Reduced-speed planner for the startup approach stages.
     auto initial_pipeline =
       std::make_shared<mtc::solvers::PipelinePlanner>(shared_from_this());
+    initial_pipeline->setPlannerId(planner_id);
+    initial_pipeline->setProperty("num_planning_attempts", planning_attempts);
     initial_pipeline->setMaxVelocityScalingFactor(
       get_parameter("initial_velocity_scaling").as_double());
     initial_pipeline->setMaxAccelerationScalingFactor(
@@ -406,7 +509,7 @@ private:
     auto to_crate_pre =
       std::make_unique<mtc::stages::MoveTo>(
         "move both arms to both_arms_crate_pre", startup_joint);
-    to_crate_pre->setTimeout(10.0);
+    to_crate_pre->setTimeout(stage_timeout);
     to_crate_pre->setGroup("both_arms");
     to_crate_pre->setGoal("both_arms_crate_pre");
     task.add(std::move(to_crate_pre));
@@ -569,7 +672,7 @@ private:
     // through the crate, so let OMPL find a collision-free route to it.
     // auto to_pre = std::make_unique<mtc::stages::MoveTo>("both arms to pregrasp", pipeline);
     auto to_pre = std::make_unique<mtc::stages::MoveTo>("both arms to pregrasp", initial_pipeline);
-    to_pre->setTimeout(5.0);
+    to_pre->setTimeout(stage_timeout);
     to_pre->setGroup("both_arms");
     to_pre->setGoal(pre_goal);
     task.add(std::move(to_pre));
@@ -584,7 +687,7 @@ private:
 
     auto to_grasp =
       std::make_unique<mtc::stages::MoveTo>("both arms grasp upper side rims", pipeline);
-    to_grasp->setTimeout(5.0);
+    to_grasp->setTimeout(stage_timeout);
     to_grasp->setGroup("both_arms");
     to_grasp->setGoal(grasp_goal);
     task.add(std::move(to_grasp));
@@ -628,7 +731,7 @@ private:
     // Keep contact collision allowed while both grippers move away from the
     // just-released side walls. Restore normal collision checking afterwards.
     auto retreat = std::make_unique<mtc::stages::MoveTo>("retreat both arms from placed crate", pipeline);
-    retreat->setTimeout(5.0);
+    retreat->setTimeout(stage_timeout);
     retreat->setGroup("both_arms");
     retreat->setGoal(retreat_goal);
     task.add(std::move(retreat));
