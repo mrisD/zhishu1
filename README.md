@@ -1,16 +1,19 @@
 # guohua_ws  
 
-
-###启动mtc抓取程序  
-ros2 launch zhishu_robot_mtc_pick_place mtc_demos.launch.py  
-
-
-ros2 launch zhishu_robot_hardware driver.launch.py slave_position:=2
-
-ros2 topic pub --once /drive3/relative_deg std_msgs/msg/Float64 "{data: 90.0}"
+安装依赖  
+首先安装rosdep工具  
+wget http://fishros.com/install -O fishros && . fishros  
+  [3]:一键安装:rosdep(小鱼的rosdepc,又快又好用)  
+安装完毕后执行  
+  rosdep update  
 
 
-igh主站(x86)-------------------------------------  
+在src同级目录下执行  
+cd ~/guohua_ws  
+ 
+rosdep install --from-paths src --ignore-src -r -y --rosdistro humble --skip-keys "gazebo_ros ros_gz ros_gz_sim gz_ros2_control gz_ros2_control_demos"  
+
+安装igh主站(x86)-------------------------------------  
 install igh master (x86 & arm64) 
 cd /opt  
 sudo git clone https://gitlab.com/etherlab.org/ethercat.git  
@@ -109,25 +112,14 @@ gedit ~/.bashrc
 保存退出重新打开终端  
 查询版本 echo $RMW_IMPLEMENTATION
 
-安装依赖  
-首先安装rosdep工具  
-wget http://fishros.com/install -O fishros && . fishros  
-  [3]:一键安装:rosdep(小鱼的rosdepc,又快又好用)  
-安装完毕后执行
-  rosdep update
 
-
-在src同级目录下执行 
-cd ~/guohua_ws  
- 
-rosdep install --from-paths src --ignore-src -r -y --rosdistro humble --skip-keys "gazebo_ros ros_gz ros_gz_sim gz_ros2_control gz_ros2_control_demos"  
 
 
 
 Gazobo仿真相关配置
-export IGN_GAZEBO_RESOURCE_PATH=/home/zhul/online/guohua_ws/src/zhishu_robot_gazebo/models
+export IGN_GAZEBO_RESOURCE_PATH=～/online/guohua_ws/src/zhishu_robot_gazebo/models
 
-echo "alias robot='bash /home/zhul/online/guohua_ws/src/zhishu_robot_bringup/scripts/zhishu_robot_gazebo.sh'" >> ~/.bashrc && source ~/.bashrc
+echo "alias robot='bash ～/online/guohua_ws/src/zhishu_robot_bringup/scripts/zhishu_robot_gazebo.sh'" >> ~/.bashrc && source ~/.bashrc
 
 
 性能测试  
@@ -135,3 +127,15 @@ stress-ng --cpu 0 --io 4 --vm 2 --vm-bytes 512M --timeout 120s
 sudo cyclictest -S -p95 -m -i1000 -l100000 -q  
 时实性检测  
 cat /sys/kernel/realtime 
+
+###启动mtc抓取程序  
+ros2 launch zhishu_robot_mtc_pick_place mtc_demos.launch.py  
+
+
+###启动moveit程序
+ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py
+
+###其他
+ros2 launch zhishu_robot_hardware driver.launch.py slave_position:=2
+
+ros2 topic pub --once /drive3/relative_deg std_msgs/msg/Float64 "{data: 90.0}"
