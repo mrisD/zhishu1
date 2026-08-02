@@ -1,14 +1,22 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="zhishu_robot_left_arm_ros2_control" params="name initial_positions_file">
-        <xacro:property name="initial_positions" value="${load_yaml(initial_positions_file)['initial_positions']}"/>
+    <xacro:macro name="zhishu_robot_left_arm_ros2_control" params="name initial_positions_file use_gazebo:=false use_fake_hardware:=true">
+        <xacro:property name="initial_positions" value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
 
         <ros2_control name="${name}" type="system">
             <hardware>
-                <!-- By default, set up controllers for simulation. This won't work on real hardware -->
-                <plugin>mock_components/GenericSystem</plugin>
-                <param name="calculate_dynamics">true</param>
-                <!-- <plugin>left_es_motor_hardware/LeftEsMotorHardwareInterface</plugin> -->
+                <xacro:if value="${use_gazebo}">
+                    <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+                </xacro:if>
+                <xacro:unless value="${use_gazebo}">
+                    <xacro:if value="${use_fake_hardware}">
+                        <plugin>mock_components/GenericSystem</plugin>
+                        <param name="calculate_dynamics">true</param>
+                    </xacro:if>
+                    <xacro:unless value="${use_fake_hardware}">
+                        <plugin>left_es_motor_hardware/LeftEsMotorHardwareInterface</plugin>
+                    </xacro:unless>
+                </xacro:unless>
                 <!-- IgH EtherCAT / GH1 SERVOPACK defaults. Per-joint params below can override these. -->
                 <param name="cycle_ns">2000000</param>
                 <param name="enable_dc">true</param>
@@ -114,8 +122,8 @@
             </joint>
 
 
-            <!-- Keep both non-EtherCAT gripper command interfaces in one mock
-                 hardware component. GenericSystem on ROS 2 Humble receives the
+            <!-- Keep both non-EtherCAT gripper command interfaces in one
+                 hardware component. GenericSystem receives the
                  complete mode-switch request and rejects foreign gripper joints
                  when the two grippers are split across different components. -->
             <joint name="gripper_left_finger_joint">

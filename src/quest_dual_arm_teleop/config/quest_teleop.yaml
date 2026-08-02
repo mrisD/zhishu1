@@ -8,13 +8,19 @@ quest_dual_arm_teleop:
     left_twist_topic: "/left_servo/delta_twist_cmds"
     right_twist_topic: "/right_servo/delta_twist_cmds"
 
-    # 手柄速度到机械臂末端速度的比例。
-    translation_scale: 0.35
-    rotation_scale: 0.50
+    # 这台真机的竖直命令方向与 Quest/OpenXR 的 +Y 方向相反。
+    # 只反转发给 MoveIt Servo 的 Z 线速度，不改变手柄姿态显示和旋转方向。
+    invert_vertical_command: true
 
-    # 真机首次测试必须保持低速。
-    max_linear_speed: 0.06
-    max_angular_speed: 0.30
+    # 手柄速度到机械臂末端速度的比例。
+    # 旧值 0.35/0.50 配合下面的低速度上限会频繁饱和，快速移动手柄时
+    # 大部分位移会被截掉。下面的值在保留真机限速的同时提高跟手性。
+    translation_scale: 0.70
+    rotation_scale: 0.75
+
+    # 真机末端速度硬上限；MoveIt Servo 配置中还有相同的第二层保护。
+    max_linear_speed: 0.15
+    max_angular_speed: 0.60
 
     # 各手柄侧握键达到此值后，只使能对应侧机械臂。
     grip_threshold: 0.65
@@ -23,7 +29,7 @@ quest_dual_arm_teleop:
     input_timeout: 0.15
 
     # 一阶低通滤波：越小越平滑，越大响应越快。
-    filter_alpha: 0.25
+    filter_alpha: 0.35
 
     # 防止 Quest 重定位或跟踪跳变导致机械臂突动。
     max_packet_translation_jump: 0.12

@@ -20,10 +20,10 @@ Quest 左右手柄 OpenXR 位姿/侧握键
 ```bash
 sudo apt update
 sudo apt install -y \
-  ros-humble-moveit-servo \
-  ros-humble-controller-manager \
-  ros-humble-joint-trajectory-controller \
-  ros-humble-eigen3-cmake-module
+  ros-jazzy-moveit-servo \
+  ros-jazzy-controller-manager \
+  ros-jazzy-joint-trajectory-controller \
+  ros-jazzy-eigen3-cmake-module
 ```
 
 ## 2. 放入工作空间并编译
@@ -43,7 +43,7 @@ source install/setup.bash
 不要同时启动原来的 `zhishu_robot.moveit.launch.py`，因为原启动文件默认激活 `dual_arm_controller`，会和左右独立控制器争用相同关节。
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source ~/your_ws/install/setup.bash
 ros2 launch quest_dual_arm_teleop quest_dual_arm_teleop.launch.py
 ```
@@ -124,21 +124,26 @@ ros2 topic hz /quest/right_controller/pose
 ```text
 Quest +Z 前  -> ROS +X 前
 Quest +X 右  -> ROS -Y 右
-Quest +Y 上  -> ROS +Z 上
+Quest +Y 上  -> ROS +Z（手柄姿态话题）
 ```
+
+当前真机安装下，MoveIt Servo 的竖直指令方向与上述 Quest 显示坐标相反，
+因此 `invert_vertical_command: true` 仅反转机器人命令的 Z 线速度。若机器人安装方向改变，
+将该参数设为 `false` 即可，无需改动 URDF。
 
 ## 7. 首次真机参数
 
 `config/quest_teleop.yaml` 已使用保守值：
 
 ```yaml
-translation_scale: 0.35
-rotation_scale: 0.50
-max_linear_speed: 0.06
-max_angular_speed: 0.30
+invert_vertical_command: true
+translation_scale: 0.70
+rotation_scale: 0.75
+max_linear_speed: 0.15
+max_angular_speed: 0.60
 grip_threshold: 0.65
 input_timeout: 0.15
-filter_alpha: 0.25
+filter_alpha: 0.35
 ```
 
 调参顺序：

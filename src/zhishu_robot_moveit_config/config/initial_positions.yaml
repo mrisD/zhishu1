@@ -1,13 +1,16 @@
 # Default initial positions for zhishu_robot's ros2_control fake system
 
 initial_positions:
-  gripper_left_finger_joint: 0.06
-  left_gripper_left_finger_joint: 0.06
+  # Start both grippers fully open. MoveIt can close them to 0.06 later.
+  gripper_left_finger_joint: 0.0
+  left_gripper_left_finger_joint: 0.0
    
   left_shoulder_pitch_joint: 0
   left_shoulder_roll_joint: 0
   left_shoulder_yaw_joint: 0
-  left_elbow_pitch_joint: 0
+  # Keep bounded elbow joints just inside their hard 0 rad lower limit. This
+  # prevents Gazebo physics round-off from reporting a tiny negative position.
+  left_elbow_pitch_joint: 0.001
   left_wrist_pitch_joint: 0
   left_wrist_roll_joint: 0
   left_wrist_yaw_joint: 0
@@ -15,7 +18,7 @@ initial_positions:
   right_shoulder_pitch_joint: 0
   right_shoulder_roll_joint: 0
   right_shoulder_yaw_joint: 0
-  right_elbow_pitch_joint: 0
+  right_elbow_pitch_joint: 0.001
   right_wrist_pitch_joint: 0
   right_wrist_roll_joint: 0
   right_wrist_yaw_joint: 0

@@ -3,10 +3,13 @@ import os
 
 from launch import LaunchDescription
 from launch.actions import (
+    DeclareLaunchArgument,
     ExecuteProcess,
     RegisterEventHandler,
 )
 from launch.event_handlers import OnProcessExit, OnProcessStart
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -14,6 +17,8 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 
 def generate_launch_description():
+    use_fake_hardware = LaunchConfiguration("use_fake_hardware")
+    use_rviz = LaunchConfiguration("use_rviz")
     # ==============================
     # 包路径查找
     # ==============================
@@ -31,7 +36,13 @@ def generate_launch_description():
     # ==============================
     moveit_config = (
         MoveItConfigsBuilder("zhishu_robot", package_name="zhishu_robot_moveit_config")
-        .robot_description(file_path="config/zhishu_robot.urdf.xacro")
+        .robot_description(
+            file_path="config/zhishu_robot.urdf.xacro",
+            mappings={
+                "use_gazebo": "false",
+                "use_fake_hardware": use_fake_hardware,
+            },
+        )
         .robot_description_semantic(file_path="config/zhishu_robot.srdf")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
         .joint_limits(file_path="config/joint_limits.yaml")
@@ -138,12 +149,23 @@ def generate_launch_description():
             "QT_QPA_PLATFORM": "xcb",
             "RVIZ_DISABLE_LIBINPUT": "1"  # 防止RViz崩溃
         },
+        condition=IfCondition(use_rviz),
     )
 
     # ==============================
     # 启动顺序
     # ==============================
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "use_fake_hardware",
+            default_value="false",
+            description="Use mock joints instead of the EtherCAT arms",
+        ),
+        DeclareLaunchArgument(
+            "use_rviz",
+            default_value="true",
+            description="Start RViz2",
+        ),
         robot_state_publisher,
         ros2_control_node,
 

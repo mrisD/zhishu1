@@ -2,7 +2,7 @@
 #include <memory>
 #include <thread>
 
-#include "moveit/move_group_interface/move_group_interface.h"
+#include "moveit/move_group_interface/move_group_interface.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 int main(int argc, char** argv)

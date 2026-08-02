@@ -19,6 +19,9 @@ controller_manager:
     dual_arm_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    body_posture_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
@@ -75,6 +78,18 @@ dual_arm_controller:
     state_interfaces:
       - position
     allow_partial_joints_goal: true
+
+body_posture_controller:
+  ros__parameters:
+    joints:
+      - waist_up_down_joint
+      - waist_pitch_joint
+      - head_yaw_joint
+      - head_pitch_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
 
 
 right_gripper_controller:

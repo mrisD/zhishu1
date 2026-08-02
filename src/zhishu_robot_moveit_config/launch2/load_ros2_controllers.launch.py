@@ -1,78 +1,81 @@
 #!/usr/bin/env python3
-"""
-Launch ROS 2 controllers for the robot.
-
-This script creates a launch description that starts the necessary controllers
-for operating the robotic arm and gripper in a specific sequence.
-
-Launched Controllers:
-    1. Joint State Broadcaster: Publishes joint states to /joint_states
-    2. Arm Controller: Controls the robot arm movements via /follow_joint_trajectory
-    3. Gripper Action Controller: Controls gripper actions via /gripper_action
-
-Launch Sequence:
-    1. Joint State Broadcaster
-    2. Arm Controller (starts after Joint State Broadcaster)
-    3. Gripper Action Controller (starts after Arm Controller)
-
-:author: Addison Sears-Collins
-:date: November 15, 2024
-"""
+"""Load the current zhishu_robot controller set into an existing manager."""
 
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, RegisterEventHandler, TimerAction
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 
-def generate_launch_description():
-    """Generate a launch description for sequentially starting robot controllers.
-
-    Returns:
-        LaunchDescription: Launch description containing sequenced controller starts
-    """
-    # Start arm controller
-    start_arm_controller_cmd = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
-             'arm_controller'],
-        output='screen')
-
-    # Start gripper action controller
-    start_gripper_action_controller_cmd = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
-             'gripper_action_controller'],
-        output='screen')
-
-    # Launch joint state broadcaster
-    start_joint_state_broadcaster_cmd = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
-             'joint_state_broadcaster'],
-        output='screen')
-
-    # Add delay to joint state broadcaster (if necessary)
-    delayed_start = TimerAction(
-        period=10.0,
-        actions=[start_joint_state_broadcaster_cmd]
+def spawner(controller_name, controller_manager, timeout):
+    return Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            controller_name,
+            "--controller-manager",
+            controller_manager,
+            "--controller-manager-timeout",
+            timeout,
+        ],
+        output="screen",
     )
 
-    # Register event handlers for sequencing
-    # Launch the joint state broadcaster after spawning the robot
-    load_joint_state_broadcaster_cmd = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=start_joint_state_broadcaster_cmd,
-            on_exit=[start_arm_controller_cmd]))
+def generate_launch_description():
+    controller_manager = LaunchConfiguration("controller_manager")
+    timeout = LaunchConfiguration("controller_manager_timeout")
 
-    # Launch the arm controller after launching the joint state broadcaster
-    load_arm_controller_cmd = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=start_arm_controller_cmd,
-            on_exit=[start_gripper_action_controller_cmd]))
+    joint_states = spawner(
+        "joint_state_broadcaster", controller_manager, timeout
+    )
+    body_posture = spawner(
+        "body_posture_controller", controller_manager, timeout
+    )
+    dual_arm = spawner("dual_arm_controller", controller_manager, timeout)
+    left_gripper = spawner(
+        "left_gripper_controller", controller_manager, timeout
+    )
+    right_gripper = spawner(
+        "right_gripper_controller", controller_manager, timeout
+    )
 
-    # Create the launch description and populate
-    ld = LaunchDescription()
-
-    # Add the actions to the launch description in sequence
-    ld.add_action(delayed_start)
-    ld.add_action(load_joint_state_broadcaster_cmd)
-    ld.add_action(load_arm_controller_cmd)
-
-    return ld
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                "controller_manager",
+                default_value="/controller_manager",
+                description="Controller manager node path",
+            ),
+            DeclareLaunchArgument(
+                "controller_manager_timeout",
+                default_value="60",
+                description="Seconds to wait for the controller manager",
+            ),
+            joint_states,
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=joint_states,
+                    on_exit=[body_posture],
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=body_posture,
+                    on_exit=[dual_arm],
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=dual_arm,
+                    on_exit=[left_gripper],
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=left_gripper,
+                    on_exit=[right_gripper],
+                )
+            ),
+        ]
+    )

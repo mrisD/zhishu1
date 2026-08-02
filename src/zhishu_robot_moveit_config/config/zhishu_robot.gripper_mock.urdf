@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<robot name="zhishu_robot_gripper_control">
+  <!--
+    Gazebo Harmonic does not keep commandable entities for URDF mimic joints.
+    This small ros2_control-only model gives the two master gripper joints
+    deterministic command and state interfaces for MoveIt and the trajectory
+    controllers. The main robot_state_publisher still publishes the full robot.
+  -->
+  <link name="gripper_control_base"/>
+  <link name="left_gripper_control_finger"/>
+  <link name="right_gripper_control_finger"/>
+
+  <joint name="left_gripper_left_finger_joint" type="prismatic">
+    <parent link="gripper_control_base"/>
+    <child link="left_gripper_control_finger"/>
+    <axis xyz="1 0 0"/>
+    <limit effort="1000.0" velocity="1.0" lower="0.0" upper="0.06"/>
+  </joint>
+
+  <joint name="gripper_left_finger_joint" type="prismatic">
+    <parent link="gripper_control_base"/>
+    <child link="right_gripper_control_finger"/>
+    <axis xyz="1 0 0"/>
+    <limit effort="1000.0" velocity="1.0" lower="0.0" upper="0.06"/>
+  </joint>
+
+  <ros2_control name="GripperMockSystem" type="system">
+    <hardware>
+      <plugin>mock_components/GenericSystem</plugin>
+      <param name="calculate_dynamics">true</param>
+    </hardware>
+    <joint name="left_gripper_left_finger_joint">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+    </joint>
+    <joint name="gripper_left_finger_joint">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+    </joint>
+  </ros2_control>
+</robot>

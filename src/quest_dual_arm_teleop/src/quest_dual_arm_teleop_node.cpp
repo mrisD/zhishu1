@@ -187,14 +187,15 @@ public:
       "left_twist_topic", "/left_servo/delta_twist_cmds");
     right_twist_topic_ = declare_parameter<std::string>(
       "right_twist_topic", "/right_servo/delta_twist_cmds");
+    invert_vertical_command_ = declare_parameter<bool>("invert_vertical_command", true);
 
-    translation_scale_ = declare_parameter<double>("translation_scale", 0.35);
-    rotation_scale_ = declare_parameter<double>("rotation_scale", 0.50);
-    max_linear_speed_ = declare_parameter<double>("max_linear_speed", 0.06);
-    max_angular_speed_ = declare_parameter<double>("max_angular_speed", 0.30);
+    translation_scale_ = declare_parameter<double>("translation_scale", 0.70);
+    rotation_scale_ = declare_parameter<double>("rotation_scale", 0.75);
+    max_linear_speed_ = declare_parameter<double>("max_linear_speed", 0.15);
+    max_angular_speed_ = declare_parameter<double>("max_angular_speed", 0.60);
     grip_threshold_ = declare_parameter<double>("grip_threshold", 0.65);
     input_timeout_s_ = declare_parameter<double>("input_timeout", 0.15);
-    filter_alpha_ = declare_parameter<double>("filter_alpha", 0.25);
+    filter_alpha_ = declare_parameter<double>("filter_alpha", 0.35);
     max_packet_translation_jump_ = declare_parameter<double>(
       "max_packet_translation_jump", 0.12);
     max_packet_rotation_jump_ = declare_parameter<double>(
@@ -226,8 +227,11 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "Quest dual-arm teleop listening on %s:%d; hold each controller grip to enable its arm",
-      bind_address_.c_str(), tcp_port_);
+      "Quest dual-arm teleop listening on %s:%d; hold each controller grip to enable its arm. "
+      "Scales linear=%.2f angular=%.2f, limits linear=%.2f m/s angular=%.2f rad/s, "
+      "vertical command inverted=%s",
+      bind_address_.c_str(), tcp_port_, translation_scale_, rotation_scale_,
+      max_linear_speed_, max_angular_speed_, invert_vertical_command_ ? "true" : "false");
   }
 
   ~QuestDualArmTeleopNode() override
@@ -518,6 +522,12 @@ private:
 
     Eigen::Vector3d linear =
       translation_scale_ * (unity_to_ros_ * delta_position_unity) / dt;
+    // The Quest pose topic keeps the standard OpenXR-to-ROS mapping for diagnostics.
+    // Only the robot command is inverted to match this physical robot's installed
+    // base-frame vertical direction.
+    if (invert_vertical_command_) {
+      linear.z() = -linear.z();
+    }
     Eigen::Vector3d angular = Eigen::Vector3d::Zero();
     if (delta_angle > 1e-6 && angle_axis.axis().allFinite()) {
       angular = rotation_scale_ * angle_axis.axis() * (angle_axis.angle() / dt);
@@ -600,14 +610,15 @@ private:
   std::string quest_frame_;
   std::string left_twist_topic_;
   std::string right_twist_topic_;
+  bool invert_vertical_command_{true};
 
-  double translation_scale_{0.35};
-  double rotation_scale_{0.50};
-  double max_linear_speed_{0.06};
-  double max_angular_speed_{0.30};
+  double translation_scale_{0.70};
+  double rotation_scale_{0.75};
+  double max_linear_speed_{0.15};
+  double max_angular_speed_{0.60};
   double grip_threshold_{0.65};
   double input_timeout_s_{0.15};
-  double filter_alpha_{0.25};
+  double filter_alpha_{0.35};
   double max_packet_translation_jump_{0.12};
   double max_packet_rotation_jump_{0.70};
   double control_rate_hz_{100.0};

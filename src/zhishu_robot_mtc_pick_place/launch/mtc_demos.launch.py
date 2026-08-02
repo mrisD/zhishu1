@@ -3,13 +3,17 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import RegisterEventHandler, TimerAction
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler, TimerAction
 from launch.event_handlers import OnProcessExit, OnProcessStart
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from moveit_configs_utils import MoveItConfigsBuilder
 
 
 def generate_launch_description():
+    use_fake_hardware = LaunchConfiguration("use_fake_hardware")
+    use_rviz = LaunchConfiguration("use_rviz")
     robot_name = "zhishu_robot"
     moveit_config_package = "zhishu_robot_moveit_config"
     mtc_package = "zhishu_robot_mtc_pick_place"
@@ -30,7 +34,13 @@ def generate_launch_description():
 
     moveit_config = (
         MoveItConfigsBuilder(robot_name, package_name=moveit_config_package)
-        .robot_description(file_path="config/zhishu_robot.urdf.xacro")
+        .robot_description(
+            file_path="config/zhishu_robot.urdf.xacro",
+            mappings={
+                "use_gazebo": "false",
+                "use_fake_hardware": use_fake_hardware,
+            },
+        )
         .robot_description_semantic(file_path="config/zhishu_robot.srdf")
         .robot_description_kinematics(file_path="config/kinematics.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
@@ -137,6 +147,7 @@ def generate_launch_description():
             "QT_QPA_PLATFORM": "xcb",
             "RVIZ_DISABLE_LIBINPUT": "1",
         },
+        condition=IfCondition(use_rviz),
     )
 
     mtc_task_node = Node(
@@ -195,6 +206,16 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "use_fake_hardware",
+            default_value="false",
+            description="Use mock joints instead of the EtherCAT arms",
+        ),
+        DeclareLaunchArgument(
+            "use_rviz",
+            default_value="true",
+            description="Start RViz2",
+        ),
         static_tf_node,
         robot_state_publisher,
         ros2_control_node,

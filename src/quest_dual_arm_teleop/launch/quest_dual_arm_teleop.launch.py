@@ -27,10 +27,17 @@ def generate_launch_description():
 
     launch_rviz = LaunchConfiguration("launch_rviz")
     tcp_port = LaunchConfiguration("tcp_port")
+    use_fake_hardware = LaunchConfiguration("use_fake_hardware")
 
     moveit_config = (
         MoveItConfigsBuilder("zhishu_robot", package_name=moveit_package)
-        .robot_description(file_path="config/zhishu_robot.urdf.xacro")
+        .robot_description(
+            file_path="config/zhishu_robot.urdf.xacro",
+            mappings={
+                "use_gazebo": "false",
+                "use_fake_hardware": use_fake_hardware,
+            },
+        )
         .robot_description_semantic(file_path="config/zhishu_robot.srdf")
         .robot_description_kinematics(file_path="config/kinematics.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
@@ -83,7 +90,6 @@ def generate_launch_description():
         arguments=[
             "left_arm_controller",
             "-c", "/controller_manager",
-            "-t", "joint_trajectory_controller/JointTrajectoryController",
             "--param-file", left_controller_params,
         ],
         output="screen",
@@ -95,7 +101,6 @@ def generate_launch_description():
         arguments=[
             "right_arm_controller",
             "-c", "/controller_manager",
-            "-t", "joint_trajectory_controller/JointTrajectoryController",
             "--param-file", right_controller_params,
         ],
         output="screen",
@@ -117,7 +122,7 @@ def generate_launch_description():
 
     left_servo = Node(
         package="moveit_servo",
-        executable="servo_node_main",
+        executable="servo_node",
         name="left_servo",
         output="screen",
         parameters=[
@@ -134,7 +139,7 @@ def generate_launch_description():
 
     right_servo = Node(
         package="moveit_servo",
-        executable="servo_node_main",
+        executable="servo_node",
         name="right_servo",
         output="screen",
         parameters=[
@@ -223,6 +228,11 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("launch_rviz", default_value="true"),
         DeclareLaunchArgument("tcp_port", default_value="5005"),
+        DeclareLaunchArgument(
+            "use_fake_hardware",
+            default_value="false",
+            description="Use mock joints instead of the EtherCAT arms",
+        ),
         robot_state_publisher,
         ros2_control_node,
         after_joint_state,

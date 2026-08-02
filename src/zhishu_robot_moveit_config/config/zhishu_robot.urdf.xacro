@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="zhishu_robot">
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+    <xacro:arg name="use_gazebo" default="false" />
+    <xacro:arg name="use_fake_hardware" default="true" />
 
     <!-- Import zhishu_robot urdf file -->
     <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot.urdf.xacro" />
@@ -8,8 +10,27 @@
     <!-- Import control_xacro -->
     <xacro:include filename="zhishu_robot.left_arm.ros2_control.xacro" />
     <xacro:include filename="zhishu_robot.right_arm.ros2_control.xacro" />
+    <xacro:include filename="zhishu_robot.gazebo.ros2_control.xacro" />
 
+    <xacro:unless value="$(arg use_gazebo)">
+        <xacro:zhishu_robot_left_arm_ros2_control
+            name="LeftArmSystem"
+            initial_positions_file="$(arg initial_positions_file)"
+            use_fake_hardware="$(arg use_fake_hardware)"/>
+        <xacro:zhishu_robot_right_arm_ros2_control
+            name="RightArmSystem"
+            initial_positions_file="$(arg initial_positions_file)"
+            use_fake_hardware="$(arg use_fake_hardware)"/>
+    </xacro:unless>
 
-    <xacro:zhishu_robot_left_arm_ros2_control name="LeftArmEtherCATSystem" initial_positions_file="$(arg initial_positions_file)"/>
-    <xacro:zhishu_robot_right_arm_ros2_control name="RightArmEtherCATSystem" initial_positions_file="$(arg initial_positions_file)"/>
+    <xacro:if value="$(arg use_gazebo)">
+        <xacro:zhishu_robot_gazebo_ros2_control
+            name="GazeboSystem"
+            initial_positions_file="$(arg initial_positions_file)"/>
+        <gazebo>
+            <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+                <parameters>$(find zhishu_robot_moveit_config)/config/ros2_controllers.yaml</parameters>
+            </plugin>
+        </gazebo>
+    </xacro:if>
 </robot>

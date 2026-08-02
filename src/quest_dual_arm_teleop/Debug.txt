@@ -36,7 +36,7 @@ SendRate = 72 Hz
 五、启动 ROS 2 遥操作系统
 终端1：
 cd ~/文档/test2_ws
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 
 ros2 launch quest_dual_arm_teleop \

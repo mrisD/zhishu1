@@ -51,7 +51,7 @@ gz service -s /gui/move_to/pose \
 
 sleep 10
 echo "Launching the MoveIt Task Constructor demo..."
-ros2 launch zhishu_robot_mtc_demos mtc_demos.launch.py \
+ros2 launch zhishu_robot_mtc_pick_place mtc_demos.launch.py \
     use_sim_time:=true \
     exe:=$exe_option
 

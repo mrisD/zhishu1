@@ -14,6 +14,7 @@ def generate_launch_description():
 
     model = LaunchConfiguration('model')
     use_gui = LaunchConfiguration('use_gui')
+    use_rviz = LaunchConfiguration('use_rviz')
     use_sim_time = LaunchConfiguration('use_sim_time')
     rviz_config = LaunchConfiguration('rviz_config')
 
@@ -54,6 +55,11 @@ def generate_launch_description():
             description='Use simulation clock when true.',
         ),
         DeclareLaunchArgument(
+            'use_rviz',
+            default_value='true',
+            description='Start RViz2.',
+        ),
+        DeclareLaunchArgument(
             'rviz_config',
             default_value=default_rviz_config,
             description='Absolute path to the RViz2 config file.',
@@ -88,6 +94,7 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz2',
             arguments=['-d', rviz_config],
+            condition=IfCondition(use_rviz),
             output='screen',
         ),
     ])

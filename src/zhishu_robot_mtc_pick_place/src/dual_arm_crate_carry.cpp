@@ -1,6 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 
-#include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/move_group_interface/move_group_interface.hpp>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit/robot_state/robot_state.h>
@@ -471,14 +471,14 @@ private:
 
     // Normal-speed planner used by the grasp, carry and retreat stages.
     auto pipeline = std::make_shared<mtc::solvers::PipelinePlanner>(shared_from_this());
-    pipeline->setPlannerId(planner_id);
+    pipeline->setPlannerId("ompl", planner_id);
     pipeline->setProperty("num_planning_attempts", planning_attempts);
     pipeline->setMaxVelocityScalingFactor(get_parameter("velocity_scaling").as_double());
     pipeline->setMaxAccelerationScalingFactor(get_parameter("acceleration_scaling").as_double());
     // Reduced-speed planner for the startup approach stages.
     auto initial_pipeline =
       std::make_shared<mtc::solvers::PipelinePlanner>(shared_from_this());
-    initial_pipeline->setPlannerId(planner_id);
+    initial_pipeline->setPlannerId("ompl", planner_id);
     initial_pipeline->setProperty("num_planning_attempts", planning_attempts);
     initial_pipeline->setMaxVelocityScalingFactor(
       get_parameter("initial_velocity_scaling").as_double());

@@ -1,0 +1,150 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- Gazebo owns all simulated commandable joints. Only the master finger
+         of each gripper is exported; Gazebo applies the URDF mimic relation to
+         the corresponding follower finger. -->
+    <xacro:macro name="zhishu_robot_gazebo_ros2_control" params="name initial_positions_file">
+        <xacro:property name="initial_positions" value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
+
+        <ros2_control name="${name}" type="system">
+            <hardware>
+                <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+            </hardware>
+
+            <joint name="left_shoulder_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['left_shoulder_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_shoulder_roll_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['left_shoulder_roll_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_shoulder_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['left_shoulder_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_elbow_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['left_elbow_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wrist_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['left_wrist_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wrist_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['left_wrist_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wrist_roll_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['left_wrist_roll_joint']}</param>
+                </state_interface>
+            </joint>
+
+            <joint name="right_shoulder_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['right_shoulder_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="right_shoulder_roll_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['right_shoulder_roll_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="right_shoulder_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['right_shoulder_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="right_elbow_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['right_elbow_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="right_wrist_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['right_wrist_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="right_wrist_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['right_wrist_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="right_wrist_roll_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['right_wrist_roll_joint']}</param>
+                </state_interface>
+            </joint>
+
+            <joint name="left_gripper_left_finger_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['left_gripper_left_finger_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="gripper_left_finger_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['gripper_left_finger_joint']}</param>
+                </state_interface>
+            </joint>
+
+            <joint name="waist_up_down_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['waist_up_down_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="waist_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['waist_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="head_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['head_yaw_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="head_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['head_pitch_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="left_wheel_joint">
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['left_wheel_joint']}</param>
+                </state_interface>
+            </joint>
+            <joint name="right_wheel_joint">
+                <state_interface name="position">
+                    <param name="initial_value">${initial_positions['right_wheel_joint']}</param>
+                </state_interface>
+            </joint>
+        </ros2_control>
+
+    </xacro:macro>
+</robot>

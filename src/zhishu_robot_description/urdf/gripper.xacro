@@ -1,6 +1,20 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+    <!-- Gazebo Sim only creates dynamic links that have valid inertial data.
+         Without this block the finger links, their prismatic joints, and the
+         corresponding ros2_control command interfaces are omitted from SDF. -->
+    <xacro:macro name="gripper_finger_inertial">
+        <inertial>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
+            <mass value="0.1"/>
+            <inertia
+                ixx="0.000363333" ixy="0.0" ixz="0.0"
+                iyy="0.000336667" iyz="0.0"
+                izz="0.000033333"/>
+        </inertial>
+    </xacro:macro>
+
     <link name="gripper_base_link">
         <visual>
             <geometry>
@@ -18,6 +32,7 @@
     </link>
 
     <link name="gripper_left_finger_link">
+        <xacro:gripper_finger_inertial/>
         <visual>
             <geometry>
                 <box size="0.02 0.06 0.20"/>
@@ -34,6 +49,7 @@
     </link>
 
     <link name="gripper_right_finger_link">
+        <xacro:gripper_finger_inertial/>
         <visual>
             <geometry>
                 <box size="0.02 0.06 0.20"/>
@@ -91,6 +107,7 @@
     </link>
 
     <link name="left_gripper_left_finger_link">
+        <xacro:gripper_finger_inertial/>
         <visual>
             <geometry>
                 <box size="0.02 0.06 0.20"/>
@@ -107,6 +124,7 @@
     </link>
 
     <link name="left_gripper_right_finger_link">
+        <xacro:gripper_finger_inertial/>
         <visual>
             <geometry>
                 <box size="0.02 0.06 0.20"/>

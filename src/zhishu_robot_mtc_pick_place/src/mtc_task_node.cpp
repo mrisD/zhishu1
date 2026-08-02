@@ -518,7 +518,7 @@ mtc::Task MTCTaskNode::createTask()
   auto ompl_planner_arm = std::make_shared<mtc::solvers::PipelinePlanner>(
   this->shared_from_this());
 
-  ompl_planner_arm->setPlannerId("RRTConnectkConfigDefault");
+  ompl_planner_arm->setPlannerId("ompl", "RRTConnectkConfigDefault");
   ompl_planner_arm->setMaxVelocityScalingFactor(0.30);
   ompl_planner_arm->setMaxAccelerationScalingFactor(0.3); 
   RCLCPP_INFO(this->get_logger(), "OMPL planner created for the arm group");

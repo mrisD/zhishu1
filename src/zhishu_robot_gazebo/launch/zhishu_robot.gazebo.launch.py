@@ -20,7 +20,9 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+from launch.substitutions import Command, FindExecutable, PythonExpression
 
 
 def generate_launch_description():
@@ -59,12 +61,22 @@ def generate_launch_description():
     gazebo_models_path = os.path.join(pkg_share_gazebo, gazebo_models_path)
     default_ros_gz_bridge_config_file_path = os.path.join(
         pkg_share_gazebo, ros_gz_bridge_config_file_path)
+    robot_xacro = os.path.join(
+        pkg_share_moveit, 'config', 'zhishu_robot.urdf.xacro')
+    controllers_yaml = os.path.join(
+        pkg_share_moveit, 'config', 'ros2_controllers.yaml')
+    robot_description = ParameterValue(
+        Command([
+            FindExecutable(name='xacro'), ' ', robot_xacro,
+            ' use_gazebo:=true use_fake_hardware:=false',
+        ]),
+        value_type=str,
+    )
 
     # Launch configuration variables
-    jsp_gui = LaunchConfiguration('jsp_gui')
     load_controllers = LaunchConfiguration('load_controllers')
+    headless = LaunchConfiguration('headless')
     robot_name = LaunchConfiguration('robot_name')
-    use_rviz = LaunchConfiguration('use_rviz')
     use_camera = LaunchConfiguration('use_camera')
     use_gazebo = LaunchConfiguration('use_gazebo')
     use_robot_state_pub = LaunchConfiguration('use_robot_state_pub')
@@ -95,6 +107,11 @@ def generate_launch_description():
         name='load_controllers',
         default_value='true',
         description='Flag to enable loading of ROS 2 controllers')
+
+    declare_headless_cmd = DeclareLaunchArgument(
+        name='headless',
+        default_value='false',
+        description='Run only the Gazebo server (no GUI)')
 
     declare_use_robot_state_pub_cmd = DeclareLaunchArgument(
         name='use_robot_state_pub',
@@ -163,42 +180,65 @@ def generate_launch_description():
         default_value='0.0',
         description='yaw angle of initial orientation, radians')
 
-    # Include Robot State Publisher launch file if enabled
-    robot_state_publisher_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            os.path.join(pkg_share_description, 'launch', 'robot_state_publisher.launch.py')
-        ]),
-        launch_arguments={
-            'jsp_gui': jsp_gui,
-            'use_camera': use_camera,
-            'use_gazebo': use_gazebo,
-            'use_rviz': use_rviz,
-            'use_sim_time': use_sim_time
-        }.items(),
+    # Publish the same Jazzy/Gazebo-ready URDF that is spawned below.
+    robot_state_publisher_cmd = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        output='screen',
+        parameters=[{
+            'robot_description': robot_description,
+            'use_sim_time': use_sim_time,
+        }],
         condition=IfCondition(use_robot_state_pub)
     )
 
-    # Include ROS 2 Controllers launch file if enabled
-    load_controllers_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            os.path.join(pkg_share_moveit, 'launch', 'load_ros2_controllers.launch.py')
-        ]),
-        launch_arguments={
-            'use_sim_time': use_sim_time
-        }.items(),
-        condition=IfCondition(load_controllers)
+    # Gazebo's controller manager owns the simulated arm joints.
+    gazebo_controller_spawner_cmd = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'joint_state_broadcaster',
+            'body_posture_controller',
+            'dual_arm_controller',
+            'left_gripper_controller',
+            'right_gripper_controller',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '60',
+            '--param-file', controllers_yaml,
+        ],
+        output='screen',
+        condition=IfCondition(load_controllers),
     )
 
-    # Set Gazebo model path
-    set_env_vars_resources = AppendEnvironmentVariable(
+    # Gazebo resolves model:// assets from this package's models directory.
+    set_env_vars_model_resources = AppendEnvironmentVariable(
         'GZ_SIM_RESOURCE_PATH',
         gazebo_models_path)
+    # The robot uses package://zhishu_robot_description/meshes/... URIs. Gazebo
+    # needs the parent share directory so it can resolve the package name and
+    # render the visual meshes (entity creation can succeed even if visuals
+    # cannot be resolved).
+    set_env_vars_robot_resources = AppendEnvironmentVariable(
+        'GZ_SIM_RESOURCE_PATH',
+        os.path.dirname(pkg_share_description))
 
     # Start Gazebo
     start_gazebo_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
-        launch_arguments=[('gz_args', [' -r -v 4 ', world_path])])
+        launch_arguments=[('gz_args', [' -r -v 4 ', world_path])],
+        condition=IfCondition(PythonExpression([
+            "'", use_gazebo, "' == 'true' and '", headless, "' != 'true'",
+        ])))
+
+    start_gazebo_headless_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
+        launch_arguments=[('gz_args', [' -s -r -v 4 ', world_path])],
+        condition=IfCondition(PythonExpression([
+            "'", use_gazebo, "' == 'true' and '", headless, "' == 'true'",
+        ])))
 
     # Bridge ROS topics and Gazebo messages for establishing communication
     start_gazebo_ros_bridge_cmd = Node(
@@ -207,7 +247,8 @@ def generate_launch_description():
         parameters=[{
             'config_file': default_ros_gz_bridge_config_file_path,
         }],
-        output='screen'
+        output='screen',
+        condition=IfCondition(use_gazebo),
     )
 
     # Includes optimizations to minimize latency and bandwidth when streaming image data
@@ -222,6 +263,7 @@ def generate_launch_description():
             ('/camera_head/depth_image', '/camera_head/depth/image_rect_raw'),
             ('/camera_head/image', '/camera_head/color/image_raw'),
         ],
+        condition=IfCondition(use_camera),
     )
 
     # Spawn the robot
@@ -239,13 +281,15 @@ def generate_launch_description():
             '-R', roll,
             '-P', pitch,
             '-Y', yaw
-        ])
+        ],
+        condition=IfCondition(use_gazebo))
 
     # Create the launch description and populate
     ld = LaunchDescription()
 
     # Declare the launch options
     ld.add_action(declare_robot_name_cmd)
+    ld.add_action(declare_headless_cmd)
     ld.add_action(declare_jsp_gui_cmd)
     ld.add_action(declare_load_controllers_cmd)
     ld.add_action(declare_use_camera_cmd)
@@ -264,12 +308,14 @@ def generate_launch_description():
     ld.add_action(declare_yaw_cmd)
 
     # Add the actions to the launch description
-    ld.add_action(set_env_vars_resources)
+    ld.add_action(set_env_vars_model_resources)
+    ld.add_action(set_env_vars_robot_resources)
     ld.add_action(robot_state_publisher_cmd)
-    ld.add_action(load_controllers_cmd)
     ld.add_action(start_gazebo_cmd)
+    ld.add_action(start_gazebo_headless_cmd)
     ld.add_action(start_gazebo_ros_bridge_cmd)
     ld.add_action(start_gazebo_ros_image_bridge_cmd)
     ld.add_action(start_gazebo_ros_spawner_cmd)
+    ld.add_action(gazebo_controller_spawner_cmd)
 
     return ld

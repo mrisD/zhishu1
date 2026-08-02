@@ -1,0 +1,47 @@
+planning_plugins:
+  - ompl_interface/OMPLPlanner
+request_adapters:
+  - default_planning_request_adapters/ResolveConstraintFrames
+  - default_planning_request_adapters/ValidateWorkspaceBounds
+  - default_planning_request_adapters/CheckStartStateBounds
+  - default_planning_request_adapters/CheckStartStateCollision
+response_adapters:
+  - default_planning_response_adapters/AddTimeOptimalParameterization
+  - default_planning_response_adapters/ValidateSolution
+  - default_planning_response_adapters/DisplayMotionPath
+planner_configs:
+  RRTConnect:
+    type: geometric::RRTConnect
+    range: 0.0
+  RRTstar:
+    type: geometric::RRTstar
+    range: 0.0
+    goal_bias: 0.05
+    delay_collision_checking: true
+
+left_arm:
+  default_planner_config: RRTConnect
+  planner_configs:
+    - RRTConnect
+    - RRTstar
+  longest_valid_segment_fraction: 0.005
+  enforce_joint_model_state_space: true
+
+right_arm:
+  default_planner_config: RRTConnect
+  planner_configs:
+    - RRTConnect
+    - RRTstar
+  longest_valid_segment_fraction: 0.005
+  enforce_joint_model_state_space: true
+
+# Planning both seven-axis arms creates a 14-DOF state space. RRTConnect is a
+# reliable default for these joint-space queries, while the smaller collision
+# checking segment prevents a path from skipping arm-to-arm collisions.
+both_arms:
+  default_planner_config: RRTConnect
+  planner_configs:
+    - RRTConnect
+    - RRTstar
+  longest_valid_segment_fraction: 0.003
+  enforce_joint_model_state_space: true

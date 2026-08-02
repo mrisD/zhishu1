@@ -5,26 +5,31 @@
 
     <!-- Plugin for simulating physics -->
     <plugin
-      filename="ignition-gazebo-physics-system"
-      name="ignition::gazebo::systems::Physics">
+      filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics">
+      <!-- DART in Gazebo Harmonic does not implement mimic constraints.
+           Bullet Featherstone keeps both fingers of each gripper coupled. -->
+      <engine>
+        <filename>gz-physics-bullet-featherstone-plugin</filename>
+      </engine>
     </plugin>
 
     <!-- Plugin for handling user commands -->
     <plugin
-      filename="ignition-gazebo-user-commands-system"
-      name="ignition::gazebo::systems::UserCommands">
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands">
     </plugin>
 
     <!-- Plugin for broadcasting scene updates -->
     <plugin
-      filename="ignition-gazebo-scene-broadcaster-system"
-      name="ignition::gazebo::systems::SceneBroadcaster">
+      filename="gz-sim-scene-broadcaster-system"
+      name="gz::sim::systems::SceneBroadcaster">
     </plugin>
 
     <!-- Plugin for sensor handling -->
     <plugin
-      filename="ignition-gazebo-sensors-system"
-      name="ignition::gazebo::systems::Sensors">
+      filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
       <render_engine>ogre2</render_engine>
     </plugin>
 
@@ -72,34 +77,101 @@
       </link>
     </model>
 
-    <!-- Include the cylinder model -->
-    <include>
-      <uri>model://red_cylinder</uri>
-      <name>red_cylinder</name>
+    <!-- Self-contained primitive objects replace Classic Gazebo model:// URIs. -->
+    <model name="red_cylinder">
       <pose>0.22 0.12 0.175 0 0 0</pose>
-    </include>
+      <link name="link">
+        <inertial>
+          <mass>0.2</mass>
+          <inertia>
+            <ixx>0.00039</ixx><iyy>0.00039</iyy><izz>0.000123</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.035</radius><length>0.15</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.035</radius><length>0.15</length></cylinder></geometry>
+          <material><ambient>0.8 0.05 0.05 1</ambient><diffuse>0.9 0.1 0.1 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
 
-    <!-- Include the other objects -->
-
-    <include>
-      <uri>model://mustard</uri>
+    <model name="mustard">
       <pose>0.7 0.15 0.08 0 0 0</pose>
-    </include>
+      <link name="link">
+        <inertial>
+          <mass>0.2</mass>
+          <inertia>
+            <ixx>0.000453</ixx><iyy>0.000487</iyy><izz>0.000087</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.06 0.04 0.16</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.06 0.04 0.16</size></box></geometry>
+          <material><ambient>0.8 0.6 0.05 1</ambient><diffuse>0.95 0.75 0.1 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
 
-    <include>
-      <uri>model://cheezit_big_original</uri>
+    <model name="cheezit_big_original">
       <pose>0.64 0.23 0.17 1.571 0 0</pose>
-    </include>
+      <link name="link">
+        <inertial>
+          <mass>0.15</mass>
+          <inertia>
+            <ixx>0.000331</ixx><iyy>0.0004</iyy><izz>0.000091</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.08 0.03 0.16</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.08 0.03 0.16</size></box></geometry>
+          <material><ambient>0.9 0.25 0.03 1</ambient><diffuse>1 0.35 0.05 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
 
-    <include>
-      <uri>model://cardboard_box</uri>
+    <model name="cardboard_box">
       <pose>0.65 0.60 0.3 0 0 0.5</pose>
-    </include>
+      <link name="link">
+        <inertial>
+          <mass>0.5</mass>
+          <inertia>
+            <ixx>0.00651</ixx><iyy>0.00885</iyy><izz>0.00771</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.35 0.25 0.3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.35 0.25 0.3</size></box></geometry>
+          <material><ambient>0.45 0.28 0.12 1</ambient><diffuse>0.55 0.36 0.18 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
 
-    <include>
-      <uri>model://coke_can</uri>
+    <model name="coke_can">
       <pose>0.5 0.15 0.15 0 0 2.3</pose>
-    </include>
+      <link name="link">
+        <inertial>
+          <mass>0.33</mass>
+          <inertia>
+            <ixx>0.000422</ixx><iyy>0.000422</iyy><izz>0.00018</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.033</radius><length>0.12</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.033</radius><length>0.12</length></cylinder></geometry>
+          <material><ambient>0.65 0.02 0.02 1</ambient><diffuse>0.8 0.05 0.05 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
 
     <!-- Define scene properties -->
     <scene>

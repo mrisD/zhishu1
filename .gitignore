@@ -1,5 +1,8 @@
 /build/*
 /install/*
 /log/*
+/build-jazzy/
+/install-jazzy/
+/log-jazzy/
 *.zip
 *.STL

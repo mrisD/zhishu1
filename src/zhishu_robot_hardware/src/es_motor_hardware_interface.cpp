@@ -175,17 +175,18 @@ int32_t clamp_i64_to_i32(int64_t value)
 }  // namespace
 
 hardware_interface::CallbackReturn EsMotorHardwareInterface::
-    on_init(const hardware_interface::HardwareInfo & info)
+    on_init(const hardware_interface::HardwareComponentInterfaceParams & params)
 {
-  if (hardware_interface::SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS) {
+  if (hardware_interface::SystemInterface::on_init(params) != hardware_interface::CallbackReturn::SUCCESS) {
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  info_ = info;
   driver_ = std::make_shared<ethercat_driver::EthercatDriver>();
 
-  hw_positions_.assign(info_.joints.size(), 0.0);
-  hw_commands_.assign(info_.joints.size(), 0.0);
+  position_cache_.assign(info_.joints.size(), 0.0);
+  command_cache_.assign(info_.joints.size(), 0.0);
+  position_state_handles_.assign(info_.joints.size(), nullptr);
+  position_command_handles_.assign(info_.joints.size(), nullptr);
   joint_to_motor_index_.assign(info_.joints.size(), kNoMotor);
   joint_sign_.assign(info_.joints.size(), 1.0);
   joint_offset_rad_.assign(info_.joints.size(), 0.0);
@@ -343,7 +344,7 @@ bool EsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
       return false;
     }
 
-    RCLCPP_INFO(logger(), "Configured %zu EtherCAT motors for ROS 2 Humble ros2_control.", driver_config_.motors.size());
+    RCLCPP_INFO(logger(), "Configured %zu EtherCAT motors for ROS 2 Jazzy ros2_control.", driver_config_.motors.size());
     return true;
   } catch (const std::exception & e) {
     RCLCPP_ERROR(logger(), "Failed to build EtherCAT driver config: %s", e.what());
@@ -457,8 +458,8 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
     const auto & state = initial_states[static_cast<size_t>(motor_index)];
     const double actual_rad = counts_to_radians(state.actual_counts, motor, joint_index);
 
-    hw_positions_[joint_index] = actual_rad;
-    hw_commands_[joint_index] = actual_rad;
+    set_position_state(joint_index, actual_rad);
+    set_position_command(joint_index, actual_rad);
 
     if (!driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts)) {
       RCLCPP_ERROR(logger(), "Failed to set initial hold target for joint '%s'.", info_.joints[joint_index].name.c_str());
@@ -489,7 +490,7 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
       logger(),
       "Activated joint '%s' on slave_position=%u, hold at %.6f rad / %.2f deg.",
       info_.joints[joint_index].name.c_str(), motor.address.slave_position,
-      hw_positions_[joint_index], hw_positions_[joint_index] * 180.0 / 3.14159265358979323846);
+      position_cache_[joint_index], position_cache_[joint_index] * 180.0 / 3.14159265358979323846);
   }
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -513,16 +514,20 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-std::vector<hardware_interface::StateInterface> EsMotorHardwareInterface::
-    export_state_interfaces()
+std::vector<hardware_interface::StateInterface::ConstSharedPtr> EsMotorHardwareInterface::
+    on_export_state_interfaces()
 {
-  std::vector<hardware_interface::StateInterface> state_interfaces;
-  state_interfaces.reserve(info_.joints.size());
+  auto state_interfaces = hardware_interface::SystemInterface::on_export_state_interfaces();
 
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     for (const auto & interface : info_.joints[i].state_interfaces) {
       if (interface.name == hardware_interface::HW_IF_POSITION) {
-        state_interfaces.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_positions_[i]);
+        const std::string interface_name =
+          info_.joints[i].name + "/" + hardware_interface::HW_IF_POSITION;
+        position_state_handles_[i] = get_state_interface_handle(interface_name);
+        if (const auto initial_value = position_state_handles_[i]->get_optional<double>()) {
+          position_cache_[i] = *initial_value;
+        }
       }
     }
   }
@@ -530,21 +535,51 @@ std::vector<hardware_interface::StateInterface> EsMotorHardwareInterface::
   return state_interfaces;
 }
 
-std::vector<hardware_interface::CommandInterface> EsMotorHardwareInterface::
-    export_command_interfaces()
+std::vector<hardware_interface::CommandInterface::SharedPtr> EsMotorHardwareInterface::
+    on_export_command_interfaces()
 {
-  std::vector<hardware_interface::CommandInterface> command_interfaces;
-  command_interfaces.reserve(info_.joints.size());
+  auto command_interfaces = hardware_interface::SystemInterface::on_export_command_interfaces();
 
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     for (const auto & interface : info_.joints[i].command_interfaces) {
       if (interface.name == hardware_interface::HW_IF_POSITION) {
-        command_interfaces.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_commands_[i]);
+        const std::string interface_name =
+          info_.joints[i].name + "/" + hardware_interface::HW_IF_POSITION;
+        position_command_handles_[i] = get_command_interface_handle(interface_name);
+        set_position_command(i, position_cache_[i]);
       }
     }
   }
 
   return command_interfaces;
+}
+
+bool EsMotorHardwareInterface::set_position_state(size_t joint_index, double value)
+{
+  position_cache_[joint_index] = value;
+  const auto & handle = position_state_handles_[joint_index];
+  return handle ? handle->set_value(value, false) : false;
+}
+
+bool EsMotorHardwareInterface::set_position_command(size_t joint_index, double value)
+{
+  command_cache_[joint_index] = value;
+  const auto & handle = position_command_handles_[joint_index];
+  return handle ? handle->set_value(value, false) : false;
+}
+
+bool EsMotorHardwareInterface::refresh_position_command(size_t joint_index)
+{
+  const auto & handle = position_command_handles_[joint_index];
+  if (!handle) {
+    return false;
+  }
+  const auto value = handle->get_optional<double>();
+  if (!value) {
+    return false;
+  }
+  command_cache_[joint_index] = *value;
+  return true;
 }
 
 double EsMotorHardwareInterface::counts_to_radians(
@@ -607,7 +642,8 @@ hardware_interface::return_type EsMotorHardwareInterface::
     const auto & motor = driver_config_.motors[static_cast<size_t>(motor_index)];
     ethercat_driver::MotorState state{};
     if (driver_->getMotorState(motor.address, state) && state.status_word != 0) {
-      hw_positions_[joint_index] = counts_to_radians(state.actual_counts, motor, joint_index);
+      set_position_state(
+        joint_index, counts_to_radians(state.actual_counts, motor, joint_index));
     }
   }
 
@@ -631,14 +667,18 @@ hardware_interface::return_type EsMotorHardwareInterface::
   static rclcpp::Clock throttle_clock(RCL_STEADY_TIME);
 
   for (size_t joint_index = 0; joint_index < info_.joints.size(); ++joint_index) {
+    // Controllers update command handles from a different thread. A failed try-lock
+    // keeps the previous safe command for this control cycle.
+    refresh_position_command(joint_index);
+
     const int motor_index = joint_to_motor_index_[joint_index];
     if (motor_index == kNoMotor) {
       // 非 EtherCAT 关节仍然导出 command_interface，用于让左臂/夹爪等控制器可以启动。
       // 这里把命令值回写到状态值，等价于 fake/passive joint，不会下发到真实 EtherCAT 电机。
       if (has_position_command_interface(info_.joints[joint_index]) &&
-        std::isfinite(hw_commands_[joint_index]))
+        std::isfinite(command_cache_[joint_index]))
       {
-        hw_positions_[joint_index] = hw_commands_[joint_index];
+        set_position_state(joint_index, command_cache_[joint_index]);
       }
       continue;
     }
@@ -646,8 +686,8 @@ hardware_interface::return_type EsMotorHardwareInterface::
     const auto & motor = driver_config_.motors[static_cast<size_t>(motor_index)];
     ethercat_driver::MotorState state{};
     if (!driver_->getMotorState(motor.address, state)) {
-      if (std::isfinite(hw_positions_[joint_index])) {
-        hw_commands_[joint_index] = hw_positions_[joint_index];
+      if (std::isfinite(position_cache_[joint_index])) {
+        set_position_command(joint_index, position_cache_[joint_index]);
       }
       RCLCPP_WARN_THROTTLE(
         logger(), throttle_clock, 1000,
@@ -657,13 +697,13 @@ hardware_interface::return_type EsMotorHardwareInterface::
     }
 
     // status_word != 0 时才认为 actual_counts 有效；否则保持上一次位置，避免状态跳到 0。
-    double hold_rad = hw_positions_[joint_index];
+    double hold_rad = position_cache_[joint_index];
     if (!std::isfinite(hold_rad)) {
       hold_rad = 0.0;
     }
     if (state.status_word != 0U) {
       hold_rad = counts_to_radians(state.actual_counts, motor, joint_index);
-      hw_positions_[joint_index] = hold_rad;
+      set_position_state(joint_index, hold_rad);
     }
 
     bool command_enable = false;
@@ -684,7 +724,7 @@ hardware_interface::return_type EsMotorHardwareInterface::
     // EtherCAT 不健康时：不接受控制器新命令，只把目标锁到当前真实位置。
     // 对应你的 dmesg：WC 0/21、UNMATCHED/SKIPPED、SAFEOP、0x001A Synchronization error。
     if (!bus_ready) {
-      hw_commands_[joint_index] = hold_rad;
+      set_position_command(joint_index, hold_rad);
       if (state.status_word != 0U) {
         driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
       }
@@ -710,9 +750,9 @@ hardware_interface::return_type EsMotorHardwareInterface::
 
     // 未真正进入 OperationEnabled 前，持续锁当前真实位置，不接受控制器默认 0。
     if (!enable_status_ok || !command_enable || !state.operation_enabled ||
-      !std::isfinite(hw_commands_[joint_index]))
+      !std::isfinite(command_cache_[joint_index]))
     {
-      hw_commands_[joint_index] = hold_rad;
+      set_position_command(joint_index, hold_rad);
       driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
 
       RCLCPP_WARN_THROTTLE(
@@ -727,9 +767,10 @@ hardware_interface::return_type EsMotorHardwareInterface::
       continue;
     }
 
-    const int32_t target_counts = radians_to_counts(hw_commands_[joint_index], motor, joint_index);
+    const int32_t target_counts =
+      radians_to_counts(command_cache_[joint_index], motor, joint_index);
     if (!driver_->setAbsoluteTargetCounts(motor.address, target_counts)) {
-      hw_commands_[joint_index] = hold_rad;
+      set_position_command(joint_index, hold_rad);
       driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
 
       RCLCPP_WARN_THROTTLE(
