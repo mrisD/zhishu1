@@ -1,9 +1,9 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <moveit/move_group_interface/move_group_interface.hpp>
-#include <moveit/planning_scene_interface/planning_scene_interface.h>
-#include <moveit/planning_scene/planning_scene.h>
-#include <moveit/robot_state/robot_state.h>
+#include <moveit/planning_scene_interface/planning_scene_interface.hpp>
+#include <moveit/planning_scene/planning_scene.hpp>
+#include <moveit/robot_state/robot_state.hpp>
 #include <moveit/task_constructor/solvers/joint_interpolation.h>
 #include <moveit/task_constructor/solvers/pipeline_planner.h>
 #include <moveit/task_constructor/stages/current_state.h>

@@ -13,7 +13,13 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
+
+# ROS 2 Jazzy's MoveIt dependency chain currently exports the deprecated
+# tl_expected compatibility package. Hide that dependency-only CMake notice;
+# our targets also opt into the supported header-level suppression below.
+set(CMAKE_WARN_DEPRECATED OFF)
 find_package(moveit_ros_planning_interface REQUIRED)
+unset(CMAKE_WARN_DEPRECATED)
 
 add_executable(quest_dual_arm_teleop_node src/quest_dual_arm_teleop_node.cpp)
 ament_target_dependencies(
@@ -30,6 +36,7 @@ ament_target_dependencies(
   rclcpp
   moveit_ros_planning_interface
 )
+target_compile_definitions(move_to_servo_ready PRIVATE SILENCE_DEPRECATION_WARNINGS)
 
 install(TARGETS
   quest_dual_arm_teleop_node
