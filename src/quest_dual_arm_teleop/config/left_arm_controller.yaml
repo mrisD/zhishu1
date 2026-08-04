@@ -15,5 +15,5 @@
     state_publish_rate: 50.0
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
-    open_loop_control: false
+    interpolate_from_desired_state: false
     allow_nonzero_velocity_at_trajectory_end: true

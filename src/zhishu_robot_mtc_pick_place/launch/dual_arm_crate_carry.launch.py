@@ -91,11 +91,7 @@ def generate_launch_description():
         package="controller_manager",
         executable="ros2_control_node",
         output="screen",
-        parameters=[
-            moveit_config.robot_description,
-            controllers_yaml,
-            {"use_sim_time": False},
-        ],
+        parameters=[controllers_yaml, {"use_sim_time": False}],
         additional_env={"LC_NUMERIC": "C"},
     )
 
@@ -110,6 +106,8 @@ def generate_launch_description():
                 "/controller_manager",
                 "--controller-manager-timeout",
                 "120",
+                "--param-file",
+                controllers_yaml,
             ],
         )
 

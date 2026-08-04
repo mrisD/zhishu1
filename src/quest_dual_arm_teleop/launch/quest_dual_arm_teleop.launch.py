@@ -69,7 +69,7 @@ def generate_launch_description():
         package="controller_manager",
         executable="ros2_control_node",
         output="screen",
-        parameters=[moveit_config.robot_description, controllers_yaml, {"use_sim_time": False}],
+        parameters=[controllers_yaml, {"use_sim_time": False}],
         additional_env={"LC_NUMERIC": "C"},
     )
 
@@ -177,20 +177,20 @@ def generate_launch_description():
         },
     )
 
-    start_servo_services = TimerAction(
+    set_servo_command_type = TimerAction(
         period=3.0,
         actions=[
             ExecuteProcess(
                 cmd=[
-                    "ros2", "service", "call", "/left_servo/start_servo",
-                    "std_srvs/srv/Trigger", "{}"
+                    "ros2", "service", "call", "/left_servo/switch_command_type",
+                    "moveit_msgs/srv/ServoCommandType", "{command_type: 1}"
                 ],
                 output="screen",
             ),
             ExecuteProcess(
                 cmd=[
-                    "ros2", "service", "call", "/right_servo/start_servo",
-                    "std_srvs/srv/Trigger", "{}"
+                    "ros2", "service", "call", "/right_servo/switch_command_type",
+                    "moveit_msgs/srv/ServoCommandType", "{command_type: 1}"
                 ],
                 output="screen",
             ),
@@ -206,7 +206,7 @@ def generate_launch_description():
                 right_servo,
                 teleop_node,
                 rviz,
-                start_servo_services,
+                set_servo_command_type,
             ],
         )
     )

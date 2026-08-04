@@ -4,6 +4,7 @@ import time
 
 import rclpy
 from geometry_msgs.msg import TwistStamped
+from moveit_msgs.srv import ServoCommandType
 from rclpy.node import Node
 
 
@@ -11,7 +12,21 @@ class SmokeTest(Node):
     def __init__(self, topic: str, frame: str):
         super().__init__("servo_smoke_test")
         self.publisher = self.create_publisher(TwistStamped, topic, 10)
+        self.command_type_client = self.create_client(
+            ServoCommandType, topic.replace("/delta_twist_cmds", "/switch_command_type")
+        )
         self.frame = frame
+
+    def select_command_type(self, command_type: int, timeout_sec: float = 5.0) -> None:
+        if not self.command_type_client.wait_for_service(timeout_sec=timeout_sec):
+            raise RuntimeError("MoveIt Servo switch_command_type service is unavailable")
+        request = ServoCommandType.Request()
+        request.command_type = command_type
+        future = self.command_type_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_sec)
+        response = future.result()
+        if response is None or not response.success:
+            raise RuntimeError("MoveIt Servo rejected the requested command type")
 
     def publish(self, axis: str, speed: float):
         msg = TwistStamped()
@@ -39,6 +54,7 @@ def main():
     rclpy.init()
     topic = f"/{args.arm}_servo/delta_twist_cmds"
     node = SmokeTest(topic, args.frame)
+    node.select_command_type(1)  # moveit_msgs/srv/ServoCommandType: TWIST
     end_time = time.monotonic() + args.duration
     try:
         while rclpy.ok() and time.monotonic() < end_time:

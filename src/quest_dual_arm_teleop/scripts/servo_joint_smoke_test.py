@@ -4,6 +4,7 @@ import time
 
 import rclpy
 from control_msgs.msg import JointJog
+from moveit_msgs.srv import ServoCommandType
 from rclpy.node import Node
 
 
@@ -24,6 +25,20 @@ class JointSmokeTest(Node):
     def __init__(self, topic: str):
         super().__init__("servo_joint_smoke_test")
         self.publisher = self.create_publisher(JointJog, topic, 10)
+        self.command_type_client = self.create_client(
+            ServoCommandType, topic.replace("/delta_joint_cmds", "/switch_command_type")
+        )
+
+    def select_command_type(self, command_type: int, timeout_sec: float = 5.0) -> None:
+        if not self.command_type_client.wait_for_service(timeout_sec=timeout_sec):
+            raise RuntimeError("MoveIt Servo switch_command_type service is unavailable")
+        request = ServoCommandType.Request()
+        request.command_type = command_type
+        future = self.command_type_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_sec)
+        response = future.result()
+        if response is None or not response.success:
+            raise RuntimeError("MoveIt Servo rejected the requested command type")
 
     def publish_velocity(self, joint_name: str, velocity: float):
         msg = JointJog()
@@ -56,6 +71,7 @@ def main():
 
     rclpy.init()
     node = JointSmokeTest(f"/{args.arm}_servo/delta_joint_cmds")
+    node.select_command_type(0)  # moveit_msgs/srv/ServoCommandType: JOINT_JOG
     end_time = time.monotonic() + args.duration
 
     try:

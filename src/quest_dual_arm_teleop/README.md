@@ -167,8 +167,8 @@ ros2 control list_hardware_interfaces
 若手柄有数据但机械臂不动：
 
 ```bash
-ros2 service call /left_servo/start_servo std_srvs/srv/Trigger {}
-ros2 service call /right_servo/start_servo std_srvs/srv/Trigger {}
+ros2 service call /left_servo/switch_command_type moveit_msgs/srv/ServoCommandType "{command_type: 1}"
+ros2 service call /right_servo/switch_command_type moveit_msgs/srv/ServoCommandType "{command_type: 1}"
 ```
 
 若 Servo 状态提示碰撞或奇异点，先将机械臂用低速规划移动到远离奇异点和自碰撞的安全初始姿态，再启动遥操作。
@@ -180,7 +180,7 @@ ros2 service call /right_servo/start_servo std_srvs/srv/Trigger {}
 - 不要同时运行 MTC 执行节点、MoveGroup 轨迹执行和 Quest Servo 遥操作。
 - 两个 Servo 节点会进行碰撞、奇异点和关节限位检查，但这些软件保护不能替代硬件限位与急停。
 
-## Fix for controller parameters on ROS 2 Humble
+## Fix for controller parameters on ROS 2 Jazzy
 
 If `left_arm_controller` or `right_arm_controller` reports that `joints` or
 `command_interfaces` is empty, the launch file must pass the controller YAML
@@ -248,11 +248,11 @@ After launching the stack, move to the named Servo-ready pose using MoveIt plann
 ros2 launch quest_dual_arm_teleop move_to_servo_ready.launch.py
 ```
 
-Then verify Servo is started:
+Then select the TWIST input type required by Jazzy Servo:
 
 ```bash
-ros2 service call /left_servo/start_servo std_srvs/srv/Trigger "{}"
-ros2 service call /right_servo/start_servo std_srvs/srv/Trigger "{}"
+ros2 service call /left_servo/switch_command_type moveit_msgs/srv/ServoCommandType "{command_type: 1}"
+ros2 service call /right_servo/switch_command_type moveit_msgs/srv/ServoCommandType "{command_type: 1}"
 ```
 
 Finally run the Cartesian smoke test:

@@ -65,18 +65,16 @@ ros2 param get /right_arm_controller joints
 ros2 param get /right_arm_controller command_interfaces
 左右臂都应该有7个关节，并且：command_interfaces = [position]
 启动 Servo。虽然启动文件会自动调用一次，但这里再确认一次：
-ros2 service call /left_servo/start_servo \
-  std_srvs/srv/Trigger "{}"
+ros2 service call /left_servo/switch_command_type moveit_msgs/srv/ServoCommandType "{command_type: 1}"
 
-ros2 service call /right_servo/start_servo \
-  std_srvs/srv/Trigger "{}"
+ros2 service call /right_servo/switch_command_type moveit_msgs/srv/ServoCommandType "{command_type: 1}"
 应返回：success=true
 检查状态：
 新终端1
 ros2 topic echo /left_servo/status
 新终端2
 ros2 topic echo /right_servo/status
-状态为：data: 0  表示正常。检查完按 Ctrl+C。
+Jazzy 的状态类型为 moveit_msgs/msg/ServoStatus；重点查看 code 和 message 字段。检查完按 Ctrl+C。
 七、先让虚拟双臂进入 Servo 初始姿态
 全零位姿接近奇异点，不适合直接进行笛卡尔 Servo 控制。
 运行：

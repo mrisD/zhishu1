@@ -71,53 +71,79 @@ def generate_launch_description():
         package="controller_manager",
         executable="ros2_control_node",
         output="screen",
-        parameters=[
-            moveit_config.robot_description,
-            ros2_controllers_yaml,
-            {"use_sim_time": False},
-        ],
+        parameters=[ros2_controllers_yaml, {"use_sim_time": False}],
         additional_env={"LC_NUMERIC": "C"},
     )
 
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "joint_state_broadcaster",
+            "--controller-manager", "/controller_manager",
+            "--param-file", ros2_controllers_yaml,
+            "--controller-manager-timeout", "120",
+        ],
         output="screen",
     )
 
     left_arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["left_arm_controller", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "left_arm_controller",
+            "--controller-manager", "/controller_manager",
+            "--param-file", ros2_controllers_yaml,
+            "--controller-manager-timeout", "120",
+        ],
         output="screen",
     )
 
     right_arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["right_arm_controller", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "right_arm_controller",
+            "--controller-manager", "/controller_manager",
+            "--param-file", ros2_controllers_yaml,
+            "--controller-manager-timeout", "120",
+        ],
         output="screen",
     )
 
     dual_arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["dual_arm_controller", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "dual_arm_controller",
+            "--controller-manager", "/controller_manager",
+            "--param-file", ros2_controllers_yaml,
+            "--controller-manager-timeout", "120",
+        ],
         output="screen",
     )
 
     left_gripper_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["left_gripper_controller", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "left_gripper_controller",
+            "--controller-manager", "/controller_manager",
+            "--param-file", ros2_controllers_yaml,
+            "--controller-manager-timeout", "120",
+        ],
         output="screen",
     )
 
     right_gripper_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["right_gripper_controller", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "right_gripper_controller",
+            "--controller-manager", "/controller_manager",
+            "--param-file", ros2_controllers_yaml,
+            "--controller-manager-timeout", "120",
+        ],
         output="screen",
     )
 
