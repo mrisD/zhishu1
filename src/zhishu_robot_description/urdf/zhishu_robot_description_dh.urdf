@@ -256,7 +256,8 @@
     <parent link="left_shoulder_pitch_link"/>
     <child link="left_shoulder_roll_link"/>
     <axis xyz="0 0 -1"/>
-    <limit lower="-0.43633" upper="1.4835" effort="100.0" velocity="1.0"/>
+    <!-- <limit lower="-0.43633" upper="1.4835" effort="100.0" velocity="1.0"/> -->
+    <limit lower="-1.4835" upper="0.43633" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="left_shoulder_yaw_link">
     <inertial>
@@ -488,7 +489,8 @@
     <parent link="right_shoulder_pitch_link"/>
     <child link="right_shoulder_roll_link"/>
     <axis xyz="0 0 -1"/>
-    <limit lower="-1.4835" upper="0.43633" effort="100.0" velocity="1.0"/>
+    <!-- <limit lower="-1.4835" upper="0.43633" effort="100.0" velocity="1.0"/> -->
+    <limit lower="-0.43633" upper="1.4835" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="right_shoulder_yaw_link">
     <inertial>
