@@ -54,7 +54,7 @@ def main():
     rclpy.init()
     topic = f"/{args.arm}_servo/delta_twist_cmds"
     node = SmokeTest(topic, args.frame)
-    node.select_command_type(1)  # moveit_msgs/srv/ServoCommandType: TWIST
+    node.select_command_type(ServoCommandType.Request.TWIST)
     end_time = time.monotonic() + args.duration
     try:
         while rclpy.ok() and time.monotonic() < end_time:

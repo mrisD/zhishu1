@@ -129,10 +129,7 @@ def generate_launch_description():
             left_servo_params,
             moveit_config.robot_description,
             moveit_config.robot_description_semantic,
-            # Deliberately do NOT pass robot_description_kinematics to Servo.
-            # move_group/RViz still receive KDL through moveit_all_params above.
-            # Without an IK plugin on the Servo node, MoveIt Servo uses its
-            # Jacobian pseudo-inverse path for Cartesian Twist commands.
+            moveit_config.robot_description_kinematics,
             moveit_config.joint_limits,
         ],
     )
@@ -146,10 +143,7 @@ def generate_launch_description():
             right_servo_params,
             moveit_config.robot_description,
             moveit_config.robot_description_semantic,
-            # Deliberately do NOT pass robot_description_kinematics to Servo.
-            # move_group/RViz still receive KDL through moveit_all_params above.
-            # Without an IK plugin on the Servo node, MoveIt Servo uses its
-            # Jacobian pseudo-inverse path for Cartesian Twist commands.
+            moveit_config.robot_description_kinematics,
             moveit_config.joint_limits,
         ],
     )

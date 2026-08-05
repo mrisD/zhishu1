@@ -47,6 +47,8 @@ install(TARGETS
 install(PROGRAMS
   scripts/servo_smoke_test.py
   scripts/servo_joint_smoke_test.py
+  scripts/mock_servo_integration_test.py
+  scripts/quest_link_test.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -58,5 +60,19 @@ install(DIRECTORY
 )
 
 install(FILES README.md DESTINATION share/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  find_package(launch_testing_ament_cmake REQUIRED)
+
+  ament_add_pytest_test(
+    test_jazzy_contracts
+    test/test_jazzy_contracts.py
+  )
+  add_launch_test(
+    test/test_mock_servo_launch.py
+    TIMEOUT 90
+  )
+endif()
 
 ament_package()

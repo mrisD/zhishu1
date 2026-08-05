@@ -71,7 +71,7 @@ def main():
 
     rclpy.init()
     node = JointSmokeTest(f"/{args.arm}_servo/delta_joint_cmds")
-    node.select_command_type(0)  # moveit_msgs/srv/ServoCommandType: JOINT_JOG
+    node.select_command_type(ServoCommandType.Request.JOINT_JOG)
     end_time = time.monotonic() + args.duration
 
     try:
