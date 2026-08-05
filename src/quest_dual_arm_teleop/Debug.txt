@@ -137,7 +137,7 @@ ros2 topic echo /quest/left_controller/deadman
 不按侧握键：data: false
 按住左手柄侧面的 Grip 键：data: true
 右手柄检查：ros2 topic echo /quest/right_controller/deadman
-注意：当前程序使用的是侧握 Grip 键，不是食指 Trigger 扳机键。Trigger 数据虽然被读取，但目前没有用于控制。
+注意：侧握 Grip 键只控制机械臂运动使能；食指 Trigger 独立控制同侧夹爪。每按下一次 Trigger，夹爪在打开/关闭之间切换一次，松开后保持当前状态。
 
 十一、第一次手柄控制
 按下面顺序进行：

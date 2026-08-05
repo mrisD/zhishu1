@@ -29,6 +29,9 @@
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
+#include "trajectory_msgs/msg/joint_trajectory.hpp"
+#include "trajectory_msgs/msg/joint_trajectory_point.hpp"
 
 namespace
 {
@@ -187,6 +190,14 @@ public:
       "left_twist_topic", "/left_servo/delta_twist_cmds");
     right_twist_topic_ = declare_parameter<std::string>(
       "right_twist_topic", "/right_servo/delta_twist_cmds");
+    left_gripper_topic_ = declare_parameter<std::string>(
+      "left_gripper_topic", "/left_gripper_controller/joint_trajectory");
+    right_gripper_topic_ = declare_parameter<std::string>(
+      "right_gripper_topic", "/right_gripper_controller/joint_trajectory");
+    left_gripper_joint_ = declare_parameter<std::string>(
+      "left_gripper_joint", "left_gripper_left_finger_joint");
+    right_gripper_joint_ = declare_parameter<std::string>(
+      "right_gripper_joint", "gripper_left_finger_joint");
     invert_vertical_command_ = declare_parameter<bool>("invert_vertical_command", true);
 
     translation_scale_ = declare_parameter<double>("translation_scale", 0.70);
@@ -194,6 +205,11 @@ public:
     max_linear_speed_ = declare_parameter<double>("max_linear_speed", 0.15);
     max_angular_speed_ = declare_parameter<double>("max_angular_speed", 0.60);
     grip_threshold_ = declare_parameter<double>("grip_threshold", 0.65);
+    trigger_press_threshold_ = declare_parameter<double>("trigger_press_threshold", 0.65);
+    trigger_release_threshold_ = declare_parameter<double>("trigger_release_threshold", 0.35);
+    gripper_open_position_ = declare_parameter<double>("gripper_open_position", 0.0);
+    gripper_closed_position_ = declare_parameter<double>("gripper_closed_position", 0.06);
+    gripper_motion_time_s_ = declare_parameter<double>("gripper_motion_time", 0.50);
     input_timeout_s_ = declare_parameter<double>("input_timeout", 0.15);
     filter_alpha_ = declare_parameter<double>("filter_alpha", 0.35);
     max_packet_translation_jump_ = declare_parameter<double>(
@@ -209,6 +225,15 @@ public:
     if (control_rate_hz_ <= 0.0) {
       throw std::runtime_error("control_rate must be positive");
     }
+    if (trigger_release_threshold_ < 0.0 || trigger_press_threshold_ > 1.0 ||
+      trigger_release_threshold_ >= trigger_press_threshold_)
+    {
+      throw std::runtime_error(
+              "trigger thresholds must satisfy 0 <= release < press <= 1");
+    }
+    if (gripper_motion_time_s_ <= 0.0) {
+      throw std::runtime_error("gripper_motion_time must be positive");
+    }
 
     left_twist_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>(left_twist_topic_, 10);
     right_twist_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>(right_twist_topic_, 10);
@@ -216,6 +241,16 @@ public:
     right_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>("/quest/right_controller/pose", 10);
     left_deadman_pub_ = create_publisher<std_msgs::msg::Bool>("/quest/left_controller/deadman", 10);
     right_deadman_pub_ = create_publisher<std_msgs::msg::Bool>("/quest/right_controller/deadman", 10);
+    left_trigger_pub_ = create_publisher<std_msgs::msg::Float32>("/quest/left_controller/trigger", 10);
+    right_trigger_pub_ = create_publisher<std_msgs::msg::Float32>("/quest/right_controller/trigger", 10);
+    left_gripper_closed_pub_ = create_publisher<std_msgs::msg::Bool>(
+      "/quest/left_controller/gripper_closed", 10);
+    right_gripper_closed_pub_ = create_publisher<std_msgs::msg::Bool>(
+      "/quest/right_controller/gripper_closed", 10);
+    left_gripper_pub_ = create_publisher<trajectory_msgs::msg::JointTrajectory>(
+      left_gripper_topic_, 10);
+    right_gripper_pub_ = create_publisher<trajectory_msgs::msg::JointTrajectory>(
+      right_gripper_topic_, 10);
     connected_pub_ = create_publisher<std_msgs::msg::Bool>("/quest/connected", 10);
 
     const auto timer_period = std::chrono::duration<double>(1.0 / control_rate_hz_);
@@ -228,6 +263,7 @@ public:
     RCLCPP_INFO(
       get_logger(),
       "Quest dual-arm teleop listening on %s:%d; hold each controller grip to enable its arm. "
+      "Each trigger press toggles its gripper open/closed. "
       "Scales linear=%.2f angular=%.2f, limits linear=%.2f m/s angular=%.2f rad/s, "
       "vertical command inverted=%s",
       bind_address_.c_str(), tcp_port_, translation_scale_, rotation_scale_,
@@ -262,6 +298,13 @@ private:
     Eigen::Matrix3d previous_rotation_ros{Eigen::Matrix3d::Identity()};
     Eigen::Vector3d filtered_linear{Eigen::Vector3d::Zero()};
     Eigen::Vector3d filtered_angular{Eigen::Vector3d::Zero()};
+  };
+
+  struct GripperState
+  {
+    bool initialized{false};
+    bool trigger_pressed{false};
+    bool closed{false};
   };
 
   bool receiveExact(const int fd, std::array<std::uint8_t, kPacketSize> & buffer)
@@ -555,6 +598,70 @@ private:
     right_deadman_pub_->publish(disabled);
   }
 
+  void publishGripperCommand(
+    const bool closed,
+    const std::string & joint_name,
+    const rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr & publisher)
+  {
+    trajectory_msgs::msg::JointTrajectory message;
+    message.joint_names.push_back(joint_name);
+
+    trajectory_msgs::msg::JointTrajectoryPoint point;
+    point.positions.push_back(closed ? gripper_closed_position_ : gripper_open_position_);
+    const auto duration_ns = static_cast<std::int64_t>(
+      std::llround(gripper_motion_time_s_ * 1.0e9));
+    point.time_from_start.sec = static_cast<std::int32_t>(duration_ns / 1000000000LL);
+    point.time_from_start.nanosec = static_cast<std::uint32_t>(duration_ns % 1000000000LL);
+    message.points.push_back(point);
+    publisher->publish(message);
+  }
+
+  void processGripper(
+    const HandPacket & hand,
+    GripperState & state,
+    const std::string & side,
+    const std::string & joint_name,
+    const rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr & command_publisher,
+    const rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr & trigger_publisher,
+    const rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr & closed_publisher)
+  {
+    std_msgs::msg::Float32 trigger_message;
+    trigger_message.data = static_cast<float>(std::clamp(hand.trigger, 0.0, 1.0));
+    trigger_publisher->publish(trigger_message);
+
+    if (!hand.valid || !std::isfinite(hand.trigger)) {
+      return;
+    }
+
+    const double trigger = std::clamp(hand.trigger, 0.0, 1.0);
+    bool send_command = false;
+
+    if (!state.initialized) {
+      // Synchronize the edge detector without moving the gripper.  This avoids
+      // an unexpected toggle if TCP reconnects while the trigger is held.
+      state.trigger_pressed = trigger >= trigger_press_threshold_;
+      state.initialized = true;
+    } else if (!state.trigger_pressed && trigger >= trigger_press_threshold_) {
+      state.trigger_pressed = true;
+      state.closed = !state.closed;
+      send_command = true;
+    } else if (state.trigger_pressed && trigger <= trigger_release_threshold_) {
+      state.trigger_pressed = false;
+    }
+
+    if (send_command) {
+      publishGripperCommand(state.closed, joint_name, command_publisher);
+      RCLCPP_INFO(
+        get_logger(), "%s trigger pressed -> gripper %s (%.3f m)",
+        side.c_str(), state.closed ? "CLOSE" : "OPEN",
+        state.closed ? gripper_closed_position_ : gripper_open_position_);
+    }
+
+    std_msgs::msg::Bool closed_message;
+    closed_message.data = state.closed;
+    closed_publisher->publish(closed_message);
+  }
+
   void controlLoop()
   {
     std_msgs::msg::Bool connected_message;
@@ -579,6 +686,10 @@ private:
 
     if (!connected_.load() || !have_packet || age_s > input_timeout_s_) {
       haltBoth();
+      // Do not open a gripper automatically on a link loss: a held object must
+      // not be dropped. Re-synchronize the trigger edge after reconnect.
+      left_gripper_state_.initialized = false;
+      right_gripper_state_.initialized = false;
       last_processed_counter_ = counter;
       return;
     }
@@ -602,6 +713,22 @@ private:
       right_twist_pub_,
       right_pose_pub_,
       right_deadman_pub_);
+    processGripper(
+      packet.left,
+      left_gripper_state_,
+      "Left",
+      left_gripper_joint_,
+      left_gripper_pub_,
+      left_trigger_pub_,
+      left_gripper_closed_pub_);
+    processGripper(
+      packet.right,
+      right_gripper_state_,
+      "Right",
+      right_gripper_joint_,
+      right_gripper_pub_,
+      right_trigger_pub_,
+      right_gripper_closed_pub_);
   }
 
   std::string bind_address_;
@@ -610,6 +737,10 @@ private:
   std::string quest_frame_;
   std::string left_twist_topic_;
   std::string right_twist_topic_;
+  std::string left_gripper_topic_;
+  std::string right_gripper_topic_;
+  std::string left_gripper_joint_;
+  std::string right_gripper_joint_;
   bool invert_vertical_command_{true};
 
   double translation_scale_{0.70};
@@ -617,6 +748,11 @@ private:
   double max_linear_speed_{0.15};
   double max_angular_speed_{0.60};
   double grip_threshold_{0.65};
+  double trigger_press_threshold_{0.65};
+  double trigger_release_threshold_{0.35};
+  double gripper_open_position_{0.0};
+  double gripper_closed_position_{0.06};
+  double gripper_motion_time_s_{0.50};
   double input_timeout_s_{0.15};
   double filter_alpha_{0.35};
   double max_packet_translation_jump_{0.12};
@@ -631,11 +767,19 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr right_pose_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr left_deadman_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr right_deadman_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr left_trigger_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr right_trigger_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr left_gripper_closed_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr right_gripper_closed_pub_;
+  rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_gripper_pub_;
+  rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_gripper_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr connected_pub_;
   rclcpp::TimerBase::SharedPtr control_timer_;
 
   HandState left_state_;
   HandState right_state_;
+  GripperState left_gripper_state_;
+  GripperState right_gripper_state_;
 
   std::atomic<bool> running_{true};
   std::atomic<bool> connected_{false};

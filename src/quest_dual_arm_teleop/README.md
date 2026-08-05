@@ -3,17 +3,18 @@
 ## 数据链路
 
 ```text
-Quest 左右手柄 OpenXR 位姿/侧握键
+Quest 左右手柄 OpenXR 位姿/侧握键/扳机键
         -> Unity TCP（二进制，72 Hz）
         -> quest_dual_arm_teleop_node
         -> /left_servo/delta_twist_cmds
         -> /right_servo/delta_twist_cmds
         -> 两个 MoveIt Servo 节点
         -> left/right_arm_controller
+        -> left/right_gripper_controller
         -> ros2_control + EtherCAT CSP
 ```
 
-本实现采用“速度映射”，不是将手柄绝对坐标直接设为机械臂目标坐标，因此按下使能键时不会跳到 Quest 世界原点。每个手柄的侧握键是对应机械臂的 deadman：按住才运动，松开立即发送零速度。
+本实现采用“速度映射”，不是将手柄绝对坐标直接设为机械臂目标坐标，因此按下使能键时不会跳到 Quest 世界原点。每个手柄的侧握键（Grip）是对应机械臂的 deadman：按住才运动，松开立即发送零速度。每个手柄的扳机键（Trigger）独立控制同侧夹爪：每按下一次切换一次开合状态，松开后保持当前状态，不要求同时按 Grip。
 
 ## 1. 安装依赖
 
@@ -60,6 +61,8 @@ ros2 control list_controllers
 joint_state_broadcaster  active
 left_arm_controller      active
 right_arm_controller     active
+left_gripper_controller  active
+right_gripper_controller active
 ```
 
 且不应激活 `dual_arm_controller`。
@@ -116,8 +119,12 @@ ros2 topic hz /quest/right_controller/pose
 - 按住左手柄侧握键：左手柄移动速度映射为左机械臂末端速度。
 - 按住右手柄侧握键：右手柄移动速度映射为右机械臂末端速度。
 - 松开某侧侧握键：该侧机械臂立即停止。
+- 第一次按下左/右 Trigger 超过 `0.65`：关闭对应侧夹爪。
+- 松开 Trigger 到 `0.35` 以下：夹爪保持当前状态，并等待下一次按下。
+- 再次按下 Trigger：打开对应侧夹爪；以后每按一次在开/关之间切换。
+- Trigger 与 Grip 相互独立；机械臂不移动时也可以开合夹爪。
 - 两侧可同时按住，实现双臂同步遥操作。
-- Quest 断连、手柄跟踪失效或 0.15 秒未收到数据：两臂发送零速度并复位。
+- Quest 断连、手柄跟踪失效或 0.15 秒未收到数据：两臂发送零速度并复位；夹爪保持当前指令，不会因断连自动松开物体。重连时先同步 Trigger 当前状态，不会因为重连时正按着 Trigger 而误切换。
 
 坐标映射：
 
@@ -142,6 +149,11 @@ rotation_scale: 0.75
 max_linear_speed: 0.15
 max_angular_speed: 0.60
 grip_threshold: 0.65
+trigger_press_threshold: 0.65
+trigger_release_threshold: 0.35
+gripper_open_position: 0.0
+gripper_closed_position: 0.06
+gripper_motion_time: 0.50
 input_timeout: 0.15
 filter_alpha: 0.35
 ```
@@ -161,8 +173,29 @@ ros2 topic hz /left_servo/delta_twist_cmds
 ros2 topic hz /right_servo/delta_twist_cmds
 ros2 topic echo /quest/left_controller/deadman
 ros2 topic echo /quest/right_controller/deadman
+ros2 topic echo /quest/left_controller/trigger
+ros2 topic echo /quest/right_controller/trigger
+ros2 topic echo /quest/left_controller/gripper_closed
+ros2 topic echo /quest/right_controller/gripper_closed
 ros2 control list_hardware_interfaces
 ```
+
+手动验证夹爪控制器（`0.0` 打开，`0.06` 关闭）：
+
+```bash
+ros2 topic pub --once /left_gripper_controller/joint_trajectory \
+  trajectory_msgs/msg/JointTrajectory \
+  "{joint_names: [left_gripper_left_finger_joint], points: [{positions: [0.06], time_from_start: {sec: 1}}]}"
+
+ros2 topic pub --once /right_gripper_controller/joint_trajectory \
+  trajectory_msgs/msg/JointTrajectory \
+  "{joint_names: [gripper_left_finger_joint], points: [{positions: [0.06], time_from_start: {sec: 1}}]}"
+```
+
+注意：源码中的 `LeftEsMotorHardwareInterface` 对两个夹爪关节当前采用软件位置回显，
+并未包含实际夹爪总线/串口协议。若上面命令只让 RViz 变化、真夹爪不动作，需要让真实
+夹爪硬件驱动导出同名的 ros2_control `position` command/state interface；Trigger 映射本身
+无需再修改。
 
 若手柄有数据但机械臂不动：
 

@@ -7,6 +7,10 @@ quest_dual_arm_teleop:
     quest_frame: "quest_tracking"
     left_twist_topic: "/left_servo/delta_twist_cmds"
     right_twist_topic: "/right_servo/delta_twist_cmds"
+    left_gripper_topic: "/left_gripper_controller/joint_trajectory"
+    right_gripper_topic: "/right_gripper_controller/joint_trajectory"
+    left_gripper_joint: "left_gripper_left_finger_joint"
+    right_gripper_joint: "gripper_left_finger_joint"
 
     # 这台真机的竖直命令方向与 Quest/OpenXR 的 +Y 方向相反。
     # 只反转发给 MoveIt Servo 的 Z 线速度，不改变手柄姿态显示和旋转方向。
@@ -24,6 +28,14 @@ quest_dual_arm_teleop:
 
     # 各手柄侧握键达到此值后，只使能对应侧机械臂。
     grip_threshold: 0.65
+
+    # 扳机键独立控制对应夹爪：每次按过 0.65 时切换一次开/关状态，
+    # 松到 0.35 以下后才允许下一次切换。两个阈值形成回差，避免抖动。
+    trigger_press_threshold: 0.65
+    trigger_release_threshold: 0.35
+    gripper_open_position: 0.0
+    gripper_closed_position: 0.06
+    gripper_motion_time: 0.50
 
     # 超过该时间没有 Quest 数据，发布零速度并复位手柄状态。
     input_timeout: 0.15

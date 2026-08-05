@@ -169,7 +169,7 @@ class MockServoIntegrationTest(Node):
         self.spin_for(0.25, lambda: self.publish_twist(0.0))
 
     @staticmethod
-    def quest_hand(z: float, grip: float) -> bytes:
+    def quest_hand(z: float, grip: float, trigger: float = 0.0) -> bytes:
         return struct.pack(
             "<9fI",
             0.0,
@@ -180,33 +180,72 @@ class MockServoIntegrationTest(Node):
             0.0,
             1.0,
             grip,
-            0.0,
+            trigger,
             1,
         )
 
     def test_quest_pipeline(self, joints: Iterable[str]) -> None:
+        gripper_joint = (
+            "left_gripper_left_finger_joint"
+            if self.arm == "left"
+            else "gripper_left_finger_joint"
+        )
+        self.spin_until(
+            lambda: gripper_joint in self.joint_positions,
+            f"{self.arm} gripper joint state",
+        )
         before = self.snapshot(joints)
         with socket.create_connection(
             ("127.0.0.1", self.tcp_port), timeout=self.timeout
         ) as client:
-            for sequence in range(100):
+            # Start released so the receiver can synchronize its edge detector.
+            for sequence in range(10):
                 packet = struct.pack(
                     "<IIIId", 0x31525651, 1, sequence, 0, sequence * 0.02
                 )
-                packet += self.quest_hand(sequence * 0.001, 1.0)
-                packet += self.quest_hand(0.0, 0.0)
+                packet += self.quest_hand(0.0, 0.0, 0.0)
+                packet += self.quest_hand(0.0, 0.0, 0.0)
                 client.sendall(packet)
                 rclpy.spin_once(self, timeout_sec=0.0)
                 time.sleep(0.02)
 
-            # Release the deadman and send several frames so the pipeline emits
-            # a final zero command before the TCP connection closes.
+            for sequence in range(10, 100):
+                packet = struct.pack(
+                    "<IIIId", 0x31525651, 1, sequence, 0, sequence * 0.02
+                )
+                moving_hand = self.quest_hand(sequence * 0.001, 1.0, 1.0)
+                idle_hand = self.quest_hand(0.0, 0.0, 0.0)
+                packet += moving_hand if self.arm == "left" else idle_hand
+                packet += moving_hand if self.arm == "right" else idle_hand
+                client.sendall(packet)
+                rclpy.spin_once(self, timeout_sec=0.0)
+                time.sleep(0.02)
+
+            gripper_closed_position = self.joint_positions[gripper_joint]
+
+            # Releasing the trigger must keep the gripper closed.  Releasing the
+            # deadman still makes the arm pipeline emit its final zero command.
             for sequence in range(100, 110):
                 packet = struct.pack(
                     "<IIIId", 0x31525651, 1, sequence, 0, sequence * 0.02
                 )
-                packet += self.quest_hand(0.1, 0.0)
-                packet += self.quest_hand(0.0, 0.0)
+                packet += self.quest_hand(0.1, 0.0, 0.0)
+                packet += self.quest_hand(0.0, 0.0, 0.0)
+                client.sendall(packet)
+                rclpy.spin_once(self, timeout_sec=0.0)
+                time.sleep(0.02)
+
+            gripper_after_release_position = self.joint_positions[gripper_joint]
+
+            # A second press toggles the gripper back open.
+            for sequence in range(110, 120):
+                packet = struct.pack(
+                    "<IIIId", 0x31525651, 1, sequence, 0, sequence * 0.02
+                )
+                toggle_hand = self.quest_hand(0.0, 0.0, 1.0)
+                idle_hand = self.quest_hand(0.0, 0.0, 0.0)
+                packet += toggle_hand if self.arm == "left" else idle_hand
+                packet += toggle_hand if self.arm == "right" else idle_hand
                 client.sendall(packet)
                 rclpy.spin_once(self, timeout_sec=0.0)
                 time.sleep(0.02)
@@ -223,11 +262,30 @@ class MockServoIntegrationTest(Node):
             failures.append("left deadman was never true")
         if delta < 0.001:
             failures.append(f"mock joint delta was only {delta:.6f} rad")
+        gripper_open_position = self.joint_positions[gripper_joint]
+        if gripper_closed_position < 0.045:
+            failures.append(
+                "trigger did not close the mock gripper: "
+                f"{gripper_closed_position:.6f} m"
+            )
+        if gripper_after_release_position < 0.045:
+            failures.append(
+                "trigger release did not preserve the closed gripper state: "
+                f"{gripper_after_release_position:.6f} m"
+            )
+        if gripper_open_position > 0.015:
+            failures.append(
+                "second trigger press did not reopen the mock gripper: "
+                f"{gripper_open_position:.6f} m"
+            )
         if failures:
             raise RuntimeError("Quest-to-mock pipeline failed: " + "; ".join(failures))
         self.get_logger().info(
-            "PASS Quest TCP -> pose/deadman -> Servo -> mock joints: "
-            f"poses={self.quest_pose_counts}, max joint delta={delta:.6f} rad"
+            "PASS Quest TCP -> pose/deadman/trigger -> Servo/gripper -> mock joints: "
+            f"poses={self.quest_pose_counts}, max arm delta={delta:.6f} rad, "
+            f"gripper close/held/open={gripper_closed_position:.6f}/"
+            f"{gripper_after_release_position:.6f}/"
+            f"{gripper_open_position:.6f} m"
         )
 
     def run(self) -> None:

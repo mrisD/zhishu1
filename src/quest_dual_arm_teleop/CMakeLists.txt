@@ -12,6 +12,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 
 # ROS 2 Jazzy's MoveIt dependency chain currently exports the deprecated
@@ -27,6 +28,7 @@ ament_target_dependencies(
   rclcpp
   geometry_msgs
   std_msgs
+  trajectory_msgs
 )
 target_link_libraries(quest_dual_arm_teleop_node Eigen3::Eigen)
 

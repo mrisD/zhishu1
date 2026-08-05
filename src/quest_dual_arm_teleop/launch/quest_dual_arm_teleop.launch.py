@@ -52,6 +52,12 @@ def generate_launch_description():
     teleop_config = os.path.join(package_share, "config", "quest_teleop.yaml")
     left_controller_params = os.path.join(package_share, "config", "left_arm_controller.yaml")
     right_controller_params = os.path.join(package_share, "config", "right_arm_controller.yaml")
+    left_gripper_controller_params = os.path.join(
+        package_share, "config", "left_gripper_controller.yaml"
+    )
+    right_gripper_controller_params = os.path.join(
+        package_share, "config", "right_gripper_controller.yaml"
+    )
     moveit_teleop_controllers = load_yaml(package_name, "config/moveit_controllers_teleop.yaml")
 
     left_servo_params = {"moveit_servo": load_yaml(package_name, "config/left_servo.yaml")}
@@ -102,6 +108,28 @@ def generate_launch_description():
             "right_arm_controller",
             "-c", "/controller_manager",
             "--param-file", right_controller_params,
+        ],
+        output="screen",
+    )
+
+    left_gripper_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "left_gripper_controller",
+            "-c", "/controller_manager",
+            "--param-file", left_gripper_controller_params,
+        ],
+        output="screen",
+    )
+
+    right_gripper_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "right_gripper_controller",
+            "-c", "/controller_manager",
+            "--param-file", right_gripper_controller_params,
         ],
         output="screen",
     )
@@ -191,9 +219,9 @@ def generate_launch_description():
         ],
     )
 
-    after_right_controller = RegisterEventHandler(
+    after_right_gripper_controller = RegisterEventHandler(
         OnProcessExit(
-            target_action=right_arm_spawner,
+            target_action=right_gripper_spawner,
             on_exit=[
                 move_group,
                 left_servo,
@@ -202,6 +230,20 @@ def generate_launch_description():
                 rviz,
                 set_servo_command_type,
             ],
+        )
+    )
+
+    after_left_gripper_controller = RegisterEventHandler(
+        OnProcessExit(
+            target_action=left_gripper_spawner,
+            on_exit=[right_gripper_spawner],
+        )
+    )
+
+    after_right_controller = RegisterEventHandler(
+        OnProcessExit(
+            target_action=right_arm_spawner,
+            on_exit=[left_gripper_spawner],
         )
     )
 
@@ -232,5 +274,7 @@ def generate_launch_description():
         after_joint_state,
         after_left_controller,
         after_right_controller,
+        after_left_gripper_controller,
+        after_right_gripper_controller,
         joint_state_spawner,
     ])
