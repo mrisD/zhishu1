@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="zhishu_robot_right_arm_ros2_control" params="name initial_positions_file use_gazebo:=false use_fake_hardware:=true">
+    <xacro:macro name="zhishu_robot_right_arm_ros2_control" params="name initial_positions_file use_gazebo:=false use_fake_hardware:=true enable_motors_on_activate:=true">
         <xacro:property name="initial_positions" value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
 
         <ros2_control name="${name}" type="system">
@@ -18,15 +18,18 @@
                     </xacro:unless>
                 </xacro:unless>
                 <!-- IgH EtherCAT / GH1 SERVOPACK defaults. Per-joint params below can override these. -->
-                <param name="cycle_ns">2000000</param>
+                <param name="cycle_ns">1000000</param>
                 <param name="enable_dc">true</param>
                 <param name="assign_activate">0x0300</param>
-                <param name="sync0_shift_ns">1000000</param>
+                <!-- Trigger SYNC0 halfway through the 1 ms application cycle. -->
+                <param name="sync0_shift_ns">500000</param>
                 <param name="select_dc_reference_clock">true</param>
                 <param name="dc_reference_alias">0</param>
                 <param name="dc_reference_slave_position">0</param>
                 <param name="enable_realtime">true</param>
                 <param name="realtime_priority">85</param>
+                <param name="realtime_cpu">5</param>
+                <param name="enable_motors_on_activate">${enable_motors_on_activate}</param>
                 <param name="master_index">1</param>
                 <param name="alias">0</param>
                 <param name="vendor_id">0x00206688</param>

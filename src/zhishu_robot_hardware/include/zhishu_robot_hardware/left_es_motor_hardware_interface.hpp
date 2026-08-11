@@ -69,6 +69,7 @@ private:
     std::vector<double> joint_snap_upper_limit_rad_;
     double joint_limit_snap_tolerance_rad_ = 0.005;
 
+    bool enable_motors_on_activate_ = true;
     bool activated_ = false;
 
 

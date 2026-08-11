@@ -74,6 +74,7 @@ def generate_launch_description():
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
+        prefix=["taskset -c 6"],
         output="screen",
         parameters=[controllers_yaml, {"use_sim_time": False}],
         additional_env={"LC_NUMERIC": "C"},

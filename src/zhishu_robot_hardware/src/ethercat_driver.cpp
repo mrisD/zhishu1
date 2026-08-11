@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
+#include <cinttypes>
 #include <climits>
 #include <cmath>
 #include <cstdio>
@@ -433,6 +434,13 @@ private:
       std::fprintf(stderr, "ethercat_driver: sync0_shift_ns must be >= 0\n");
       return false;
     }
+    if (config.enable_dc && config.sync0_shift_ns >= config.cycle_ns) {
+      std::fprintf(
+        stderr,
+        "ethercat_driver: sync0_shift_ns (%ld) must be smaller than cycle_ns (%ld)\n",
+        static_cast<long>(config.sync0_shift_ns), static_cast<long>(config.cycle_ns));
+      return false;
+    }
 
     const unsigned int master_index = config.motors.front().address.master_index;
     for (const auto & motor : config.motors) {
@@ -484,17 +492,46 @@ private:
       return;
     }
 
-    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+    if (config_.realtime_cpu >= 0) {
+      if (config_.realtime_cpu >= CPU_SETSIZE) {
+        std::fprintf(
+          stderr, "ethercat_driver: realtime_cpu=%d exceeds CPU_SETSIZE=%d\n",
+          config_.realtime_cpu, CPU_SETSIZE);
+      } else {
+        cpu_set_t cpu_set;
+        CPU_ZERO(&cpu_set);
+        CPU_SET(config_.realtime_cpu, &cpu_set);
+        const int affinity_ret = pthread_setaffinity_np(
+          pthread_self(), sizeof(cpu_set), &cpu_set);
+        if (affinity_ret != 0) {
+          std::fprintf(
+            stderr, "ethercat_driver: pthread_setaffinity_np(cpu=%d) failed: %s\n",
+            config_.realtime_cpu, std::strerror(affinity_ret));
+        } else {
+          std::fprintf(
+            stderr, "ethercat_driver: realtime CPU affinity active cpu=%d\n",
+            config_.realtime_cpu);
+        }
+      }
+    }
+
+    const bool memory_locked = mlockall(MCL_CURRENT | MCL_FUTURE) == 0;
+    if (!memory_locked) {
       std::fprintf(stderr, "ethercat_driver: mlockall failed: %s\n", std::strerror(errno));
     }
 
     sched_param param{};
     param.sched_priority = config_.realtime_priority;
-    if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) != 0) {
+    const int sched_ret = pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+    if (sched_ret != 0) {
       std::fprintf(
         stderr,
         "ethercat_driver: pthread_setschedparam(SCHED_FIFO, %d) failed: %s. Run as root or grant CAP_SYS_NICE.\n",
-        config_.realtime_priority, std::strerror(errno));
+        config_.realtime_priority, std::strerror(sched_ret));
+    } else {
+      std::fprintf(
+        stderr, "ethercat_driver: realtime active policy=SCHED_FIFO priority=%d memory_locked=%s\n",
+        config_.realtime_priority, memory_locked ? "yes" : "no");
     }
   }
 
@@ -876,18 +913,25 @@ private:
 
   void loop()
   {
-    setupRealtime();
-
     if (!initEthercat()) {
       ethercat_ok_.store(false);
       running_.store(false);
       return;
     }
+    // Enter FIFO scheduling only after all allocation and EtherCAT setup work is done.
+    setupRealtime();
     ethercat_ok_.store(true);
 
     timespec wake_time{};
     clock_gettime(CLOCK_MONOTONIC, &wake_time);
     const double dt = static_cast<double>(config_.cycle_ns) * 1e-9;
+    uint64_t cycle_count = 0;
+    uint64_t deadline_miss_count = 0;
+    uint64_t late_sample_count = 0;
+    uint64_t late_total_ns = 0;
+    uint64_t max_late_ns = 0;
+    uint64_t max_execution_ns = 0;
+    int64_t stats_start_ns = monotonicNs();
 
     while (running_.load()) {
       addNs(wake_time, config_.cycle_ns);
@@ -900,6 +944,14 @@ private:
 
       ecrt_master_receive(master_);
       ecrt_domain_process(domain_);
+
+      // Refresh working-counter health every cycle so ros2_control reacts within
+      // one millisecond instead of waiting for the throttled diagnostic poll.
+      ec_domain_state_t cyclic_domain_state{};
+      ecrt_domain_state(domain_, &cyclic_domain_state);
+      domain_wc_.store(static_cast<int>(cyclic_domain_state.working_counter));
+      domain_wc_state_.store(static_cast<int>(cyclic_domain_state.wc_state));
+      ethercat_ok_.store(cyclic_domain_state.wc_state == EC_WC_COMPLETE);
 
       for (auto & motor : motors_) {
         const uint16_t sw = EC_READ_U16(domain_pd_ + motor->offsets.status_word);
@@ -938,9 +990,54 @@ private:
 
       checkMasterStateThrottled();
 
-      const int sleep_ret = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &wake_time, nullptr);
+      const int64_t execution_end_ns = monotonicNs();
+      const int64_t scheduled_wake_ns = static_cast<int64_t>(timespecToNs(wake_time));
+      const uint64_t execution_ns = static_cast<uint64_t>(
+        std::max<int64_t>(0, execution_end_ns - (scheduled_wake_ns - config_.cycle_ns)));
+      max_execution_ns = std::max(max_execution_ns, execution_ns);
+
+      int sleep_ret = 0;
+      do {
+        sleep_ret = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &wake_time, nullptr);
+      } while (sleep_ret == EINTR);
       if (sleep_ret != 0 && sleep_ret != EINTR) {
         std::fprintf(stderr, "ethercat_driver: clock_nanosleep failed: %s\n", std::strerror(sleep_ret));
+      }
+
+      const int64_t actual_wake_ns = monotonicNs();
+      const int64_t lateness_ns = actual_wake_ns - scheduled_wake_ns;
+      if (lateness_ns > 0) {
+        const uint64_t positive_lateness_ns = static_cast<uint64_t>(lateness_ns);
+        ++late_sample_count;
+        late_total_ns += positive_lateness_ns;
+        max_late_ns = std::max(max_late_ns, positive_lateness_ns);
+        if (lateness_ns >= config_.cycle_ns) {
+          ++deadline_miss_count;
+          // Do not run a burst of back-to-back catch-up cycles after a large stall.
+          clock_gettime(CLOCK_MONOTONIC, &wake_time);
+        }
+      }
+      ++cycle_count;
+
+      if (actual_wake_ns - stats_start_ns >= 60000000000LL) {
+        const double elapsed_s = static_cast<double>(actual_wake_ns - stats_start_ns) * 1e-9;
+        const double rate_hz = elapsed_s > 0.0 ? static_cast<double>(cycle_count) / elapsed_s : 0.0;
+        const double mean_late_us = late_sample_count > 0 ?
+          static_cast<double>(late_total_ns) / static_cast<double>(late_sample_count) / 1000.0 : 0.0;
+        std::fprintf(
+          stderr,
+          "ethercat_driver: timing rate=%.2f Hz cycles=%" PRIu64
+          " deadline_misses=%" PRIu64 " mean_late=%.1f us max_late=%.1f us max_exec=%.1f us\n",
+          rate_hz, cycle_count, deadline_miss_count, mean_late_us,
+          static_cast<double>(max_late_ns) / 1000.0,
+          static_cast<double>(max_execution_ns) / 1000.0);
+        cycle_count = 0;
+        deadline_miss_count = 0;
+        late_sample_count = 0;
+        late_total_ns = 0;
+        max_late_ns = 0;
+        max_execution_ns = 0;
+        stats_start_ns = actual_wake_ns;
       }
     }
 
@@ -981,7 +1078,8 @@ private:
     {
       std::fprintf(
         stderr,
-        "ethercat_driver: master slaves=%u al=0x%02X link=%u | domain wc=%u wc_state=%u\n",
+        "ethercat_driver: master%u slaves=%u al=0x%02X link=%u | domain wc=%u wc_state=%u\n",
+        config_.motors.front().address.master_index,
         master_state.slaves_responding, master_state.al_states, master_state.link_up,
         domain_state.working_counter, domain_state.wc_state);
 

@@ -18,6 +18,7 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
     use_fake_hardware = LaunchConfiguration("use_fake_hardware")
+    enable_motors_on_activate = LaunchConfiguration("enable_motors_on_activate")
     use_rviz = LaunchConfiguration("use_rviz")
     # ==============================
     # 包路径查找
@@ -41,6 +42,7 @@ def generate_launch_description():
             mappings={
                 "use_gazebo": "false",
                 "use_fake_hardware": use_fake_hardware,
+                "enable_motors_on_activate": enable_motors_on_activate,
             },
         )
         .robot_description_semantic(file_path="config/zhishu_robot.srdf")
@@ -69,6 +71,7 @@ def generate_launch_description():
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
+        prefix=["taskset -c 6"],  #controller_manager 固定到 CPU6
         output="screen",
         parameters=[controllers_yaml, {"use_sim_time": False}],
         additional_env={"LC_NUMERIC": "C"},
@@ -195,6 +198,11 @@ def generate_launch_description():
             "use_rviz",
             default_value="true",
             description="Start RViz2",
+        ),
+        DeclareLaunchArgument(
+            "enable_motors_on_activate",
+            default_value="true",
+            description="Enable CiA402 operation; false keeps EtherCAT communication-only mode",
         ),
         robot_state_publisher,
         ros2_control_node,

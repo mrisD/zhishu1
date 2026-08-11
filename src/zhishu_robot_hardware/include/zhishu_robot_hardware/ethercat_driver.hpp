@@ -57,6 +57,7 @@ struct DriverConfig
 
   bool enable_realtime = true;
   int realtime_priority = 80;
+  int realtime_cpu = -1;
 
   std::vector<MotorConfig> motors;
 };

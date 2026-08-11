@@ -1,0 +1,572 @@
+ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py 
+[INFO] [launch]: All log files can be found below /home/pi/.ros/log/2026-08-10-08-43-49-189433-NanoPC-T6-LTS-3297
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [3312]
+[INFO] [ros2_control_node-2]: process started with pid [3313]
+[INFO] [spawner-3]: process started with pid [3314]
+[ros2_control_node-2] [INFO] [1786351429.931420141] [controller_manager]: Using Steady (Monotonic) clock for triggering controller manager cycles.
+[ros2_control_node-2] [INFO] [1786351429.950008352] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[robot_state_publisher-1] [INFO] [1786351429.953230685] [robot_state_publisher]: Robot initialized
+[ros2_control_node-2] [INFO] [1786351430.039657652] [controller_manager]: update rate is 500 Hz
+[ros2_control_node-2] [INFO] [1786351430.039730277] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-2] [INFO] [1786351430.039744277] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-2] [INFO] [1786351430.042999278] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 50.
+[ros2_control_node-2] [INFO] [1786351430.065669363] [controller_manager]: Received robot description from topic.
+[ros2_control_node-2] [INFO] [1786351430.065736447] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[ros2_control_node-2] [INFO] [1786351430.078244865] [controller_manager]: Loading hardware 'LeftArmSystem' 
+[ros2_control_node-2] [INFO] [1786351430.084573740] [controller_manager]: Loaded hardware 'LeftArmSystem' from plugin 'left_es_motor_hardware/LeftEsMotorHardwareInterface'
+[ros2_control_node-2] [INFO] [1786351430.084726282] [controller_manager]: Initialize hardware 'LeftArmSystem' 
+[ros2_control_node-2] [INFO] [1786351430.088928616] [LeftEsMotorHardwareInterface]: EtherCAT joint mapping: joint=left_shoulder_pitch_joint motor=left_arm_motor_0 slave_position=0 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.089004157] [LeftEsMotorHardwareInterface]: EtherCAT joint mapping: joint=left_shoulder_roll_joint motor=left_arm_motor_1 slave_position=1 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.089030991] [LeftEsMotorHardwareInterface]: EtherCAT joint mapping: joint=left_shoulder_yaw_joint motor=left_arm_motor_2 slave_position=2 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.089058991] [LeftEsMotorHardwareInterface]: EtherCAT joint mapping: joint=left_elbow_pitch_joint motor=left_arm_motor_3 slave_position=3 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.089065116] [LeftEsMotorHardwareInterface]: Joint limit snap enabled: joint=left_elbow_pitch_joint lower=0.000000 upper=nan tolerance=0.005000 rad
+[ros2_control_node-2] [INFO] [1786351430.089090199] [LeftEsMotorHardwareInterface]: EtherCAT joint mapping: joint=left_wrist_yaw_joint motor=left_arm_motor_4 slave_position=4 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.089113824] [LeftEsMotorHardwareInterface]: EtherCAT joint mapping: joint=left_wrist_pitch_joint motor=left_arm_motor_5 slave_position=5 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.089136282] [LeftEsMotorHardwareInterface]: EtherCAT joint mapping: joint=left_wrist_roll_joint motor=left_arm_motor_6 slave_position=6 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.089220282] [LeftEsMotorHardwareInterface]: Configured 7 EtherCAT motors for ROS 2 Jazzy ros2_control.
+[ros2_control_node-2] [INFO] [1786351430.089255282] [controller_manager]: Successful initialization of hardware 'LeftArmSystem'
+[ros2_control_node-2] [INFO] [1786351430.089639407] [controller_manager]: Loading hardware 'RightArmSystem' 
+[ros2_control_node-2] [INFO] [1786351430.089688699] [controller_manager]: Loaded hardware 'RightArmSystem' from plugin 'es_motor_hardware/EsMotorHardwareInterface'
+[ros2_control_node-2] [INFO] [1786351430.089737991] [controller_manager]: Initialize hardware 'RightArmSystem' 
+[ros2_control_node-2] [INFO] [1786351430.094079158] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_shoulder_pitch_joint motor=right_arm_motor_0 slave_position=0 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.094137200] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_shoulder_roll_joint motor=right_arm_motor_1 slave_position=1 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.094161700] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_shoulder_yaw_joint motor=right_arm_motor_2 slave_position=2 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.094186200] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_elbow_pitch_joint motor=right_arm_motor_3 slave_position=3 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.094238991] [EsMotorHardwareInterface]: Joint limit snap enabled: joint=right_elbow_pitch_joint lower=0.000000 upper=nan tolerance=0.005000 rad
+[ros2_control_node-2] [INFO] [1786351430.094266408] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_wrist_yaw_joint motor=right_arm_motor_4 slave_position=4 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.094289158] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_wrist_pitch_joint motor=right_arm_motor_5 slave_position=5 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.094311616] [EsMotorHardwareInterface]: EtherCAT joint mapping: joint=right_wrist_roll_joint motor=right_arm_motor_6 slave_position=6 counts_per_rev=131072.0 sign=1.0 offset_rad=0.000000
+[ros2_control_node-2] [INFO] [1786351430.094317450] [EsMotorHardwareInterface]: Configured 7 EtherCAT motors for ROS 2 Jazzy ros2_control.
+[ros2_control_node-2] [INFO] [1786351430.094336116] [controller_manager]: Successful initialization of hardware 'RightArmSystem'
+[ros2_control_node-2] [INFO] [1786351430.094582575] [controller_manager]: Activating component 'RightArmSystem'.
+[ros2_control_node-2] [INFO] [1786351430.094607366] [resource_manager]: 'configure' hardware 'RightArmSystem' 
+[ros2_control_node-2] [INFO] [1786351430.094619325] [EsMotorHardwareInterface]: Hardware configured. EtherCAT will start in on_activate().
+[ros2_control_node-2] [INFO] [1786351430.094624575] [resource_manager]: Successful 'configure' of hardware 'RightArmSystem'
+[ros2_control_node-2] [INFO] [1786351430.094633325] [resource_manager]: 'activate' hardware 'RightArmSystem' 
+[ros2_control_node-2] ethercat_driver: init_master OK, master=1
+[ros2_control_node-2] ethercat_driver: configure_slave OK, motors=7
+[ros2_control_node-2] ethercat_driver: configure_pdo OK, RxPDO=0x1601 TxPDO=0x1A01
+[ros2_control_node-2] ethercat_driver: activate_master OK master=1 motors=7 cycle=2000000 ns DC=on assign=0x0300 sync0_shift=1000000 ns ref_alias=0 ref_position=0
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_0' address master=1 alias=0 position=0 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_1' address master=1 alias=0 position=1 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_2' address master=1 alias=0 position=2 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_3' address master=1 alias=0 position=3 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_4' address master=1 alias=0 position=4 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_5' address master=1 alias=0 position=5 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_6' address master=1 alias=0 position=6 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=0 wc_state=0
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_0' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_1' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_2' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_3' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_4' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_5' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_6' online=1 op=0 al=0x02
+[spawner-3] [INFO] [1786351430.615703460] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=3 wc_state=1
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_0' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=6 wc_state=1
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_1' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=12 wc_state=1
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_2' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_3' online=1 op=0 al=0x04
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=18 wc_state=1
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_3' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_4' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_5' online=1 op=0 al=0x04
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x08 link=1 | domain wc=21 wc_state=2
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_5' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: motor 'right_arm_motor_6' online=1 op=1 al=0x08
+[ros2_control_node-2] [INFO] [1786351440.338766229] [EsMotorHardwareInterface]: Activated joint 'right_shoulder_pitch_joint' on slave_position=0, hold at 0.000144 rad / 0.01 deg.
+[ros2_control_node-2] [INFO] [1786351440.338869479] [EsMotorHardwareInterface]: Activated joint 'right_shoulder_roll_joint' on slave_position=1, hold at 0.000048 rad / 0.00 deg.
+[ros2_control_node-2] [INFO] [1786351440.338889896] [EsMotorHardwareInterface]: Activated joint 'right_shoulder_yaw_joint' on slave_position=2, hold at -0.000527 rad / -0.03 deg.
+[ros2_control_node-2] [INFO] [1786351440.338907687] [EsMotorHardwareInterface]: Activated joint 'right_elbow_pitch_joint' on slave_position=3, hold at 0.000911 rad / 0.05 deg.
+[ros2_control_node-2] [INFO] [1786351440.338924896] [EsMotorHardwareInterface]: Activated joint 'right_wrist_yaw_joint' on slave_position=4, hold at -0.000096 rad / -0.01 deg.
+[ros2_control_node-2] [INFO] [1786351440.338941229] [EsMotorHardwareInterface]: Activated joint 'right_wrist_pitch_joint' on slave_position=5, hold at 0.000623 rad / 0.04 deg.
+[ros2_control_node-2] [INFO] [1786351440.338957562] [EsMotorHardwareInterface]: Activated joint 'right_wrist_roll_joint' on slave_position=6, hold at 0.000000 rad / 0.00 deg.
+[ros2_control_node-2] [INFO] [1786351440.339017354] [resource_manager]: Successful 'activate' of hardware 'RightArmSystem'
+[ros2_control_node-2] [INFO] [1786351440.339246604] [controller_manager]: Activating component 'LeftArmSystem'.
+[ros2_control_node-2] [WARN] [1786351440.339522229] [EsMotorHardwareInterface]: Joint 'right_shoulder_pitch_joint' is not command-enabled yet: enable_status_ok=1 command_enable=1 operation_enabled=0 status_word=0x1208. Holding current position.
+[ros2_control_node-2] [INFO] [1786351440.339729312] [resource_manager]: 'configure' hardware 'LeftArmSystem' 
+[ros2_control_node-2] [INFO] [1786351440.339757021] [LeftEsMotorHardwareInterface]: Hardware configured. EtherCAT will start in on_activate().
+[ros2_control_node-2] [INFO] [1786351440.339776562] [resource_manager]: Successful 'configure' of hardware 'LeftArmSystem'
+[ros2_control_node-2] [INFO] [1786351440.339804854] [resource_manager]: 'activate' hardware 'LeftArmSystem' 
+[ros2_control_node-2] ethercat_driver: init_master OK, master=0
+[ros2_control_node-2] ethercat_driver: configure_slave OK, motors=7
+[ros2_control_node-2] ethercat_driver: configure_pdo OK, RxPDO=0x1601 TxPDO=0x1A01
+[ros2_control_node-2] ethercat_driver: activate_master OK master=0 motors=7 cycle=2000000 ns DC=on assign=0x0300 sync0_shift=1000000 ns ref_alias=0 ref_position=0
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_0' address master=0 alias=0 position=0 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_1' address master=0 alias=0 position=1 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_2' address master=0 alias=0 position=2 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_3' address master=0 alias=0 position=3 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_4' address master=0 alias=0 position=4 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_5' address master=0 alias=0 position=5 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_6' address master=0 alias=0 position=6 vendor=0x00206688 product=0x26483052
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=0 wc_state=0
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_0' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_1' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_2' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_3' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_4' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_5' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_6' online=1 op=0 al=0x02
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=3 wc_state=1
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_0' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=6 wc_state=1
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_1' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=9 wc_state=1
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_2' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=15 wc_state=1
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_3' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_4' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x02 link=1 | domain wc=18 wc_state=1
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_5' online=1 op=1 al=0x08
+[ros2_control_node-2] ethercat_driver: master slaves=7 al=0x08 link=1 | domain wc=21 wc_state=2
+[ros2_control_node-2] ethercat_driver: motor 'left_arm_motor_6' online=1 op=1 al=0x08
+[ros2_control_node-2] [INFO] [1786351450.590689051] [LeftEsMotorHardwareInterface]: Activated joint 'left_shoulder_pitch_joint' on slave_position=0, hold at -0.000240 rad / -0.01 deg.
+[ros2_control_node-2] [INFO] [1786351450.590901092] [LeftEsMotorHardwareInterface]: Activated joint 'left_shoulder_roll_joint' on slave_position=1, hold at -0.000048 rad / -0.00 deg.
+[ros2_control_node-2] [INFO] [1786351450.590961467] [LeftEsMotorHardwareInterface]: Activated joint 'left_shoulder_yaw_joint' on slave_position=2, hold at -0.000048 rad / -0.00 deg.
+[ros2_control_node-2] [INFO] [1786351450.591013676] [LeftEsMotorHardwareInterface]: Activated joint 'left_elbow_pitch_joint' on slave_position=3, hold at 0.001342 rad / 0.08 deg.
+[ros2_control_node-2] [INFO] [1786351450.591064426] [LeftEsMotorHardwareInterface]: Activated joint 'left_wrist_yaw_joint' on slave_position=4, hold at -0.000096 rad / -0.01 deg.
+[ros2_control_node-2] [INFO] [1786351450.591114592] [LeftEsMotorHardwareInterface]: Activated joint 'left_wrist_pitch_joint' on slave_position=5, hold at -0.000096 rad / -0.01 deg.
+[ros2_control_node-2] [INFO] [1786351450.591166217] [LeftEsMotorHardwareInterface]: Activated joint 'left_wrist_roll_joint' on slave_position=6, hold at 0.000000 rad / 0.00 deg.
+[ros2_control_node-2] [INFO] [1786351450.591262176] [resource_manager]: Successful 'activate' of hardware 'LeftArmSystem'
+[ros2_control_node-2] [INFO] [1786351450.591756551] [controller_manager]: Registering statistics for : RightArmSystem
+[ros2_control_node-2] [INFO] [1786351450.593044259] [controller_manager]: Registering statistics for : LeftArmSystem
+[ros2_control_node-2] [WARN] [1786351450.593528718] [LeftEsMotorHardwareInterface]: Joint 'left_shoulder_pitch_joint' is not command-enabled yet: enable_status_ok=1 command_enable=1 operation_enabled=0 status_word=0x1208. Holding current position.
+[ros2_control_node-2] [INFO] [1786351450.593764384] [controller_manager]: Resource Manager has been successfully initialized. Starting Controller Manager services...
+[ros2_control_node-2] [INFO] [1786351450.678084101] [controller_manager]: Loading controller : 'joint_state_broadcaster' of type 'joint_state_broadcaster/JointStateBroadcaster'
+[ros2_control_node-2] [INFO] [1786351450.678221768] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1786351450.718945772] [controller_manager]: Controller 'joint_state_broadcaster' node arguments: --ros-args --params-file /home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml --params-file /tmp/launch_params_o45ej50n 
+[spawner-3] [INFO] [1786351450.753366817] [spawner_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[ros2_control_node-2] [INFO] [1786351450.756727984] [controller_manager]: Configuring controller: 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1786351450.757175401] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[ros2_control_node-2] [INFO] [1786351450.804951197] [controller_manager]: Activating controllers: [ joint_state_broadcaster ]
+[ros2_control_node-2] [INFO] [1786351450.806354406] [controller_manager]: Successfully switched controllers!
+[spawner-3] [INFO] [1786351450.820703657] [spawner_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[INFO] [spawner-3]: process has finished cleanly [pid 3314]
+[INFO] [spawner-4]: process started with pid [3661]
+[spawner-4] [INFO] [1786351452.002531567] [spawner_dual_arm_controller]: Setting controller param "params_file" to "['/home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml']" for dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351452.018396194] [controller_manager]: Loading controller : 'dual_arm_controller' of type 'joint_trajectory_controller/JointTrajectoryController'
+[ros2_control_node-2] [INFO] [1786351452.018583152] [controller_manager]: Loading controller 'dual_arm_controller'
+[ros2_control_node-2] [INFO] [1786351452.047440364] [controller_manager]: Controller 'dual_arm_controller' node arguments: --ros-args --params-file /home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml --params-file /tmp/launch_params_o45ej50n --params-file /home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml 
+[spawner-4] [INFO] [1786351452.115923121] [spawner_dual_arm_controller]: Loaded dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351452.118111787] [controller_manager]: Configuring controller: 'dual_arm_controller'
+[ros2_control_node-2] [INFO] [1786351452.121925329] [dual_arm_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-2] [INFO] [1786351452.122289621] [dual_arm_controller]: Command interfaces are [position] and state interfaces are [position].
+[ros2_control_node-2] [INFO] [1786351452.122472205] [dual_arm_controller]: Using 'splines' interpolation method.
+[ros2_control_node-2] [INFO] [1786351452.144988582] [dual_arm_controller]: Goals with partial set of joints are allowed
+[ros2_control_node-2] [INFO] [1786351452.145136748] [dual_arm_controller]: Action status changes will be monitored at 20.00 Hz.
+[ros2_control_node-2] [INFO] [1786351452.160254125] [dual_arm_controller]: Setting initial scaling factor to 1.000000
+[ros2_control_node-2] [INFO] [1786351452.160393542] [dual_arm_controller]: No scaling interface set. This controller will not read speed scaling from the hardware.
+[ros2_control_node-2] [INFO] [1786351452.165257375] [controller_manager]: Activating controllers: [ dual_arm_controller ]
+[ros2_control_node-2] [INFO] [1786351452.170499501] [controller_manager]: Successfully switched controllers!
+[ros2_control_node-2] [WARN] [1786351452.170823543] [controller_manager]: Overrun might occur, Total time : 3498.542 us (Expected < 2000.000 us) --> Read time : 205.917 us, Update time : 2971.792 us (Switch time : 2691.500 us (Switch chained mode time : 11.084 us, perform mode change time : 153.125 us, Activation time : 2509.500 us, Deactivation time : 1.750 us)), Write time : 320.833 us
+[ros2_control_node-2] [WARN] [1786351452.170981626] [controller_manager]: Overrun detected! The controller manager missed its desired rate of 500 Hz. The loop took 3.716806 ms (missed cycles : 2).
+[spawner-4] [INFO] [1786351452.174798668] [spawner_dual_arm_controller]: Configured and activated dual_arm_controller
+[INFO] [spawner-4]: process has finished cleanly [pid 3661]
+[INFO] [spawner-5]: process started with pid [3696]
+[spawner-5] [INFO] [1786351453.406683917] [spawner_left_gripper_controller]: Setting controller param "params_file" to "['/home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml']" for left_gripper_controller
+[ros2_control_node-2] [INFO] [1786351453.423361710] [controller_manager]: Loading controller : 'left_gripper_controller' of type 'joint_trajectory_controller/JointTrajectoryController'
+[ros2_control_node-2] [INFO] [1786351453.423538169] [controller_manager]: Loading controller 'left_gripper_controller'
+[ros2_control_node-2] [INFO] [1786351453.424414919] [controller_manager]: Controller 'left_gripper_controller' node arguments: --ros-args --params-file /home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml --params-file /tmp/launch_params_o45ej50n --params-file /home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml 
+[spawner-5] [INFO] [1786351453.472232215] [spawner_left_gripper_controller]: Loaded left_gripper_controller
+[ros2_control_node-2] [INFO] [1786351453.475272549] [controller_manager]: Configuring controller: 'left_gripper_controller'
+[ros2_control_node-2] [INFO] [1786351453.475898465] [left_gripper_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-2] [INFO] [1786351453.476209674] [left_gripper_controller]: Command interfaces are [position] and state interfaces are [position].
+[ros2_control_node-2] [INFO] [1786351453.476268007] [left_gripper_controller]: Using 'splines' interpolation method.
+[ros2_control_node-2] [INFO] [1786351453.491125217] [left_gripper_controller]: Action status changes will be monitored at 20.00 Hz.
+[ros2_control_node-2] [INFO] [1786351453.497872926] [left_gripper_controller]: Setting initial scaling factor to 1.000000
+[ros2_control_node-2] [INFO] [1786351453.498015843] [left_gripper_controller]: No scaling interface set. This controller will not read speed scaling from the hardware.
+[ros2_control_node-2] [INFO] [1786351453.503483718] [controller_manager]: Activating controllers: [ left_gripper_controller ]
+[ros2_control_node-2] [INFO] [1786351453.505700968] [controller_manager]: Successfully switched controllers!
+[spawner-5] [INFO] [1786351453.510378719] [spawner_left_gripper_controller]: Configured and activated left_gripper_controller
+[INFO] [spawner-5]: process has finished cleanly [pid 3696]
+[INFO] [spawner-6]: process started with pid [3728]
+[INFO] [rviz2-7]: process started with pid [3732]
+[spawner-6] [INFO] [1786351454.701774797] [spawner_right_gripper_controller]: Setting controller param "params_file" to "['/home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml']" for right_gripper_controller
+[ros2_control_node-2] [INFO] [1786351454.719583382] [controller_manager]: Loading controller : 'right_gripper_controller' of type 'joint_trajectory_controller/JointTrajectoryController'
+[ros2_control_node-2] [INFO] [1786351454.720505632] [controller_manager]: Loading controller 'right_gripper_controller'
+[ros2_control_node-2] [INFO] [1786351454.722003341] [controller_manager]: Controller 'right_gripper_controller' node arguments: --ros-args --params-file /home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml --params-file /tmp/launch_params_o45ej50n --params-file /home/pi/Documents/zhul/guohua_ws/install/zhishu_robot_moveit_config/share/zhishu_robot_moveit_config/config/ros2_controllers.yaml 
+[spawner-6] [INFO] [1786351454.753897677] [spawner_right_gripper_controller]: Loaded right_gripper_controller
+[ros2_control_node-2] [INFO] [1786351454.760333595] [controller_manager]: Configuring controller: 'right_gripper_controller'
+[ros2_control_node-2] [INFO] [1786351454.761985011] [right_gripper_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-2] [INFO] [1786351454.762507678] [right_gripper_controller]: Command interfaces are [position] and state interfaces are [position].
+[ros2_control_node-2] [INFO] [1786351454.762718845] [right_gripper_controller]: Using 'splines' interpolation method.
+[ros2_control_node-2] [INFO] [1786351454.782630638] [right_gripper_controller]: Action status changes will be monitored at 20.00 Hz.
+[ros2_control_node-2] [INFO] [1786351454.792529223] [right_gripper_controller]: Setting initial scaling factor to 1.000000
+[ros2_control_node-2] [INFO] [1786351454.792707723] [right_gripper_controller]: No scaling interface set. This controller will not read speed scaling from the hardware.
+[ros2_control_node-2] [INFO] [1786351454.796104181] [controller_manager]: Activating controllers: [ right_gripper_controller ]
+[ros2_control_node-2] [INFO] [1786351454.797604515] [controller_manager]: Successfully switched controllers!
+[spawner-6] [INFO] [1786351454.802128265] [spawner_right_gripper_controller]: Configured and activated right_gripper_controller
+[INFO] [spawner-6]: process has finished cleanly [pid 3728]
+[INFO] [move_group-8]: process started with pid [3823]
+[move_group-8] [INFO] [1786351455.636194058] [move_group.moveit.moveit.ros.rdf_loader]: Loaded robot model in 0.00696296 seconds
+[move_group-8] [INFO] [1786351455.636350099] [move_group.moveit.moveit.core.robot_model]: Loading robot model 'zhishu_robot'...
+[move_group-8] [INFO] [1786351455.636378683] [move_group.moveit.moveit.core.robot_model]: No root/virtual joint specified in SRDF. Assuming fixed joint
+[move_group-8] [INFO] [1786351455.656644560] [move_group.moveit.moveit.kinematics.kdl_kinematics_plugin]: Joint weights for group 'left_arm': 1 1 1 1 1 1 1
+[move_group-8] [INFO] [1786351455.658251935] [move_group.moveit.moveit.kinematics.kdl_kinematics_plugin]: Joint weights for group 'right_arm': 1 1 1 1 1 1 1
+[move_group-8] [INFO] [1786351455.701249439] [move_group.moveit.moveit.ros.planning_scene_monitor]: Publishing maintained planning scene on 'monitored_planning_scene'
+[move_group-8] [INFO] [1786351455.701534106] [move_group.moveit.moveit.ros.moveit_cpp]: Listening to 'joint_states' for joint states
+[move_group-8] [INFO] [1786351455.702314606] [move_group.moveit.moveit.ros.current_state_monitor]: Listening to joint states on topic 'joint_states'
+[move_group-8] [INFO] [1786351455.703091023] [move_group.moveit.moveit.ros.planning_scene_monitor]: Listening to '/attached_collision_object' for attached collision objects
+[move_group-8] [INFO] [1786351455.703131564] [move_group.moveit.moveit.ros.planning_scene_monitor]: Stopping existing planning scene publisher.
+[move_group-8] [INFO] [1786351455.704346648] [move_group.moveit.moveit.ros.planning_scene_monitor]: Stopped publishing maintained planning scene.
+[move_group-8] [INFO] [1786351455.705829190] [move_group.moveit.moveit.ros.planning_scene_monitor]: Publishing maintained planning scene on 'monitored_planning_scene'
+[move_group-8] [INFO] [1786351455.706017023] [move_group.moveit.moveit.ros.planning_scene_monitor]: Starting planning scene monitor
+[move_group-8] [INFO] [1786351455.707237356] [move_group.moveit.moveit.ros.planning_scene_monitor]: Listening to '/planning_scene'
+[move_group-8] [INFO] [1786351455.707300356] [move_group.moveit.moveit.ros.planning_scene_monitor]: Starting world geometry update monitor for collision objects, attached objects, octomap updates.
+[move_group-8] [INFO] [1786351455.708325273] [move_group.moveit.moveit.ros.planning_scene_monitor]: Listening to 'collision_object'
+[move_group-8] [INFO] [1786351455.709008357] [move_group.moveit.moveit.ros.planning_scene_monitor]: Listening to 'planning_scene_world' for planning scene world geometry
+[move_group-8] [WARN] [1786351455.710416815] [move_group.moveit.moveit.ros.occupancy_map_monitor]: Resolution not specified for Octomap. Assuming resolution = 0.1 instead
+[move_group-8] [ERROR] [1786351455.710476023] [move_group.moveit.moveit.ros.occupancy_map_monitor]: No 3D sensor plugin(s) defined for octomap updates
+[move_group-8] [INFO] [1786351455.766658321] [move_group.moveit.moveit.ros.planning_pipeline]: Successfully loaded planner 'OMPL'
+[move_group-8] [INFO] [1786351455.768848154] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351455.772877821] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351455.772962696] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351455.773485071] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351455.773527655] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-8] [INFO] [1786351455.773611655] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-8] [INFO] [1786351455.773634988] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-8] [INFO] [1786351455.773676405] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-8] [INFO] [1786351455.776980405] [move_group]: Try loading adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-8] [INFO] [1786351455.790533865] [move_group]: Loaded adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-8] [INFO] [1786351455.790591323] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-8] [INFO] [1786351455.794740865] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-8] [INFO] [1786351455.794791907] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-8] [INFO] [1786351455.796245865] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-8] [INFO] [1786351455.808840325] [move_group.moveit.moveit.planners.pilz.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[rviz2-7] [INFO] [1786351455.826174368] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-7] [INFO] [1786351455.826328660] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[move_group-8] [INFO] [1786351455.837328286] [move_group.moveit.moveit.planners.pilz.command_planner]: Available plugins: pilz_industrial_motion_planner/PlanningContextLoaderCIRC pilz_industrial_motion_planner/PlanningContextLoaderLIN pilz_industrial_motion_planner/PlanningContextLoaderPTP 
+[move_group-8] [INFO] [1786351455.837476453] [move_group.moveit.moveit.planners.pilz.command_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderCIRC
+[move_group-8] [INFO] [1786351455.844257703] [move_group.moveit.moveit.planners.pilz.command_planner]: Registered Algorithm [CIRC]
+[move_group-8] [INFO] [1786351455.844318662] [move_group.moveit.moveit.planners.pilz.command_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderLIN
+[move_group-8] [INFO] [1786351455.847248454] [move_group.moveit.moveit.planners.pilz.command_planner]: Registered Algorithm [LIN]
+[move_group-8] [INFO] [1786351455.847314370] [move_group.moveit.moveit.planners.pilz.command_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderPTP
+[move_group-8] [INFO] [1786351455.850859871] [move_group.moveit.moveit.planners.pilz.command_planner]: Registered Algorithm [PTP]
+[move_group-8] [INFO] [1786351455.850944746] [move_group.moveit.moveit.ros.planning_pipeline]: Successfully loaded planner 'Pilz Industrial Motion Planner'
+[move_group-8] [INFO] [1786351455.853010913] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351455.853268746] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351455.853289454] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351455.853916246] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351455.853949496] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-8] [INFO] [1786351455.854005496] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-8] [INFO] [1786351455.854019496] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-8] [INFO] [1786351455.854111371] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-8] [INFO] [1786351455.856395705] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-8] [INFO] [1786351455.857907997] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-8] [INFO] [1786351455.857948830] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-8] [INFO] [1786351455.859211163] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[rviz2-7] [INFO] [1786351455.898103751] [rviz2]: Stereo is NOT SUPPORTED
+[move_group-8] [INFO] [1786351455.902440251] [move_group.moveit.moveit.plugins.simple_controller_manager]: Added FollowJointTrajectory controller for dual_arm_controller
+[move_group-8] [INFO] [1786351455.904696585] [move_group.moveit.moveit.plugins.simple_controller_manager]: Added FollowJointTrajectory controller for left_gripper_controller
+[move_group-8] [INFO] [1786351455.907793210] [move_group.moveit.moveit.plugins.simple_controller_manager]: Added FollowJointTrajectory controller for right_gripper_controller
+[move_group-8] [INFO] [1786351455.908162460] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351455.908222543] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351455.909190002] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Trajectory execution is managing controllers
+[move_group-8] [INFO] [1786351455.909238127] [move_group]: MoveGroup debug mode is ON
+[move_group-8] [INFO] [1786351455.958585507] [move_group.moveit.moveit.planners.pilz.move_group_sequence_action]: initialize move group sequence action
+[move_group-8] [INFO] [1786351455.965638591] [move_group.moveit.moveit.planners.pilz.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-8] [INFO] [1786351455.966362799] [move_group.moveit.moveit.planners.pilz.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-8] [INFO] [1786351455.969472841] [move_group.moveit.moveit.ros.move_group.executable]: 
+[move_group-8] 
+[move_group-8] ********************************************************
+[move_group-8] * MoveGroup using: 
+[move_group-8] *     - apply_planning_scene_service
+[move_group-8] *     - clear_octomap_service
+[move_group-8] *     - get_group_urdf
+[move_group-8] *     - load_geometry_from_file
+[move_group-8] *     - CartesianPathService
+[move_group-8] *     - execute_trajectory_action
+[move_group-8] *     - get_planning_scene_service
+[move_group-8] *     - kinematics_service
+[move_group-8] *     - move_action
+[move_group-8] *     - motion_plan_service
+[move_group-8] *     - query_planners_service
+[move_group-8] *     - state_validation_service
+[move_group-8] *     - save_geometry_to_file
+[move_group-8] *     - SequenceAction
+[move_group-8] *     - SequenceService
+[move_group-8] ********************************************************
+[move_group-8] 
+[move_group-8] [INFO] [1786351455.969583674] [move_group.moveit.moveit.ros.move_group.context]: MoveGroup context using pipeline ompl
+[move_group-8] [INFO] [1786351455.969607591] [move_group.moveit.moveit.ros.move_group.context]: MoveGroup context initialization complete
+[move_group-8] Loading 'move_group/ApplyPlanningSceneService'...
+[move_group-8] Loading 'move_group/ClearOctomapService'...
+[move_group-8] Loading 'move_group/GetUrdfService'...
+[move_group-8] Loading 'move_group/LoadGeometryFromFileService'...
+[move_group-8] Loading 'move_group/MoveGroupCartesianPathService'...
+[move_group-8] Loading 'move_group/MoveGroupExecuteTrajectoryAction'...
+[move_group-8] Loading 'move_group/MoveGroupGetPlanningSceneService'...
+[move_group-8] Loading 'move_group/MoveGroupKinematicsService'...
+[move_group-8] Loading 'move_group/MoveGroupMoveAction'...
+[move_group-8] Loading 'move_group/MoveGroupPlanService'...
+[move_group-8] Loading 'move_group/MoveGroupQueryPlannersService'...
+[move_group-8] Loading 'move_group/MoveGroupStateValidationService'...
+[move_group-8] Loading 'move_group/SaveGeometryToFileService'...
+[move_group-8] Loading 'pilz_industrial_motion_planner/MoveGroupSequenceAction'...
+[move_group-8] Loading 'pilz_industrial_motion_planner/MoveGroupSequenceService'...
+[move_group-8] 
+[move_group-8] You can start planning now!
+[move_group-8] 
+[rviz2-7] Warning: class_loader.impl: SEVERE WARNING!!! A namespace collision has occurred with plugin factory for class rviz_default_plugins::displays::InteractiveMarkerDisplay. New factory will OVERWRITE existing one. This situation occurs when libraries containing plugins are directly linked against an executable (the one running right now generating this message). Please separate plugins out into their own library or just don't link against the library and use either class_loader::ClassLoader/MultiLibraryClassLoader to open.
+[rviz2-7]          at line 321 in /opt/ros/jazzy/include/class_loader/class_loader/class_loader_core.hpp
+[rviz2-7] [WARN] [1786351456.195311489] [rcl.logging_rosout]: Publisher already registered for node name: 'rviz2'. If this is due to multiple nodes with the same name then all logs for the logger named 'rviz2' will go out over the existing publisher. As soon as any node with that name is destructed it will unregister the publisher, preventing any further logs for that name from being published on the rosout topic.
+[rviz2-7] [ERROR] [1786351459.270765506] [rviz2.moveit.ros.motion_planning_frame]: Action server: /recognize_objects not available
+[rviz2-7] [INFO] [1786351459.313898760] [rviz2.moveit.ros.motion_planning_frame]: MoveGroup namespace changed: / -> . Reloading params.
+[rviz2-7] [INFO] [1786351459.431072231] [rviz2.moveit.ros.rdf_loader]: Loaded robot model in 0.0440808 seconds
+[rviz2-7] [INFO] [1786351459.431721772] [rviz2.moveit.core.robot_model]: Loading robot model 'zhishu_robot'...
+[rviz2-7] [INFO] [1786351459.432377147] [rviz2.moveit.core.robot_model]: No root/virtual joint specified in SRDF. Assuming fixed joint
+[rviz2-7] [INFO] [1786351459.473253068] [rviz2.moveit.kinematics.kdl_kinematics_plugin]: Joint weights for group 'left_arm': 1 1 1 1 1 1 1
+[rviz2-7] [INFO] [1786351459.474382985] [rviz2.moveit.kinematics.kdl_kinematics_plugin]: Joint weights for group 'right_arm': 1 1 1 1 1 1 1
+[rviz2-7] [INFO] [1786351459.492206445] [rviz2.moveit.ros.planning_scene_monitor]: Publishing maintained planning scene on 'monitored_planning_scene'
+[rviz2-7] [INFO] [1786351459.554271076] [rviz2.moveit.ros.planning_scene_monitor]: Starting planning scene monitor
+[rviz2-7] [INFO] [1786351459.555979368] [rviz2.moveit.ros.planning_scene_monitor]: Listening to '/monitored_planning_scene'
+[rviz2-7] [INFO] [1786351462.123197334] [interactive_marker_display_367925743904]: Connected on namespace: /rviz_moveit_motion_planning_display/robot_interaction_interactive_marker_topic
+[rviz2-7] [INFO] [1786351462.166225464] [rviz2.moveit.ros.motion_planning_frame]: group left_arm
+[rviz2-7] [INFO] [1786351462.166315297] [rviz2.moveit.ros.motion_planning_frame]: Constructing new MoveGroup connection for group 'left_arm' in namespace ''
+[rviz2-7] [INFO] [1786351462.195988008] [rviz2.moveit.ros.move_group_interface]: Ready to take commands for planning group left_arm.
+[rviz2-7] [INFO] [1786351463.500082556] [interactive_marker_display_367925743904]: Sending request for interactive markers
+[rviz2-7] [INFO] [1786351464.137847120] [interactive_marker_display_367925743904]: Service response received for initialization
+[move_group-8] [INFO] [1786351509.248232944] [move_group.moveit.moveit.ros.move_group.move_action]: MoveGroupMoveAction: Received request
+[rviz2-7] [INFO] [1786351509.248756778] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request accepted
+[move_group-8] [INFO] [1786351509.249387069] [move_group.moveit.moveit.ros.move_group.move_action]: executing..
+[move_group-8] [INFO] [1786351509.252206320] [move_group.moveit.moveit.ros.move_group.move_action]: Combined planning and execution request received for MoveGroup action. Forwarding to planning and execution pipeline.
+[move_group-8] [INFO] [1786351509.252499153] [move_group.moveit.moveit.ros.plan_execution]: Planning attempt 1 of at most 1
+[move_group-8] [INFO] [1786351509.252696028] [move_group.moveit.moveit.ros.move_group.capability]: Using planning pipeline 'ompl'
+[move_group-8] [INFO] [1786351509.254053445] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351509.254389445] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351509.254698778] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-8] [INFO] [1786351509.255021362] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-8] [INFO] [1786351509.264696238] [move_group.moveit.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'left_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-8] [INFO] [1786351509.267278946] [move_group]: Calling Planner 'OMPL'
+[move_group-8] [INFO] [1786351509.389454042] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-8] [INFO] [1786351509.712265199] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-8] [INFO] [1786351509.753742828] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-8] [WARN] [1786351509.765350580] [move_group.moveit.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-8] [INFO] [1786351509.767011621] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351509.767083663] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351509.767618580] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Validating trajectory with allowed_start_tolerance 0.01
+[move_group-8] [INFO] [1786351509.769873455] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Starting trajectory execution ...
+[move_group-8] [INFO] [1786351509.770109997] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351509.770227830] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351509.770987914] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: sending trajectory to dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351509.791493541] [dual_arm_controller]: Received new action goal
+[ros2_control_node-2] [INFO] [1786351509.791679332] [dual_arm_controller]: Accepted new action goal
+[move_group-8] [INFO] [1786351509.791970707] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: dual_arm_controller started execution
+[move_group-8] [INFO] [1786351509.792017082] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Goal request accepted!
+[move_group-8] [INFO] [1786351547.548174084] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Received event 'stop'
+[move_group-8] [INFO] [1786351547.548263334] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Cancelling execution for dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351547.548864168] [dual_arm_controller]: Got request to cancel goal
+[ros2_control_node-2] [INFO] [1786351547.548947584] [dual_arm_controller]: Canceling active action goal because cancel callback received.
+[move_group-8] [INFO] [1786351547.549532959] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Stopped trajectory execution.
+[move_group-8] [INFO] [1786351547.593191672] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Controller 'dual_arm_controller' successfully finished
+[move_group-8] [INFO] [1786351547.593306880] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Completed trajectory execution with status PREEMPTED ...
+[move_group-8] [INFO] [1786351547.608239340] [move_group.moveit.moveit.ros.move_group.move_action]: CONTROL_FAILED
+[rviz2-7] [INFO] [1786351547.630590051] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request aborted
+[rviz2-7] [ERROR] [1786351547.632210259] [rviz2.moveit.ros.move_group_interface]: MoveGroupInterface::move() failed or timeout reached
+[move_group-8] [INFO] [1786351554.993072207] [move_group.moveit.moveit.ros.move_group.move_action]: MoveGroupMoveAction: Received request
+[rviz2-7] [INFO] [1786351554.993473832] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request accepted
+[move_group-8] [INFO] [1786351554.993776874] [move_group.moveit.moveit.ros.move_group.move_action]: executing..
+[move_group-8] [INFO] [1786351554.996009874] [move_group.moveit.moveit.ros.move_group.move_action]: Combined planning and execution request received for MoveGroup action. Forwarding to planning and execution pipeline.
+[move_group-8] [INFO] [1786351554.996230374] [move_group.moveit.moveit.ros.plan_execution]: Planning attempt 1 of at most 1
+[move_group-8] [INFO] [1786351554.996421708] [move_group.moveit.moveit.ros.move_group.capability]: Using planning pipeline 'ompl'
+[move_group-8] [INFO] [1786351554.997513708] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351554.997873333] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351554.998143124] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-8] [INFO] [1786351554.998550000] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-8] [INFO] [1786351555.001345625] [move_group.moveit.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'left_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-8] [INFO] [1786351555.001769708] [move_group]: Calling Planner 'OMPL'
+[move_group-8] [INFO] [1786351555.104126343] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-8] [INFO] [1786351555.296794071] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-8] [INFO] [1786351555.328950033] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-8] [WARN] [1786351555.337107950] [move_group.moveit.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-8] [INFO] [1786351555.338010659] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351555.338083284] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351555.338453992] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Validating trajectory with allowed_start_tolerance 0.01
+[move_group-8] [INFO] [1786351555.339912325] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Starting trajectory execution ...
+[move_group-8] [INFO] [1786351555.340079450] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351555.340191742] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351555.340644409] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: sending trajectory to dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351555.358541952] [dual_arm_controller]: Received new action goal
+[ros2_control_node-2] [INFO] [1786351555.358935119] [dual_arm_controller]: Accepted new action goal
+[move_group-8] [INFO] [1786351555.360487953] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: dual_arm_controller started execution
+[move_group-8] [INFO] [1786351555.360550078] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Goal request accepted!
+[move_group-8] [INFO] [1786351605.044735695] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Received event 'stop'
+[move_group-8] [INFO] [1786351605.044841861] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Cancelling execution for dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351605.045417611] [dual_arm_controller]: Got request to cancel goal
+[ros2_control_node-2] [INFO] [1786351605.045500153] [dual_arm_controller]: Canceling active action goal because cancel callback received.
+[move_group-8] [INFO] [1786351605.046042361] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Stopped trajectory execution.
+[move_group-8] [INFO] [1786351605.065770113] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Controller 'dual_arm_controller' successfully finished
+[move_group-8] [INFO] [1786351605.065885613] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Completed trajectory execution with status PREEMPTED ...
+[move_group-8] [INFO] [1786351605.072295281] [move_group.moveit.moveit.ros.move_group.move_action]: CONTROL_FAILED
+[rviz2-7] [INFO] [1786351605.082387823] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request aborted
+[rviz2-7] [ERROR] [1786351605.082779532] [rviz2.moveit.ros.move_group_interface]: MoveGroupInterface::move() failed or timeout reached
+[move_group-8] [INFO] [1786351612.933153154] [move_group.moveit.moveit.ros.move_group.move_action]: MoveGroupMoveAction: Received request
+[rviz2-7] [INFO] [1786351612.933575196] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request accepted
+[move_group-8] [INFO] [1786351612.933746696] [move_group.moveit.moveit.ros.move_group.move_action]: executing..
+[move_group-8] [INFO] [1786351612.936040654] [move_group.moveit.moveit.ros.move_group.move_action]: Combined planning and execution request received for MoveGroup action. Forwarding to planning and execution pipeline.
+[move_group-8] [INFO] [1786351612.936232863] [move_group.moveit.moveit.ros.plan_execution]: Planning attempt 1 of at most 1
+[move_group-8] [INFO] [1786351612.936400279] [move_group.moveit.moveit.ros.move_group.capability]: Using planning pipeline 'ompl'
+[move_group-8] [INFO] [1786351612.937417321] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351612.938096904] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351612.938335779] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-8] [INFO] [1786351612.938749946] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-8] [INFO] [1786351612.940293446] [move_group.moveit.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'left_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-8] [INFO] [1786351612.940546030] [move_group]: Calling Planner 'OMPL'
+[move_group-8] [INFO] [1786351613.064553084] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-8] [INFO] [1786351613.076163752] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-8] [INFO] [1786351613.079785377] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-8] [WARN] [1786351613.080740294] [move_group.moveit.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-8] [INFO] [1786351613.080934252] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351613.081040419] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351613.081150377] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Validating trajectory with allowed_start_tolerance 0.01
+[move_group-8] [INFO] [1786351613.081793502] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Starting trajectory execution ...
+[move_group-8] [INFO] [1786351613.081965294] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351613.082097127] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351613.082481836] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: sending trajectory to dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351613.083723461] [dual_arm_controller]: Received new action goal
+[ros2_control_node-2] [INFO] [1786351613.083772461] [dual_arm_controller]: Accepted new action goal
+[move_group-8] [INFO] [1786351613.083961752] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: dual_arm_controller started execution
+[move_group-8] [INFO] [1786351613.083989752] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Goal request accepted!
+[ros2_control_node-2] [INFO] [1786351617.055335693] [dual_arm_controller]: Goal reached, success!
+[move_group-8] [INFO] [1786351617.084973404] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Controller 'dual_arm_controller' successfully finished
+[move_group-8] [INFO] [1786351617.091899322] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Completed trajectory execution with status SUCCEEDED ...
+[move_group-8] [INFO] [1786351617.102720448] [move_group.moveit.moveit.ros.move_group.move_action]: Solution was found and executed.
+[rviz2-7] [INFO] [1786351617.105074781] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request complete!
+[move_group-8] [INFO] [1786351624.007635808] [move_group.moveit.moveit.ros.move_group.move_action]: MoveGroupMoveAction: Received request
+[rviz2-7] [INFO] [1786351624.008005933] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request accepted
+[move_group-8] [INFO] [1786351624.008567975] [move_group.moveit.moveit.ros.move_group.move_action]: executing..
+[move_group-8] [INFO] [1786351624.009877850] [move_group.moveit.moveit.ros.move_group.move_action]: Combined planning and execution request received for MoveGroup action. Forwarding to planning and execution pipeline.
+[move_group-8] [INFO] [1786351624.010226975] [move_group.moveit.moveit.ros.plan_execution]: Planning attempt 1 of at most 1
+[move_group-8] [INFO] [1786351624.010475475] [move_group.moveit.moveit.ros.move_group.capability]: Using planning pipeline 'ompl'
+[move_group-8] [INFO] [1786351624.011645934] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351624.012225100] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351624.012496934] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-8] [INFO] [1786351624.012888351] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-8] [INFO] [1786351624.014659642] [move_group.moveit.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'left_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-8] [INFO] [1786351624.014930892] [move_group]: Calling Planner 'OMPL'
+[move_group-8] [INFO] [1786351624.170749658] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-8] [INFO] [1786351624.190166202] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-8] [INFO] [1786351624.194398285] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-8] [WARN] [1786351624.195545119] [move_group.moveit.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-8] [INFO] [1786351624.195910577] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351624.195963661] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351624.196092577] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Validating trajectory with allowed_start_tolerance 0.01
+[move_group-8] [INFO] [1786351624.197788327] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Starting trajectory execution ...
+[move_group-8] [INFO] [1786351624.197858619] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351624.197898577] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351624.198052869] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: sending trajectory to dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351624.198894036] [dual_arm_controller]: Received new action goal
+[ros2_control_node-2] [INFO] [1786351624.198940411] [dual_arm_controller]: Accepted new action goal
+[move_group-8] [INFO] [1786351624.199164994] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: dual_arm_controller started execution
+[move_group-8] [INFO] [1786351624.199196203] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Goal request accepted!
+[ros2_control_node-2] [INFO] [1786351632.903559910] [dual_arm_controller]: Goal reached, success!
+[move_group-8] [INFO] [1786351632.949740957] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Controller 'dual_arm_controller' successfully finished
+[move_group-8] [INFO] [1786351632.955635832] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Completed trajectory execution with status SUCCEEDED ...
+[move_group-8] [INFO] [1786351632.959078083] [move_group.moveit.moveit.ros.move_group.move_action]: Solution was found and executed.
+[rviz2-7] [INFO] [1786351632.961768416] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request complete!
+[move_group-8] [INFO] [1786351641.648772581] [move_group.moveit.moveit.ros.move_group.move_action]: MoveGroupMoveAction: Received request
+[rviz2-7] [INFO] [1786351641.649346581] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request accepted
+[move_group-8] [INFO] [1786351641.649963456] [move_group.moveit.moveit.ros.move_group.move_action]: executing..
+[move_group-8] [INFO] [1786351641.652237290] [move_group.moveit.moveit.ros.move_group.move_action]: Combined planning and execution request received for MoveGroup action. Forwarding to planning and execution pipeline.
+[move_group-8] [INFO] [1786351641.652520498] [move_group.moveit.moveit.ros.plan_execution]: Planning attempt 1 of at most 1
+[move_group-8] [INFO] [1786351641.652718248] [move_group.moveit.moveit.ros.move_group.capability]: Using planning pipeline 'ompl'
+[move_group-8] [INFO] [1786351641.656349498] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351641.656708248] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351641.657031707] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-8] [INFO] [1786351641.657514707] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-8] [INFO] [1786351641.661139249] [move_group.moveit.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'left_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-8] [INFO] [1786351641.661809790] [move_group]: Calling Planner 'OMPL'
+[move_group-8] [INFO] [1786351641.866892144] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-8] [INFO] [1786351641.968440571] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-8] [INFO] [1786351641.978872322] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-8] [WARN] [1786351641.983371573] [move_group.moveit.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-8] [INFO] [1786351641.985729115] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351641.986613156] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351641.987360990] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Validating trajectory with allowed_start_tolerance 0.01
+[move_group-8] [INFO] [1786351642.000143574] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Starting trajectory execution ...
+[move_group-8] [INFO] [1786351642.003853867] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351642.004216117] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351642.004937700] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: sending trajectory to dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351642.010679742] [dual_arm_controller]: Received new action goal
+[ros2_control_node-2] [INFO] [1786351642.010808659] [dual_arm_controller]: Accepted new action goal
+[move_group-8] [INFO] [1786351642.011141742] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: dual_arm_controller started execution
+[move_group-8] [INFO] [1786351642.011228367] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Goal request accepted!
+[ros2_control_node-2] [INFO] [1786351666.111496830] [dual_arm_controller]: Goal reached, success!
+[move_group-8] [INFO] [1786351666.162388294] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Controller 'dual_arm_controller' successfully finished
+[move_group-8] [INFO] [1786351666.167841294] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Completed trajectory execution with status SUCCEEDED ...
+[move_group-8] [INFO] [1786351666.173091587] [move_group.moveit.moveit.ros.move_group.move_action]: Solution was found and executed.
+[rviz2-7] [INFO] [1786351666.180978837] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request complete!
+[move_group-8] [INFO] [1786351677.328240999] [move_group.moveit.moveit.ros.move_group.move_action]: MoveGroupMoveAction: Received request
+[rviz2-7] [INFO] [1786351677.328548416] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request accepted
+[move_group-8] [INFO] [1786351677.328602666] [move_group.moveit.moveit.ros.move_group.move_action]: executing..
+[move_group-8] [INFO] [1786351677.330034166] [move_group.moveit.moveit.ros.move_group.move_action]: Combined planning and execution request received for MoveGroup action. Forwarding to planning and execution pipeline.
+[move_group-8] [INFO] [1786351677.330150249] [move_group.moveit.moveit.ros.plan_execution]: Planning attempt 1 of at most 1
+[move_group-8] [INFO] [1786351677.330257874] [move_group.moveit.moveit.ros.move_group.capability]: Using planning pipeline 'ompl'
+[move_group-8] [INFO] [1786351677.330830416] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351677.330983249] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351677.331123833] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-8] [INFO] [1786351677.331760833] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-8] [INFO] [1786351677.332758916] [move_group.moveit.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'left_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-8] [INFO] [1786351677.332959000] [move_group]: Calling Planner 'OMPL'
+[move_group-8] [INFO] [1786351677.544257521] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-8] [INFO] [1786351677.638443114] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-8] [INFO] [1786351677.646712448] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-8] [WARN] [1786351677.649001740] [move_group.moveit.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-8] [INFO] [1786351677.649283490] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351677.649327240] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351677.649514198] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Validating trajectory with allowed_start_tolerance 0.01
+[move_group-8] [INFO] [1786351677.651788615] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Starting trajectory execution ...
+[move_group-8] [INFO] [1786351677.651981115] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351677.652083490] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351677.652462073] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: sending trajectory to dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351677.656347949] [dual_arm_controller]: Received new action goal
+[ros2_control_node-2] [INFO] [1786351677.656414157] [dual_arm_controller]: Accepted new action goal
+[move_group-8] [INFO] [1786351677.656591490] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: dual_arm_controller started execution
+[move_group-8] [INFO] [1786351677.656625324] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Goal request accepted!
+[ros2_control_node-2] [INFO] [1786351699.331329210] [dual_arm_controller]: Goal reached, success!
+[move_group-8] [INFO] [1786351699.357780463] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Controller 'dual_arm_controller' successfully finished
+[move_group-8] [INFO] [1786351699.363545255] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Completed trajectory execution with status SUCCEEDED ...
+[move_group-8] [INFO] [1786351699.373214297] [move_group.moveit.moveit.ros.move_group.move_action]: Solution was found and executed.
+[rviz2-7] [INFO] [1786351699.377720548] [rviz2.moveit.ros.move_group_interface]: Plan and Execute request complete!
+[rviz2-7] [INFO] [1786351946.963244466] [rviz2.moveit.ros.move_group_interface]: MoveGroup action client/server ready
+[move_group-8] [INFO] [1786351946.964202883] [move_group.moveit.moveit.ros.move_group.move_action]: MoveGroupMoveAction: Received request
+[rviz2-7] [INFO] [1786351946.964522550] [rviz2.moveit.ros.move_group_interface]: Planning request accepted
+[move_group-8] [INFO] [1786351946.964750050] [move_group.moveit.moveit.ros.move_group.move_action]: executing..
+[move_group-8] [INFO] [1786351946.966166966] [move_group.moveit.moveit.ros.move_group.move_action]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-8] [INFO] [1786351946.966264092] [move_group.moveit.moveit.ros.move_group.capability]: Using planning pipeline 'ompl'
+[move_group-8] [INFO] [1786351946.967520758] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-8] [INFO] [1786351946.968025050] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-8] [INFO] [1786351946.968619758] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-8] [INFO] [1786351946.969258508] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-8] [INFO] [1786351946.971679050] [move_group.moveit.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'left_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-8] [INFO] [1786351946.972257134] [move_group]: Calling Planner 'OMPL'
+[move_group-8] [INFO] [1786351947.097038146] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-8] [INFO] [1786351947.121908857] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-8] [INFO] [1786351947.126772108] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-8] [WARN] [1786351947.128984983] [move_group.moveit.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-8] [INFO] [1786351947.130438941] [move_group.moveit.moveit.ros.move_group.move_action]: Motion plan was computed successfully.
+[rviz2-7] [INFO] [1786351947.132024442] [rviz2.moveit.ros.move_group_interface]: Planning request complete!
+[rviz2-7] [INFO] [1786351947.133154942] [rviz2.moveit.ros.move_group_interface]: time taken to generate plan: 0.123887 seconds
+[rviz2-7] [INFO] [1786351951.008819706] [rviz2.moveit.ros.move_group_interface]: Execute request accepted
+[move_group-8] [INFO] [1786351951.009097956] [move_group.moveit.moveit.ros.move_group.clear_octomap_service]: Execution request received
+[move_group-8] [INFO] [1786351951.009392248] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351951.009515914] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351951.010024581] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Validating trajectory with allowed_start_tolerance 0.01
+[move_group-8] [INFO] [1786351951.012006165] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Starting trajectory execution ...
+[move_group-8] [INFO] [1786351951.012179123] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351951.012278581] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 3 controllers in list
+[move_group-8] [INFO] [1786351951.012662706] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: sending trajectory to dual_arm_controller
+[ros2_control_node-2] [INFO] [1786351951.014858665] [dual_arm_controller]: Received new action goal
+[ros2_control_node-2] [INFO] [1786351951.015065165] [dual_arm_controller]: Accepted new action goal
+[move_group-8] [INFO] [1786351951.015391540] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: dual_arm_controller started execution
+[move_group-8] [INFO] [1786351951.015423332] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Goal request accepted!
+[ros2_control_node-2] [INFO] [1786351959.963372772] [dual_arm_controller]: Goal reached, success!
+[move_group-8] [INFO] [1786351959.966350398] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Controller 'dual_arm_controller' successfully finished
+[move_group-8] [INFO] [1786351959.971921815] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Completed trajectory execution with status SUCCEEDED ...
+[move_group-8] [INFO] [1786351959.973156732] [move_group.moveit.moveit.ros.move_group.clear_octomap_service]: Execution completed: SUCCEEDED
+[rviz2-7] [INFO] [1786351959.974761774] [rviz2.moveit.ros.move_group_interface]: Execute request success!
+

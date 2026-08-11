@@ -3,6 +3,7 @@
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
     <xacro:arg name="use_gazebo" default="false" />
     <xacro:arg name="use_fake_hardware" default="true" />
+    <xacro:arg name="enable_motors_on_activate" default="true" />
 
     <!-- Import zhishu_robot urdf file -->
     <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot.urdf.xacro" />
@@ -16,11 +17,13 @@
         <xacro:zhishu_robot_left_arm_ros2_control
             name="LeftArmSystem"
             initial_positions_file="$(arg initial_positions_file)"
-            use_fake_hardware="$(arg use_fake_hardware)"/>
+            use_fake_hardware="$(arg use_fake_hardware)"
+            enable_motors_on_activate="$(arg enable_motors_on_activate)"/>
         <xacro:zhishu_robot_right_arm_ros2_control
             name="RightArmSystem"
             initial_positions_file="$(arg initial_positions_file)"
-            use_fake_hardware="$(arg use_fake_hardware)"/>
+            use_fake_hardware="$(arg use_fake_hardware)"
+            enable_motors_on_activate="$(arg enable_motors_on_activate)"/>
     </xacro:unless>
 
     <xacro:if value="$(arg use_gazebo)">

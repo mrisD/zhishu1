@@ -1,7 +1,14 @@
 # This config file is used by ros2_control
 controller_manager:
   ros__parameters:
-    update_rate: 500  # Hz
+    # Keep ros2_control synchronized with both 1 ms EtherCAT cyclic tasks.
+    update_rate: 1000  # Hz
+    enforce_command_limits: true
+    # Keep the manager below the EtherCAT threads (FIFO 85), but above the
+    # PREEMPT_RT IRQ threads (FIFO 50) to avoid equal-priority preemption.
+    thread_priority: 70
+    cpu_affinity: 6
+    lock_memory: true
 
     left_arm_controller:
       type: joint_trajectory_controller/JointTrajectoryController

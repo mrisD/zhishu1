@@ -223,6 +223,11 @@ bool EsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
       get_string_param(info_.hardware_parameters, "enable_realtime", "true"), "enable_realtime");
     driver_config_.realtime_priority = static_cast<int>(parse_i64(
       get_string_param(info_.hardware_parameters, "realtime_priority", "80"), "realtime_priority"));
+    driver_config_.realtime_cpu = static_cast<int>(parse_i64(
+      get_string_param(info_.hardware_parameters, "realtime_cpu", "-1"), "realtime_cpu"));
+    enable_motors_on_activate_ = parse_bool(
+      get_string_param(info_.hardware_parameters, "enable_motors_on_activate", "true"),
+      "enable_motors_on_activate");
 
     joint_limit_snap_tolerance_rad_ = parse_double(
       get_string_param(info_.hardware_parameters, "joint_limit_snap_tolerance_rad", "0.005"),
@@ -470,12 +475,18 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
 
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-  for (const auto & motor : driver_config_.motors) {
-    if (!driver_->setEnable(motor.address, true)) {
-      RCLCPP_ERROR(logger(), "Failed to enable motor '%s'.", motor.name.c_str());
-      driver_->stop();
-      return hardware_interface::CallbackReturn::ERROR;
+  if (enable_motors_on_activate_) {
+    for (const auto & motor : driver_config_.motors) {
+      if (!driver_->setEnable(motor.address, true)) {
+        RCLCPP_ERROR(logger(), "Failed to enable motor '%s'.", motor.name.c_str());
+        driver_->stop();
+        return hardware_interface::CallbackReturn::ERROR;
+      }
     }
+  } else {
+    RCLCPP_WARN(
+      logger(),
+      "EtherCAT communication-only mode: all motors remain Operation Disabled; commands cannot move the arm.");
   }
 
   activated_ = true;
