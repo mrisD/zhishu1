@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+
+  <!--
+    Current version is a string-only simulation.
+    The two MTC subtrees model the future real dual-arm pick and place calls.
+  -->
+  <BehaviorTree ID="MainTree">
+    <Sequence name="box_transport_sequence">
+      <DetectBox name="detect_box"/>
+      <NavigateToPickPosition name="navigate_to_pick_position"/>
+      <SubTree ID="DualArmPickMTC" name="dual_arm_pick_mtc"/>
+      <NavigateToPlacePosition name="navigate_to_place_position"/>
+      <SubTree ID="DualArmPlaceMTC" name="dual_arm_place_mtc"/>
+      <!-- Execute at most three total attempts; stop immediately on SUCCESS. -->
+      <RetryUntilSuccessful num_attempts="3">
+        <NavigateToStandby name="navigate_to_standby"/>
+      </RetryUntilSuccessful>
+      <ReportTaskCompleted name="report_task_completed"/>
+    </Sequence>
+  </BehaviorTree>
+
+  <BehaviorTree ID="DualArmPickMTC">
+    <Sequence name="dual_arm_pick_mtc_sequence">
+      <MTCPrepareDualArms name="mtc_prepare_dual_arms"/>
+      <MTCOpenGrippers name="mtc_open_grippers"/>
+      <MTCApproachBox name="mtc_approach_box"/>
+      <MTCCloseGrippers name="mtc_close_grippers"/>
+      <MTCAttachBox name="mtc_attach_box"/>
+      <MTCLiftBox name="mtc_lift_box"/>
+    </Sequence>
+  </BehaviorTree>
+
+  <BehaviorTree ID="DualArmPlaceMTC">
+    <Sequence name="dual_arm_place_mtc_sequence">
+      <MTCLowerBox name="mtc_lower_box"/>
+      <MTCOpenGrippersForRelease name="mtc_open_grippers_for_release"/>
+      <MTCDetachBox name="mtc_detach_box"/>
+      <MTCRetreatDualArms name="mtc_retreat_dual_arms"/>
+      <MTCReturnSafePose name="mtc_return_safe_pose"/>
+    </Sequence>
+  </BehaviorTree>
+
+</root>
