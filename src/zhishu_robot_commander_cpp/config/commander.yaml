@@ -1,0 +1,11 @@
+zhishu_robot_commander:
+  ros__parameters:
+    commander:
+      left_end_effector_link: L_hand_link
+      right_end_effector_link: R_hand_link
+      velocity_scaling: 0.30
+      acceleration_scaling: 0.30
+      planning_time: 5.0
+      planning_attempts: 5
+      cartesian_eef_step: 0.005
+      minimum_cartesian_fraction: 0.95

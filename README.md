@@ -306,6 +306,32 @@ enable_kernel_ethercat_log:=false
 也可设置环境变量 `ZHISHU_ROBOT_LOG_DIR` 修改默认日志根目录。详细说明见
 `src/zhishu_robot_logging/README.md`。
 
+### 7.5 Commander C++ SDK
+
+`zhishu_robot_commander_cpp` 提供 MoveIt 2 C++ SDK 和 ROS 2 话题桥接节点，支持
+左右臂、双臂以及两个夹爪。先启动真机或假硬件 bringup，再启动 Commander：
+
+```bash
+ros2 launch zhishu_robot_commander_cpp commander.launch.py \
+  use_fake_hardware:=true enable_motors_on_activate:=true
+```
+
+监听执行结果：
+
+```bash
+ros2 topic echo /zhishu_robot_commander/status
+```
+
+示例：双臂回到 SRDF home 状态：
+
+```bash
+ros2 topic pub --once /zhishu_robot_commander/both_arms/named_target \
+  std_msgs/msg/String "{data: both_arms_home}"
+```
+
+Commander 不会自行启动控制器，启动参数必须和已经运行的 bringup 保持一致。
+完整接口和 C++ 示例见 `src/zhishu_robot_commander_cpp/README.md`。
+
 ## 8. Meta Quest 3S 双臂遥操作
 
 Quest 遥操作使用左右独立控制器：
@@ -526,6 +552,7 @@ colcon test-result --verbose
 | 移动到 Servo 初始姿态 | `ros2 launch quest_dual_arm_teleop move_to_servo_ready.launch.py` |
 | 真机 MoveIt bringup | `ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py` |
 | 独立日志记录器 | `ros2 launch zhishu_robot_logging log_recorder.launch.py` |
+| Commander 话题桥接 | `ros2 launch zhishu_robot_commander_cpp commander.launch.py` |
 | URDF/RViz 显示 | `ros2 launch zhishu_robot_description display_dh.launch.py` |
 | Gazebo | `ros2 launch zhishu_robot_gazebo zhishu_robot.gazebo.launch.py` |
 | Gazebo + MoveIt + RViz | `ros2 launch zhishu_robot_gazebo zhishu_robot.gazebo_moveit.launch.py` |
