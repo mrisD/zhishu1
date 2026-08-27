@@ -266,6 +266,46 @@ ros2 control list_hardware_interfaces
 ros2 topic hz /joint_states
 ```
 
+### 7.4 日志记录
+
+真机 MoveIt bringup 默认启动中央日志记录器。每次启动会建立独立会话目录：
+
+```text
+<guohua_ws>/zhishu_robot_logs/YYYY-MM-DD/HH-MM-SS/
+  zhishu_robot_YYYYMMDD_HHMMSS_PID.log
+  ethercat_kernel.log
+  native/
+```
+
+中央日志汇总 `/rosout`，达到 10 MiB 后自动轮转；`native/` 保存 ROS 2 原生的
+逐进程日志。日志写盘位于独立进程，不进入 EtherCAT 控制循环。
+
+首次启用 EtherCAT 内核日志时，在机器人上执行一次权限配置：
+
+```bash
+sudo $(ros2 pkg prefix zhishu_robot_logging)/lib/zhishu_robot_logging/\
+setup_kernel_ethercat_sudo.sh
+```
+
+常用启动参数：
+
+```bash
+ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
+  log_root:=/home/zhul/robot_logs \
+  log_max_file_size_mb:=10 \
+  log_min_severity:=20
+```
+
+分别关闭中央日志或内核日志：
+
+```bash
+enable_log_recorder:=false
+enable_kernel_ethercat_log:=false
+```
+
+也可设置环境变量 `ZHISHU_ROBOT_LOG_DIR` 修改默认日志根目录。详细说明见
+`src/zhishu_robot_logging/README.md`。
+
 ## 8. Meta Quest 3S 双臂遥操作
 
 Quest 遥操作使用左右独立控制器：
@@ -485,6 +525,7 @@ colcon test-result --verbose
 | Quest 双臂遥操作 | `ros2 launch quest_dual_arm_teleop quest_dual_arm_teleop.launch.py` |
 | 移动到 Servo 初始姿态 | `ros2 launch quest_dual_arm_teleop move_to_servo_ready.launch.py` |
 | 真机 MoveIt bringup | `ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py` |
+| 独立日志记录器 | `ros2 launch zhishu_robot_logging log_recorder.launch.py` |
 | URDF/RViz 显示 | `ros2 launch zhishu_robot_description display_dh.launch.py` |
 | Gazebo | `ros2 launch zhishu_robot_gazebo zhishu_robot.gazebo.launch.py` |
 | Gazebo + MoveIt + RViz | `ros2 launch zhishu_robot_gazebo zhishu_robot.gazebo_moveit.launch.py` |

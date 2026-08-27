@@ -1,24 +1,77 @@
 #!/usr/bin/env python3
+from datetime import datetime
 import os
+from pathlib import Path
+import re
 
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
+    OpaqueFunction,
     RegisterEventHandler,
+    SetLaunchConfiguration,
+    SetEnvironmentVariable,
 )
 from launch.event_handlers import OnProcessExit, OnProcessStart
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
+from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackagePrefix, FindPackageShare
 
 from moveit_configs_utils import MoveItConfigsBuilder
 
 
+def _default_log_root():
+    """Return <workspace>/zhishu_robot_logs beside colcon's log dir."""
+    package_share = Path(
+        get_package_share_directory("zhishu_robot_bringup")
+    ).resolve()
+    for parent in package_share.parents:
+        if parent.name == "install":
+            return parent.parent / "zhishu_robot_logs"
+    return Path.cwd() / "zhishu_robot_logs"
+
+
+def _configure_native_log_directory(context):
+    """Put every process-level ROS log in this bringup session directory."""
+    configured_root = LaunchConfiguration("log_root").perform(context).strip()
+    session_name = LaunchConfiguration("log_session").perform(context).strip()
+    if session_name in {".", ".."} or not re.fullmatch(
+        r"[A-Za-z0-9_.-]+", session_name
+    ):
+        raise ValueError(
+            "log_session must contain only letters, digits, '.', '_' or '-'"
+        )
+    if configured_root:
+        root = Path(configured_root).expanduser()
+    else:
+        root = Path(
+            os.environ.get("ZHISHU_ROBOT_LOG_DIR", str(_default_log_root()))
+        ).expanduser()
+
+    native_directory = (
+        root / datetime.now().strftime("%Y-%m-%d") / session_name / "native"
+    )
+    native_directory.mkdir(parents=True, exist_ok=True)
+    return [
+        SetLaunchConfiguration("log_root", str(root)),
+        SetEnvironmentVariable("ROS_LOG_DIR", str(native_directory)),
+    ]
+
+
 def generate_launch_description():
+    session_started_at = datetime.now().strftime("%H-%M-%S")
     use_fake_hardware = LaunchConfiguration("use_fake_hardware")
     enable_motors_on_activate = LaunchConfiguration("enable_motors_on_activate")
+    enable_log_recorder = LaunchConfiguration("enable_log_recorder")
+    enable_kernel_ethercat_log = LaunchConfiguration("enable_kernel_ethercat_log")
+    log_root = LaunchConfiguration("log_root")
+    log_session = LaunchConfiguration("log_session")
+    log_max_file_size_mb = LaunchConfiguration("log_max_file_size_mb")
+    log_min_severity = LaunchConfiguration("log_min_severity")
     use_rviz = LaunchConfiguration("use_rviz")
     # ==============================
     # 包路径查找
@@ -53,6 +106,39 @@ def generate_launch_description():
     )
 
     moveit_all_params = moveit_config.to_dict()
+
+    # ==============================
+    # Central file logger
+    # ==============================
+    # File I/O stays outside controller_manager's 1 kHz EtherCAT process.
+    log_recorder_node = Node(
+        package="zhishu_robot_logging",
+        executable="zhishu_robot_log_recorder",
+        name="zhishu_robot_log_recorder",
+        output="screen",
+        parameters=[{
+            "log_root": ParameterValue(log_root, value_type=str),
+            "session_name": ParameterValue(log_session, value_type=str),
+            "max_file_size_mb": ParameterValue(log_max_file_size_mb, value_type=int),
+            "min_severity": ParameterValue(log_min_severity, value_type=int),
+        }],
+        condition=IfCondition(enable_log_recorder),
+    )
+
+    kernel_ethercat_logger = ExecuteProcess(
+        cmd=[
+            PathJoinSubstitution([
+                FindPackagePrefix("zhishu_robot_logging"),
+                "lib",
+                "zhishu_robot_logging",
+                "kernel_ethercat_logger",
+            ]),
+            "--log-root", log_root,
+            "--session-name", log_session,
+        ],
+        output="screen",
+        condition=IfCondition(enable_kernel_ethercat_log),
+    )
 
     # ==============================
     # 1. robot_state_publisher
@@ -191,7 +277,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             "use_fake_hardware",
-            default_value="false",
+            default_value="true",
             description="Use mock joints instead of the EtherCAT arms",
         ),
         DeclareLaunchArgument(
@@ -204,6 +290,44 @@ def generate_launch_description():
             default_value="true",
             description="Enable CiA402 operation; false keeps EtherCAT communication-only mode",
         ),
+        DeclareLaunchArgument(
+            "enable_log_recorder",
+            default_value="true",
+            description="Record /rosout to daily rotating text files",
+        ),
+        DeclareLaunchArgument(
+            "enable_kernel_ethercat_log",
+            default_value="true",
+            description="Record new filtered kernel EtherCAT messages",
+        ),
+        DeclareLaunchArgument(
+            "log_root",
+            default_value=os.environ.get(
+                "ZHISHU_ROBOT_LOG_DIR", str(_default_log_root())
+            ),
+            description=(
+                "Log root; defaults to <workspace>/zhishu_robot_logs "
+                "beside build, install, and log"
+            ),
+        ),
+        DeclareLaunchArgument(
+            "log_session",
+            default_value=session_started_at,
+            description="Per-launch directory name; defaults to bringup start time HH-MM-SS",
+        ),
+        DeclareLaunchArgument(
+            "log_max_file_size_mb",
+            default_value="10",
+            description="Rotate the central log after this many MiB",
+        ),
+        DeclareLaunchArgument(
+            "log_min_severity",
+            default_value="10",
+            description="Minimum severity: DEBUG=10 INFO=20 WARN=30 ERROR=40 FATAL=50",
+        ),
+        OpaqueFunction(function=_configure_native_log_directory),
+        log_recorder_node,
+        kernel_ethercat_logger,
         robot_state_publisher,
         ros2_control_node,
 

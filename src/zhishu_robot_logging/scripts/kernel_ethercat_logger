@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+
+"""Record new EtherCAT-related kernel messages for one robot launch."""
+
+import argparse
+from datetime import datetime
+import os
+from pathlib import Path
+import re
+import signal
+import subprocess
+import sys
+
+
+FILTER = re.compile(
+    r"EtherCAT|Link state|TIMED OUT|UNMATCHED|SKIPPED|Synchronization",
+    re.IGNORECASE,
+)
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--log-root", required=True)
+    parser.add_argument("--session-name", required=True)
+    return parser.parse_args()
+
+
+def validate_session_name(value):
+    if value in {".", ".."} or not re.fullmatch(r"[A-Za-z0-9_.-]+", value):
+        raise ValueError("session name must contain only letters, digits, '.', '_' or '-'")
+
+
+def main():
+    arguments = parse_arguments()
+    validate_session_name(arguments.session_name)
+
+    session_directory = (
+        Path(arguments.log_root).expanduser()
+        / datetime.now().strftime("%Y-%m-%d")
+        / arguments.session_name
+    )
+    session_directory.mkdir(parents=True, exist_ok=True)
+    log_path = session_directory / "ethercat_kernel.log"
+
+    command = [
+        "/usr/bin/sudo",
+        "-n",
+        "/usr/bin/dmesg",
+        "--follow-new",
+        "--ctime",
+    ]
+    process = None
+    stopping = False
+
+    def stop_process(_signum, _frame):
+        nonlocal stopping
+        stopping = True
+        if process is not None and process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except (PermissionError, ProcessLookupError):
+                pass
+
+    signal.signal(signal.SIGINT, stop_process)
+    signal.signal(signal.SIGTERM, stop_process)
+
+    diagnostics = []
+    with log_path.open("a", encoding="utf-8", buffering=1) as stream:
+        stream.write(
+            f"# EtherCAT kernel log started at {datetime.now().isoformat(timespec='seconds')}\n"
+        )
+        try:
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+                start_new_session=True,
+            )
+        except OSError as error:
+            message = f"cannot start kernel log reader: {error}"
+            stream.write(f"# ERROR: {message}\n")
+            print(f"kernel_ethercat_logger: {message}", file=sys.stderr)
+            return 1
+
+        assert process.stdout is not None
+        for line in process.stdout:
+            if FILTER.search(line):
+                stream.write(line if line.endswith("\n") else line + "\n")
+            elif len(diagnostics) < 10:
+                diagnostics.append(line.strip())
+
+        return_code = process.wait()
+        if stopping:
+            stream.write(
+                f"# EtherCAT kernel log stopped at "
+                f"{datetime.now().isoformat(timespec='seconds')}\n"
+            )
+            return 0
+        if return_code != 0:
+            details = "; ".join(item for item in diagnostics if item)
+            message = f"dmesg reader exited with code {return_code}"
+            if details:
+                message += f": {details}"
+            stream.write(f"# ERROR: {message}\n")
+            print(f"kernel_ethercat_logger: {message}", file=sys.stderr)
+            print(
+                "Configure password-free access for the exact dmesg command "
+                "documented in zhishu_robot_logging/README.md.",
+                file=sys.stderr,
+            )
+            return return_code
+
+        stream.write(
+            f"# EtherCAT kernel log stopped at {datetime.now().isoformat(timespec='seconds')}\n"
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, ValueError) as error:
+        print(f"kernel_ethercat_logger: {error}", file=sys.stderr)
+        sys.exit(1)

@@ -1,0 +1,12 @@
+zhishu_robot_log_recorder:
+  ros__parameters:
+    # Empty means: $ZHISHU_ROBOT_LOG_DIR, then <workspace>/zhishu_robot_logs.
+    log_root: ""
+    # Empty means the recorder start time in HH-MM-SS format.
+    session_name: ""
+    file_prefix: "zhishu_robot"
+    max_file_size_mb: 10
+    min_severity: 10
+    flush_each_line: true
+    exclude_loggers:
+      - "zhishu_robot_log_recorder"
