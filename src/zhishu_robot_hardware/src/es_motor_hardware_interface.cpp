@@ -1,4 +1,5 @@
 #include "zhishu_robot_hardware/es_motor_hardware_interface.hpp"
+#include "zhishu_robot_hardware/motor_fault_decoder.hpp"
 
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
 #include <pluginlib/class_list_macros.hpp>
@@ -190,10 +191,44 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
   joint_to_motor_index_.assign(info_.joints.size(), kNoMotor);
   joint_sign_.assign(info_.joints.size(), 1.0);
   joint_offset_rad_.assign(info_.joints.size(), 0.0);
+  joint_position_wraparound_.assign(info_.joints.size(), false);
+  joint_position_wrap_reference_rad_.assign(
+    info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_turn_offset_rad_.assign(info_.joints.size(), 0.0);
+  joint_turn_offset_initialized_.assign(info_.joints.size(), false);
   joint_snap_lower_limit_rad_.assign(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   joint_snap_upper_limit_rad_.assign(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
   if (!build_driver_config_from_ros2_control_info()) {
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+
+  if (auto executor = params.executor.lock()) {
+    recovery_node_ = std::make_shared<rclcpp::Node>("right_arm_fault_recovery");
+    executor->add_node(recovery_node_->get_node_base_interface());
+
+    reset_fault_service_ = recovery_node_->create_service<std_srvs::srv::Trigger>(
+      "/right_arm/reset_fault",
+      [this](
+        const std::shared_ptr<std_srvs::srv::Trigger::Request>,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+      {
+        response->success = reset_faults_manually(response->message);
+      });
+
+    enable_service_ = recovery_node_->create_service<std_srvs::srv::SetBool>(
+      "/right_arm/enable",
+      [this](
+        const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+        std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+      {
+        response->success = set_motors_enabled_manually(request->data, response->message);
+      });
+
+    RCLCPP_INFO(
+      logger(), "Manual recovery services ready: /right_arm/reset_fault and /right_arm/enable");
+  } else {
+    RCLCPP_ERROR(logger(), "Controller manager executor is unavailable; cannot create recovery services.");
     return hardware_interface::CallbackReturn::ERROR;
   }
 
@@ -225,6 +260,9 @@ bool EsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
       get_string_param(info_.hardware_parameters, "realtime_priority", "80"), "realtime_priority"));
     driver_config_.realtime_cpu = static_cast<int>(parse_i64(
       get_string_param(info_.hardware_parameters, "realtime_cpu", "-1"), "realtime_cpu"));
+    driver_config_.csp_direct_position_commands = parse_bool(
+      get_string_param(info_.hardware_parameters, "csp_direct_position_commands", "false"),
+      "csp_direct_position_commands");
     enable_motors_on_activate_ = parse_bool(
       get_string_param(info_.hardware_parameters, "enable_motors_on_activate", "true"),
       "enable_motors_on_activate");
@@ -284,8 +322,6 @@ bool EsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
         get_local_or_global_param(joint.parameters, info_.hardware_parameters, "mode_of_operation", "8"), joint.name + ".mode_of_operation"));
       motor_config.auto_enable = parse_bool(
         get_local_or_global_param(joint.parameters, info_.hardware_parameters, "auto_enable", "false"), joint.name + ".auto_enable");
-      motor_config.auto_fault_reset = parse_bool(
-        get_local_or_global_param(joint.parameters, info_.hardware_parameters, "auto_fault_reset", "true"), joint.name + ".auto_fault_reset");
       motor_config.max_velocity_counts_s = parse_double(
         get_local_or_global_param(joint.parameters, info_.hardware_parameters, "max_velocity_counts_s", "8000.0"), joint.name + ".max_velocity_counts_s");
       motor_config.max_accel_counts_s2 = parse_double(
@@ -302,6 +338,14 @@ bool EsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
         get_local_or_global_param(joint.parameters, info_.hardware_parameters, "joint_sign", "1.0"), joint.name + ".joint_sign");
       joint_offset_rad_[joint_index] = parse_double(
         get_local_or_global_param(joint.parameters, info_.hardware_parameters, "position_offset_rad", "0.0"), joint.name + ".position_offset_rad");
+      joint_position_wraparound_[joint_index] = parse_bool(
+        get_local_or_global_param(
+          joint.parameters, info_.hardware_parameters, "position_wraparound", "false"),
+        joint.name + ".position_wraparound");
+      joint_position_wrap_reference_rad_[joint_index] = parse_double(
+        get_local_or_global_param(
+          joint.parameters, info_.hardware_parameters, "position_wrap_reference_rad", "nan"),
+        joint.name + ".position_wrap_reference_rad");
 
       if (has_param(joint.parameters, "snap_lower_limit_rad")) {
         joint_snap_lower_limit_rad_[joint_index] = parse_double(
@@ -327,9 +371,12 @@ bool EsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
 
       RCLCPP_INFO(
         logger(),
-        "EtherCAT joint mapping: joint=%s motor=%s slave_position=%u counts_per_rev=%.1f sign=%.1f offset_rad=%.6f",
+        "EtherCAT joint mapping: joint=%s motor=%s slave_position=%u counts_per_rev=%.1f "
+        "sign=%.1f offset_rad=%.6f wraparound=%d wrap_reference_rad=%.6f",
         joint.name.c_str(), motor_config.name.c_str(), motor_config.address.slave_position,
-        motor_config.counts_per_rev, joint_sign_[joint_index], joint_offset_rad_[joint_index]);
+        motor_config.counts_per_rev, joint_sign_[joint_index], joint_offset_rad_[joint_index],
+        static_cast<int>(joint_position_wraparound_[joint_index]),
+        joint_position_wrap_reference_rad_[joint_index]);
 
       if (std::isfinite(joint_snap_lower_limit_rad_[joint_index]) ||
           std::isfinite(joint_snap_upper_limit_rad_[joint_index]))
@@ -429,8 +476,12 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
     on_activate(const rclcpp_lifecycle::State & previous_state)
 {
   (void)previous_state;
+  const std::lock_guard<std::mutex> recovery_lock(recovery_mutex_);
+  const bool recovering_from_hardware_fault = hardware_fault_latched_.load();
 
-  if (!driver_->start(driver_config_)) {
+  // on_error() deliberately leaves the EtherCAT worker alive for diagnostics
+  // and manual CiA402 recovery. Re-activation must reuse that worker.
+  if (!driver_->isRunning() && !driver_->start(driver_config_)) {
     RCLCPP_ERROR(logger(), "Failed to start EtherCAT driver.");
     return hardware_interface::CallbackReturn::ERROR;
   }
@@ -453,6 +504,9 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
 
   // 关键：启动后先用 7 个电机的真实当前位置初始化 ros2_control 命令，
   // 再把底层目标写成当前 counts，最后才 setEnable(true)。这样控制器默认 0 不会把电机拉回零点。
+  // 每次激活都重新学习本次上电的整圈分支，因为无电池绝对编码器断电后只保留单圈角度。
+  std::fill(joint_turn_offset_rad_.begin(), joint_turn_offset_rad_.end(), 0.0);
+  std::fill(joint_turn_offset_initialized_.begin(), joint_turn_offset_initialized_.end(), false);
   for (size_t joint_index = 0; joint_index < info_.joints.size(); ++joint_index) {
     const int motor_index = joint_to_motor_index_[joint_index];
     if (motor_index == kNoMotor) {
@@ -475,7 +529,109 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
 
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-  if (enable_motors_on_activate_) {
+  // Wait briefly for the low-rate 0x603F mailbox diagnostics before deciding
+  // whether a startup fault is the expected communication-loss latch.
+  const auto diagnostic_deadline =
+    std::chrono::steady_clock::now() + std::chrono::milliseconds(1500);
+  while (std::chrono::steady_clock::now() < diagnostic_deadline) {
+    bool all_fault_diagnostics_ready = true;
+    for (const auto & motor : driver_config_.motors) {
+      ethercat_driver::MotorState state{};
+      if (!driver_->getMotorState(motor.address, state) ||
+        ((state.fault || state.fault_reaction_active) && !state.error_code_valid))
+      {
+        all_fault_diagnostics_ready = false;
+        break;
+      }
+    }
+    if (all_fault_diagnostics_ready) {
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+
+  // Some drives report the expected communication fault (0x7500) after the
+  // EtherCAT master has been stopped.  Clear a fault exactly once here, while
+  // the target is already holding the measured position and before any motor
+  // is enabled.  Runtime faults are still latched by read() and are never
+  // reset automatically.
+  bool startup_fault_reset_requested = false;
+  for (size_t i = 0; i < driver_config_.motors.size(); ++i) {
+    const auto & state = initial_states[i];
+    if (!state.fault && !state.fault_reaction_active) {
+      continue;
+    }
+    const auto & motor = driver_config_.motors[i];
+    ethercat_driver::MotorState diagnosed_state{};
+    if (!driver_->getMotorState(motor.address, diagnosed_state) ||
+      !diagnosed_state.error_code_valid)
+    {
+      RCLCPP_ERROR(logger(), "Refusing startup fault reset for motor '%s': 0x603F is unavailable.", motor.name.c_str());
+      latch_hardware_fault("startup fault diagnostics unavailable for motor '" + motor.name + "'");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    const std::string decoded_faults =
+      zhishu_robot_hardware::format_motor_fault_mask(diagnosed_state.error_code);
+    // A non-zero vendor fault mask can contain hardware or mechanical faults
+    // (for example encoder failure or motor stall). Never clear it
+    // automatically during startup; require an explicit operator recovery.
+    if (diagnosed_state.error_code != 0x0000) {
+      RCLCPP_ERROR(
+        logger(),
+        "Refusing startup fault reset for motor '%s': error_code=0x%04X "
+        "status_word=0x%04X decoded_faults=[%s].",
+        motor.name.c_str(), diagnosed_state.error_code, diagnosed_state.status_word,
+        decoded_faults.c_str());
+      latch_hardware_fault("startup vendor fault requires manual recovery for motor '" + motor.name + "'");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    if (!driver_->requestFaultReset(motor.address)) {
+      RCLCPP_ERROR(logger(), "Failed to request startup fault reset for motor '%s'.", motor.name.c_str());
+      latch_hardware_fault("startup fault reset request failed for motor '" + motor.name + "'");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    startup_fault_reset_requested = true;
+    RCLCPP_WARN(
+      logger(),
+      "One-shot startup fault reset requested for motor '%s' while motion remains disabled "
+      "(status_word=0x%04X error_code=0x%04X decoded_faults=[%s]).",
+      motor.name.c_str(), diagnosed_state.status_word, diagnosed_state.error_code,
+      decoded_faults.c_str());
+  }
+
+  if (startup_fault_reset_requested) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    bool all_faults_cleared = false;
+    int stable_clear_cycles = 0;
+    while (std::chrono::steady_clock::now() < deadline) {
+      bool clear_this_cycle = true;
+      for (const auto & motor : driver_config_.motors) {
+        ethercat_driver::MotorState state{};
+        if (!driver_->getMotorState(motor.address, state) || !state.ethercat_ok ||
+          state.fault || state.fault_reaction_active || state.quick_stop_active)
+        {
+          clear_this_cycle = false;
+          break;
+        }
+      }
+      stable_clear_cycles = clear_this_cycle ? stable_clear_cycles + 1 : 0;
+      if (stable_clear_cycles >= 5) {
+        all_faults_cleared = true;
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    if (!all_faults_cleared) {
+      RCLCPP_ERROR(logger(), "Startup fault reset did not clear every motor; motors will remain disabled.");
+      latch_hardware_fault("startup one-shot fault reset timed out");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    RCLCPP_INFO(logger(), "One-shot startup fault reset completed; proceeding with normal activation.");
+  }
+
+  const bool enable_on_this_activation =
+    enable_motors_on_activate_ && !recovering_from_hardware_fault;
+  if (enable_on_this_activation) {
     for (const auto & motor : driver_config_.motors) {
       if (!driver_->setEnable(motor.address, true)) {
         RCLCPP_ERROR(logger(), "Failed to enable motor '%s'.", motor.name.c_str());
@@ -486,10 +642,21 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
   } else {
     RCLCPP_WARN(
       logger(),
-      "EtherCAT communication-only mode: all motors remain Operation Disabled; commands cannot move the arm.");
+      recovering_from_hardware_fault ?
+      "Hardware fault recovery activation: all motors remain Operation Disabled; "
+      "explicit operator enable is required." :
+      "EtherCAT communication-only mode: all motors remain Operation Disabled; "
+      "commands cannot move the arm.");
   }
 
-  activated_ = true;
+  safety_stop_reported_.assign(driver_config_.motors.size(), false);
+  last_fault_error_code_valid_.assign(driver_config_.motors.size(), false);
+  last_fault_error_code_.assign(driver_config_.motors.size(), 0);
+  manual_motion_enabled_.store(enable_on_this_activation);
+  hardware_fault_latched_.store(false);
+  // Publish the active state last so service callbacks cannot observe partially
+  // initialized diagnostic storage.
+  activated_.store(true);
 
   for (size_t joint_index = 0; joint_index < info_.joints.size(); ++joint_index) {
     const int motor_index = joint_to_motor_index_[joint_index];
@@ -511,8 +678,10 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
     on_deactivate(const rclcpp_lifecycle::State & previous_state)
 {
   (void)previous_state;
+  const std::lock_guard<std::mutex> recovery_lock(recovery_mutex_);
 
-  activated_ = false;
+  activated_.store(false);
+  manual_motion_enabled_.store(false);
 
   if (driver_) {
     for (const auto & motor : driver_config_.motors) {
@@ -522,6 +691,28 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
     driver_->stop();
   }
 
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn EsMotorHardwareInterface::
+    on_error(const rclcpp_lifecycle::State & previous_state)
+{
+  (void)previous_state;
+  const std::lock_guard<std::mutex> recovery_lock(recovery_mutex_);
+
+  activated_.store(false);
+  manual_motion_enabled_.store(false);
+  hardware_fault_latched_.store(true);
+  if (driver_) {
+    for (const auto & motor : driver_config_.motors) {
+      driver_->setEnable(motor.address, false);
+    }
+  }
+
+  RCLCPP_ERROR(
+    logger(),
+    "Hardware entered error processing. Controllers using this arm are stopped; "
+    "EtherCAT remains active for diagnostics and manual fault reset.");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -596,11 +787,47 @@ bool EsMotorHardwareInterface::refresh_position_command(size_t joint_index)
 double EsMotorHardwareInterface::counts_to_radians(
   int32_t counts,
   const ethercat_driver::MotorConfig & motor,
-  size_t joint_index) const
+  size_t joint_index)
 {
-  double position =
+  const double raw_position =
     joint_sign_[joint_index] * (static_cast<double>(counts) / motor.counts_per_rev * kTwoPi) +
     joint_offset_rad_[joint_index];
+  double position = raw_position;
+
+  if (joint_position_wraparound_[joint_index]) {
+    double reference = position_cache_[joint_index];
+    if (!joint_turn_offset_initialized_[joint_index] &&
+      std::isfinite(joint_position_wrap_reference_rad_[joint_index]))
+    {
+      reference = joint_position_wrap_reference_rad_[joint_index];
+    }
+    if (!std::isfinite(reference)) {
+      reference = 0.0;
+    }
+
+    // Pick the raw + n*2*pi value nearest the expected/previous ROS position.
+    // Re-evaluating against the previous sample also preserves continuity if a
+    // drive resets its single-turn branch while ros2_control is still running.
+    const double learned_turn_offset =
+      std::round((reference - raw_position) / kTwoPi) * kTwoPi;
+    const bool offset_changed =
+      !joint_turn_offset_initialized_[joint_index] ||
+      std::abs(learned_turn_offset - joint_turn_offset_rad_[joint_index]) > 1e-9;
+
+    if (offset_changed) {
+      const bool was_initialized = joint_turn_offset_initialized_[joint_index];
+      joint_turn_offset_rad_[joint_index] = learned_turn_offset;
+      RCLCPP_INFO(
+        logger(),
+        "%s position branch for joint '%s': raw=%.6f rad reference=%.6f rad "
+        "turn_offset=%+.6f rad reported=%.6f rad.",
+        was_initialized ? "Adjusted" : "Initialized",
+        info_.joints[joint_index].name.c_str(), raw_position, reference,
+        learned_turn_offset, raw_position + learned_turn_offset);
+    }
+    joint_turn_offset_initialized_[joint_index] = true;
+    position = raw_position + joint_turn_offset_rad_[joint_index];
+  }
 
   // Only absorb tiny *out-of-range* encoder/zero-point errors. In-range values are
   // left untouched, and a real violation larger than the tolerance remains visible
@@ -629,9 +856,217 @@ int32_t EsMotorHardwareInterface::radians_to_counts(
   const ethercat_driver::MotorConfig & motor,
   size_t joint_index) const
 {
-  const double motor_radians = (radians - joint_offset_rad_[joint_index]) / joint_sign_[joint_index];
+  // Undo the same learned branch correction used on the state side. Without this,
+  // e.g. raw=-350 deg/report=10 deg followed by a 10 deg command would request a
+  // real +360 deg move.
+  const double raw_radians = radians - joint_turn_offset_rad_[joint_index];
+  const double motor_radians =
+    (raw_radians - joint_offset_rad_[joint_index]) / joint_sign_[joint_index];
   const double counts = motor_radians / kTwoPi * motor.counts_per_rev;
   return clamp_i64_to_i32(static_cast<int64_t>(std::llround(counts)));
+}
+
+bool EsMotorHardwareInterface::reset_faults_manually(std::string & message)
+{
+  const std::lock_guard<std::mutex> lock(recovery_mutex_);
+
+  if (!driver_ || !driver_->isRunning() || driver_config_.motors.empty()) {
+    message = "EtherCAT is not running; manual reset is unavailable";
+    return false;
+  }
+
+  // Fault reset never implies re-enable. Lock out write() first and explicitly
+  // disable every axis before issuing CiA402 controlword 0x0080 requests.
+  manual_motion_enabled_.store(false);
+  for (const auto & motor : driver_config_.motors) {
+    driver_->setEnable(motor.address, false);
+  }
+
+  size_t recovery_count = 0;
+  for (const auto & motor : driver_config_.motors) {
+    ethercat_driver::MotorState state{};
+    if (!driver_->getMotorState(motor.address, state)) {
+      message = "failed to read motor state for " + motor.name;
+      return false;
+    }
+    if (!state.ethercat_ok || !state.slave_online) {
+      message = "EtherCAT is not healthy for " + motor.name;
+      return false;
+    }
+    if (state.fault || state.fault_reaction_active) {
+      const std::string decoded_faults = state.error_code_valid ?
+        zhishu_robot_hardware::format_motor_fault_mask(state.error_code) : "unavailable";
+      RCLCPP_WARN(
+        logger(),
+        "Manual fault reset requested for motor '%s': status_word=0x%04X "
+        "error_code=%s0x%04X decoded_faults=[%s]",
+        motor.name.c_str(), state.status_word, state.error_code_valid ? "" : "unavailable/",
+        state.error_code, decoded_faults.c_str());
+      if (!driver_->requestFaultReset(motor.address)) {
+        message = "failed to request fault reset for " + motor.name;
+        return false;
+      }
+      ++recovery_count;
+    } else if (state.quick_stop_active) {
+      RCLCPP_WARN(
+        logger(),
+        "Manual Quick Stop release requested for motor '%s': status_word=0x%04X",
+        motor.name.c_str(), state.status_word);
+      if (!driver_->requestQuickStopRelease(motor.address)) {
+        message = "failed to request Quick Stop release for " + motor.name;
+        return false;
+      }
+      ++recovery_count;
+    }
+  }
+
+  if (recovery_count == 0) {
+    message = "no CiA402 Fault/FaultReactionActive/QuickStopActive state found; motors remain disabled";
+    return true;
+  }
+
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (std::chrono::steady_clock::now() < deadline) {
+    bool clear = true;
+    for (const auto & motor : driver_config_.motors) {
+      ethercat_driver::MotorState state{};
+      if (!driver_->getMotorState(motor.address, state) || !state.ethercat_ok ||
+        !state.slave_online || !state.slave_operational || state.status_word == 0U ||
+        state.fault || state.fault_reaction_active || state.quick_stop_active)
+      {
+        clear = false;
+        break;
+      }
+    }
+    if (clear) {
+      message = "safety-state recovery completed for " + std::to_string(recovery_count) +
+        " motor(s); motors are still disabled, call /right_arm/enable with data=true";
+      return true;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+
+  message = "safety-state recovery timed out; motors remain disabled";
+  return false;
+}
+
+void EsMotorHardwareInterface::latch_hardware_fault(const std::string & reason)
+{
+  manual_motion_enabled_.store(false);
+  const bool first_report = !hardware_fault_latched_.exchange(true);
+  for (const auto & motor : driver_config_.motors) {
+    driver_->setEnable(motor.address, false);
+  }
+  if (first_report) {
+    RCLCPP_ERROR(
+      logger(),
+      "Hardware fault propagated to controller_manager: %s. "
+      "The active trajectory will be aborted and motors remain disabled.",
+      reason.c_str());
+  }
+}
+
+bool EsMotorHardwareInterface::set_motors_enabled_manually(bool enable, std::string & message)
+{
+  const std::lock_guard<std::mutex> lock(recovery_mutex_);
+
+  if (!activated_.load() || !driver_ || driver_config_.motors.empty()) {
+    message = "hardware is not active";
+    return false;
+  }
+
+  if (!enable) {
+    manual_motion_enabled_.store(false);
+    bool ok = true;
+    for (const auto & motor : driver_config_.motors) {
+      ok = driver_->setEnable(motor.address, false) && ok;
+    }
+    message = ok ? "motors disabled" : "one or more motors could not be disabled";
+    return ok;
+  }
+
+  // Validate every axis and synchronize both ros2_control and CSP targets to the
+  // measured position before enabling. This prevents an immediate jump to a stale target.
+  std::vector<ethercat_driver::MotorState> states(driver_config_.motors.size());
+  for (size_t i = 0; i < driver_config_.motors.size(); ++i) {
+    const auto & motor = driver_config_.motors[i];
+    auto & state = states[i];
+    if (!driver_->getMotorState(motor.address, state)) {
+      message = "failed to read motor state for " + motor.name;
+      return false;
+    }
+    if (!state.ethercat_ok || !state.slave_online || !state.slave_operational ||
+      state.status_word == 0U)
+    {
+      message = "EtherCAT/slave is not ready for " + motor.name;
+      return false;
+    }
+    if (state.fault || state.fault_reaction_active || state.quick_stop_active) {
+      std::ostringstream oss;
+      oss << "motor " << motor.name << " is not safe to enable: status_word=0x"
+          << std::hex << state.status_word << " error_code=0x" << state.error_code
+          << " decoded_faults=["
+          << (state.error_code_valid ?
+          zhishu_robot_hardware::format_motor_fault_mask(state.error_code) : "unavailable")
+          << "]";
+      message = oss.str();
+      return false;
+    }
+  }
+
+  manual_motion_enabled_.store(false);
+  // write() is still running while the motion latch is false. It continuously
+  // keeps each CSP target at the measured counts without rewriting the
+  // controller-owned ros2_control command handle.
+  for (size_t i = 0; i < driver_config_.motors.size(); ++i) {
+    const auto & motor = driver_config_.motors[i];
+    const auto & state = states[i];
+    if (!driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts)) {
+      message = "failed to synchronize CSP target for " + motor.name;
+      return false;
+    }
+  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+  for (const auto & motor : driver_config_.motors) {
+    if (!driver_->setEnable(motor.address, true)) {
+      for (const auto & rollback_motor : driver_config_.motors) {
+        driver_->setEnable(rollback_motor.address, false);
+      }
+      message = "failed to request enable for " + motor.name;
+      return false;
+    }
+  }
+
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  int stable_cycles = 0;
+  while (std::chrono::steady_clock::now() < deadline) {
+    bool enabled_this_cycle = true;
+    for (const auto & motor : driver_config_.motors) {
+      ethercat_driver::MotorState state{};
+      if (!driver_->getMotorState(motor.address, state) || !state.ethercat_ok ||
+        state.fault || state.fault_reaction_active || state.quick_stop_active ||
+        !state.operation_enabled)
+      {
+        enabled_this_cycle = false;
+        break;
+      }
+    }
+    stable_cycles = enabled_this_cycle ? stable_cycles + 1 : 0;
+    if (stable_cycles >= 5) {
+      manual_motion_enabled_.store(true);
+      message = "all motors are Operation Enabled; release/re-acquire VR grip before motion";
+      return true;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+
+  for (const auto & motor : driver_config_.motors) {
+    driver_->setEnable(motor.address, false);
+  }
+  manual_motion_enabled_.store(false);
+  message = "enable timed out; motors were disabled again";
+  return false;
 }
 
 hardware_interface::return_type EsMotorHardwareInterface::
@@ -652,10 +1087,65 @@ hardware_interface::return_type EsMotorHardwareInterface::
 
     const auto & motor = driver_config_.motors[static_cast<size_t>(motor_index)];
     ethercat_driver::MotorState state{};
-    if (driver_->getMotorState(motor.address, state) && state.status_word != 0) {
+    if (!driver_->getMotorState(motor.address, state)) {
+      latch_hardware_fault("getMotorState failed for joint '" + info_.joints[joint_index].name + "'");
+      return hardware_interface::return_type::ERROR;
+    }
+
+    const int expected_domain_wc = static_cast<int>(driver_config_.motors.size() * 3U);
+    const bool bus_ready =
+      state.ethercat_ok && state.slave_online && state.slave_operational &&
+      state.status_word != 0U && state.domain_wc >= expected_domain_wc &&
+      state.domain_wc_state == 2;
+    if (!bus_ready) {
+      std::ostringstream reason;
+      reason << "EtherCAT not ready at joint '" << info_.joints[joint_index].name
+             << "': online=" << state.slave_online
+             << " op=" << state.slave_operational
+             << " al=0x" << std::hex << static_cast<unsigned int>(state.slave_al_state)
+             << std::dec << " domain_wc=" << state.domain_wc << "/" << expected_domain_wc
+             << " wc_state=" << state.domain_wc_state;
+      latch_hardware_fault(reason.str());
+      return hardware_interface::return_type::ERROR;
+    }
+
+    if (state.status_word != 0) {
       set_position_state(
         joint_index, counts_to_radians(state.actual_counts, motor, joint_index));
     }
+
+    if (state.fault || state.fault_reaction_active || state.quick_stop_active) {
+      const size_t diagnostic_index = static_cast<size_t>(motor_index);
+      const bool error_code_changed = state.error_code_valid &&
+        (!last_fault_error_code_valid_[diagnostic_index] ||
+        state.error_code != last_fault_error_code_[diagnostic_index]);
+      if (!safety_stop_reported_[diagnostic_index] || error_code_changed) {
+        const std::string decoded_faults = state.error_code_valid ?
+          zhishu_robot_hardware::format_motor_fault_mask(state.error_code) : "unavailable";
+        RCLCPP_ERROR(
+          logger(),
+          "Safety stop latched for joint '%s': fault=%d fault_reaction=%d quick_stop=%d "
+          "status_word=0x%04X error_code=%s0x%04X decoded_faults=[%s]. "
+          "EtherCAT stays active for diagnostics, "
+          "but motion remains disabled until manual reset and explicit reactivation.",
+          info_.joints[joint_index].name.c_str(), state.fault, state.fault_reaction_active,
+          state.quick_stop_active, state.status_word, state.error_code_valid ? "" : "unavailable/",
+          state.error_code, decoded_faults.c_str());
+        safety_stop_reported_[diagnostic_index] = true;
+        last_fault_error_code_valid_[diagnostic_index] = state.error_code_valid;
+        last_fault_error_code_[diagnostic_index] = state.error_code;
+      }
+      latch_hardware_fault(
+        "drive safety state at joint '" + info_.joints[joint_index].name + "'");
+      return hardware_interface::return_type::ERROR;
+    }
+
+    // Only the ros2_control read thread owns these diagnostic vectors. Reset the
+    // per-axis report latch after the safety state has genuinely cleared so a
+    // later occurrence (including the same 0x603F code) is logged again.
+    const size_t diagnostic_index = static_cast<size_t>(motor_index);
+    safety_stop_reported_[diagnostic_index] = false;
+    last_fault_error_code_valid_[diagnostic_index] = false;
   }
 
   return hardware_interface::return_type::OK;
@@ -667,9 +1157,11 @@ hardware_interface::return_type EsMotorHardwareInterface::
   (void)time;
   (void)period;
 
-  if (!activated_ || !driver_ || driver_config_.motors.empty()) {
+  if (!activated_.load() || !driver_ || driver_config_.motors.empty()) {
     return hardware_interface::return_type::OK;
   }
+
+  const bool motion_enabled = manual_motion_enabled_.load();
 
   // 7 个电机、每个从站当前 PDO 工作计数为 3，所以满 WC 应为 21。
   // EtherCAT 出现 WC 不满、SAFEOP、同步错误时，禁止继续追 MoveIt 下发的轨迹点，
@@ -697,14 +1189,9 @@ hardware_interface::return_type EsMotorHardwareInterface::
     const auto & motor = driver_config_.motors[static_cast<size_t>(motor_index)];
     ethercat_driver::MotorState state{};
     if (!driver_->getMotorState(motor.address, state)) {
-      if (std::isfinite(position_cache_[joint_index])) {
-        set_position_command(joint_index, position_cache_[joint_index]);
-      }
-      RCLCPP_WARN_THROTTLE(
-        logger(), throttle_clock, 1000,
-        "getMotorState failed for joint '%s'. Holding last ros2_control position.",
-        info_.joints[joint_index].name.c_str());
-      continue;
+      latch_hardware_fault(
+        "getMotorState failed for joint '" + info_.joints[joint_index].name + "'");
+      return hardware_interface::return_type::ERROR;
     }
 
     // status_word != 0 时才认为 actual_counts 有效；否则保持上一次位置，避免状态跳到 0。
@@ -735,7 +1222,6 @@ hardware_interface::return_type EsMotorHardwareInterface::
     // EtherCAT 不健康时：不接受控制器新命令，只把目标锁到当前真实位置。
     // 对应你的 dmesg：WC 0/21、UNMATCHED/SKIPPED、SAFEOP、0x001A Synchronization error。
     if (!bus_ready) {
-      set_position_command(joint_index, hold_rad);
       if (state.status_word != 0U) {
         driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
       }
@@ -756,21 +1242,29 @@ hardware_interface::return_type EsMotorHardwareInterface::
         state.domain_wc,
         expected_domain_wc,
         state.domain_wc_state);
-      continue;
+      std::ostringstream reason;
+      reason << "EtherCAT not ready at joint '" << info_.joints[joint_index].name
+             << "': online=" << state.slave_online
+             << " op=" << state.slave_operational
+             << " al=0x" << std::hex << static_cast<unsigned int>(state.slave_al_state)
+             << std::dec << " domain_wc=" << state.domain_wc << "/" << expected_domain_wc
+             << " wc_state=" << state.domain_wc_state;
+      latch_hardware_fault(reason.str());
+      return hardware_interface::return_type::ERROR;
     }
 
     // 未真正进入 OperationEnabled 前，持续锁当前真实位置，不接受控制器默认 0。
-    if (!enable_status_ok || !command_enable || !state.operation_enabled ||
+    if (!motion_enabled || !enable_status_ok || !command_enable || !state.operation_enabled ||
       !std::isfinite(command_cache_[joint_index]))
     {
-      set_position_command(joint_index, hold_rad);
       driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
 
       RCLCPP_WARN_THROTTLE(
         logger(), throttle_clock, 1000,
-        "Joint '%s' is not command-enabled yet: enable_status_ok=%d command_enable=%d "
-        "operation_enabled=%d status_word=0x%04X. Holding current position.",
+        "Joint '%s' is not command-enabled yet: motion_enabled=%d enable_status_ok=%d "
+        "command_enable=%d operation_enabled=%d status_word=0x%04X. Holding current position.",
         info_.joints[joint_index].name.c_str(),
+        motion_enabled,
         enable_status_ok,
         command_enable,
         state.operation_enabled,
@@ -781,13 +1275,15 @@ hardware_interface::return_type EsMotorHardwareInterface::
     const int32_t target_counts =
       radians_to_counts(command_cache_[joint_index], motor, joint_index);
     if (!driver_->setAbsoluteTargetCounts(motor.address, target_counts)) {
-      set_position_command(joint_index, hold_rad);
       driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
 
       RCLCPP_WARN_THROTTLE(
         logger(), throttle_clock, 1000,
         "setAbsoluteTargetCounts failed for joint '%s'. Holding current position.",
         info_.joints[joint_index].name.c_str());
+      latch_hardware_fault(
+        "setAbsoluteTargetCounts failed for joint '" + info_.joints[joint_index].name + "'");
+      return hardware_interface::return_type::ERROR;
     }
   }
 

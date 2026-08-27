@@ -11,6 +11,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(std_srvs REQUIRED)
 
 # IgH EtherCAT master user-space development files
 set(ECRT_INCLUDE_DIR "/usr/local/etherlab/include" CACHE PATH "Path containing ecrt.h")
@@ -80,6 +81,7 @@ ament_target_dependencies(${PROJECT_NAME}
   rclcpp_lifecycle
   hardware_interface
   pluginlib
+  std_srvs
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -132,6 +134,7 @@ ament_export_dependencies(
   rclcpp_lifecycle
   hardware_interface
   pluginlib
+  std_srvs
 )
 
 ament_package()

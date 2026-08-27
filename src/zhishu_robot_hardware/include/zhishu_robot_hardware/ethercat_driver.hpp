@@ -36,7 +36,6 @@ struct MotorConfig
   int8_t mode_of_operation = 8;  // CiA402 CSP
 
   bool auto_enable = false;
-  bool auto_fault_reset = true;
 
   double max_velocity_counts_s = 8000.0;
   double max_accel_counts_s2 = 20000.0;
@@ -59,6 +58,11 @@ struct DriverConfig
   int realtime_priority = 80;
   int realtime_cpu = -1;
 
+  // In CiA-402 CSP mode, forward each ros2_control target directly to the PDO.
+  // Keep this opt-in so the legacy software trapezoidal profile remains available
+  // for non-CSP deployments and rollback.
+  bool csp_direct_position_commands = false;
+
   std::vector<MotorConfig> motors;
 };
 
@@ -69,8 +73,13 @@ struct MotorState
   bool slave_operational = false;
   bool operation_enabled = false;
   bool target_reached = false;
+  bool fault = false;
+  bool fault_reaction_active = false;
+  bool quick_stop_active = false;
 
   uint16_t status_word = 0;
+  uint16_t error_code = 0;
+  bool error_code_valid = false;
   int cia402_state = 0;
   int slave_al_state = 0;
   int domain_wc = 0;
@@ -117,6 +126,7 @@ public:
   bool setEnable(const MotorAddress & address, bool enable);
   bool getEnabledStatus(const MotorAddress & address, bool & enable) const;
   bool requestFaultReset(const MotorAddress & address);
+  bool requestQuickStopRelease(const MotorAddress & address);
 
   bool getMotorState(const MotorAddress & address, MotorState & state) const;
   std::vector<MotorState> getAllMotorStates() const;

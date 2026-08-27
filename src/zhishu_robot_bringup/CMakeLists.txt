@@ -12,4 +12,12 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(
+  PROGRAMS
+    scripts/reset_left_arm_fault.sh
+    scripts/reset_right_arm_fault.sh
+    scripts/reset_dual_arms_fault.sh
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

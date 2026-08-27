@@ -6,6 +6,7 @@
 #include <cinttypes>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -130,10 +131,12 @@ struct MotorContext
 
   MotorConfig config;
   ec_slave_config_t * sc = nullptr;
+  ec_sdo_request_t * error_code_request = nullptr;
   PdoOffsets offsets{};
 
   std::atomic<bool> command_enable{true};
   std::atomic<bool> fault_reset_requested{false};
+  std::atomic<bool> quick_stop_release_requested{false};
   std::atomic<bool> operation_enabled{false};
   std::atomic<bool> target_reached{true};
   std::atomic<bool> have_goal{false};
@@ -143,6 +146,8 @@ struct MotorContext
   std::atomic<int32_t> actual_counts{0};
   std::atomic<int32_t> command_counts{0};
   std::atomic<uint16_t> statusword{0};
+  std::atomic<uint16_t> error_code{0};
+  std::atomic<bool> error_code_valid{false};
   std::atomic<int> cia402_state{static_cast<int>(Cia402State::Unknown)};
   std::atomic<int64_t> goal_counts{0};
   std::atomic<int> slave_al_state{0};
@@ -152,6 +157,8 @@ struct MotorContext
   int fault_reset_counter = 0;
   bool first_cycle = true;
   bool hold_latched_after_enable = false;
+  bool error_code_request_pending = false;
+  uint64_t next_error_code_cycle = 0;
 
   uint8_t last_slave_al_state = 0xFF;
   bool last_slave_online = false;
@@ -369,6 +376,16 @@ public:
     return true;
   }
 
+  bool requestQuickStopRelease(const MotorAddress & address)
+  {
+    auto motor = findMotor(address);
+    if (!motor) {
+      return false;
+    }
+    motor->quick_stop_release_requested.store(true);
+    return true;
+  }
+
   bool getMotorState(const MotorAddress & address, MotorState & state) const
   {
     auto motor = findMotor(address);
@@ -476,7 +493,13 @@ private:
     state.slave_operational = motor.slave_operational.load();
     state.operation_enabled = motor.operation_enabled.load();
     state.target_reached = motor.target_reached.load();
+    const auto cia402_state = static_cast<Cia402State>(motor.cia402_state.load());
+    state.fault = cia402_state == Cia402State::Fault;
+    state.fault_reaction_active = cia402_state == Cia402State::FaultReactionActive;
+    state.quick_stop_active = cia402_state == Cia402State::QuickStopActive;
     state.status_word = motor.statusword.load();
+    state.error_code = motor.error_code.load();
+    state.error_code_valid = motor.error_code_valid.load();
     state.cia402_state = motor.cia402_state.load();
     state.slave_al_state = motor.slave_al_state.load();
     state.domain_wc = domain_wc_.load();
@@ -596,6 +619,15 @@ private:
         std::fprintf(stderr, "ethercat_driver: failed to get slave config for %s (%s)\n", motor->config.name.c_str(), toString(addr).c_str());
         return false;
       }
+      motor->error_code_request =
+        ecrt_slave_config_create_sdo_request(motor->sc, 0x603F, 0x00, 2);
+      if (motor->error_code_request == nullptr) {
+        std::fprintf(stderr, "ethercat_driver: failed to create 0x603F SDO request for %s\n", motor->config.name.c_str());
+        return false;
+      }
+      ecrt_sdo_request_timeout(motor->error_code_request, 500);
+      motor->next_error_code_cycle = 200U +
+        static_cast<uint64_t>(addr.slave_position) * 100U;
     }
 
     configureReferenceClock();
@@ -759,9 +791,24 @@ private:
       return true;
     }
 
-    ecrt_slave_config_sdo8(motor.sc, 0x6060, 0x00, static_cast<uint8_t>(motor.config.mode_of_operation));
-    ecrt_slave_config_sdo8(motor.sc, 0x60C2, 0x01, 0x02);
-    ecrt_slave_config_sdo8(motor.sc, 0x60C2, 0x02, 0xFD);  // -3 => 10^-3 s = 1 ms
+    const auto write_sdo8 = [&motor](uint16_t index, uint8_t subindex, uint8_t value) {
+      const int ret = ecrt_slave_config_sdo8(motor.sc, index, subindex, value);
+      if (ret != 0) {
+        std::fprintf(
+          stderr,
+          "ethercat_driver: SDO config failed for %s at 0x%04X:%02X value=0x%02X: %d\n",
+          motor.config.name.c_str(), index, subindex, value, ret);
+        return false;
+      }
+      return true;
+    };
+
+    if (!write_sdo8(0x6060, 0x00, static_cast<uint8_t>(motor.config.mode_of_operation)) ||
+      !write_sdo8(0x60C2, 0x01, 0x01) ||
+      !write_sdo8(0x60C2, 0x02, 0xFD))  // 1 * 10^-3 s = 1 ms
+    {
+      return false;
+    }
     return true;
   }
 
@@ -801,15 +848,13 @@ private:
 
   uint16_t controlwordFor(MotorContext & motor, uint16_t status_word)
   {
-    const bool enable = motor.command_enable.load();
     const Cia402State state = decodeStatusWord(status_word);
 
-    if (!enable) {
-      return 0x0006;  // shutdown: voltage enabled, operation disabled
-    }
-
     if (state == Cia402State::Fault) {
-      if (motor.config.auto_fault_reset || motor.fault_reset_requested.exchange(false)) {
+      // Latch the drive disabled on every fault. A reset pulse may clear the fault,
+      // but motion can only resume after a separate explicit enable command.
+      motor.command_enable.store(false);
+      if (motor.fault_reset_requested.exchange(false)) {
         motor.fault_reset_counter = 50;
       }
       if (motor.fault_reset_counter > 0) {
@@ -817,6 +862,29 @@ private:
         return 0x0080;
       }
       return 0x0000;
+    }
+
+    motor.fault_reset_counter = 0;
+
+    if (state == Cia402State::QuickStopActive) {
+      // Keep Quick Stop asserted and require an explicit disable/enable recovery
+      // sequence. Never jump directly back to Operation Enabled.
+      motor.command_enable.store(false);
+      if (motor.quick_stop_release_requested.load()) {
+        // Disable Voltage is the conservative CiA402 exit from QuickStopActive.
+        // Once the drive leaves this state, command_enable remains false and the
+        // normal disabled path advances only as far as ReadyToSwitchOn (0x0006).
+        return 0x0000;
+      }
+      return 0x0002;
+    }
+
+    // A release request is only consumed after the drive has actually left
+    // QuickStopActive. A new Quick Stop therefore requires a new manual request.
+    motor.quick_stop_release_requested.store(false);
+
+    if (!motor.command_enable.load()) {
+      return 0x0006;  // shutdown: voltage enabled, operation disabled
     }
 
     switch (state) {
@@ -829,7 +897,7 @@ private:
       case Cia402State::OperationEnabled:
         return 0x000F;  // keep enabled
       case Cia402State::QuickStopActive:
-        return 0x000F;
+        return 0x0002;
       case Cia402State::NotReadyToSwitchOn:
       case Cia402State::FaultReactionActive:
       case Cia402State::Fault:
@@ -964,6 +1032,29 @@ private:
         motor->cia402_state.store(static_cast<int>(state));
         motor->operation_enabled.store(op_enabled);
 
+        // Read the standard CiA-402 error code through the mailbox at 1 Hz per
+        // drive. This keeps the fixed, firmware-supported PDO mapping unchanged.
+        if (motor->error_code_request != nullptr) {
+          const ec_request_state_t request_state =
+            ecrt_sdo_request_state(motor->error_code_request);
+          if (motor->error_code_request_pending) {
+            if (request_state == EC_REQUEST_SUCCESS) {
+              motor->error_code.store(EC_READ_U16(ecrt_sdo_request_data(motor->error_code_request)));
+              motor->error_code_valid.store(true);
+              motor->error_code_request_pending = false;
+              motor->next_error_code_cycle = cycle_count + 1000U;
+            } else if (request_state == EC_REQUEST_ERROR) {
+              motor->error_code_request_pending = false;
+              motor->next_error_code_cycle = cycle_count + 1000U;
+            }
+          } else if (cycle_count >= motor->next_error_code_cycle &&
+            request_state != EC_REQUEST_BUSY)
+          {
+            ecrt_sdo_request_read(motor->error_code_request);
+            motor->error_code_request_pending = true;
+          }
+        }
+
         if (motor->first_cycle) {
           motor->cmd_position = static_cast<double>(actual);
           motor->profile_velocity = 0.0;
@@ -972,7 +1063,26 @@ private:
           motor->first_cycle = false;
         }
 
-        updateProfile(*motor, dt, actual, op_enabled);
+        const bool direct_csp_command =
+          config_.csp_direct_position_commands &&
+          motor->config.mode_of_operation == 8 &&
+          op_enabled &&
+          motor->command_enable.load() &&
+          motor->hold_latched_after_enable;
+        if (direct_csp_command) {
+          // The JointTrajectoryController already interpolates the MoveIt trajectory
+          // at the ros2_control rate. Re-profiling each moving target creates a
+          // deadband at target_tolerance_counts and causes visible stop-start motion.
+          const int64_t goal = motor->goal_counts.load();
+          motor->cmd_position = static_cast<double>(goal);
+          motor->profile_velocity = 0.0;
+          motor->target_reached.store(
+            std::llabs(goal - static_cast<int64_t>(actual)) <= motor->config.target_tolerance_counts);
+        } else {
+          // Preserve the legacy profile and all safe hold behavior while disabled,
+          // outside CSP, or when direct CSP is explicitly disabled.
+          updateProfile(*motor, dt, actual, op_enabled);
+        }
         const int32_t command_position = clampToInt32(motor->cmd_position);
         motor->command_counts.store(command_position);
 
@@ -1238,6 +1348,11 @@ bool EthercatDriver::getEnabledStatus(const MotorAddress &address, bool &enable)
 bool EthercatDriver::requestFaultReset(const MotorAddress &address)
 {
   return impl_->requestFaultReset(address);
+}
+
+bool EthercatDriver::requestQuickStopRelease(const MotorAddress & address)
+{
+  return impl_->requestQuickStopRelease(address);
 }
 
 bool EthercatDriver::getMotorState(const MotorAddress & address, MotorState & state) const

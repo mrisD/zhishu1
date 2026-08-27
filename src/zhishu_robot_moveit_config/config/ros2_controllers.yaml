@@ -46,6 +46,7 @@ left_arm_controller:
       - position
     state_interfaces:
       - position
+    interpolate_from_desired_state: false
 
 right_arm_controller:
   ros__parameters:
@@ -61,6 +62,7 @@ right_arm_controller:
       - position
     state_interfaces:
       - position
+    interpolate_from_desired_state: false
 
 
 dual_arm_controller:
@@ -85,6 +87,8 @@ dual_arm_controller:
     state_interfaces:
       - position
     allow_partial_joints_goal: true
+    interpolate_from_desired_state: false
+    set_last_command_interface_value_as_state_on_activation: false
 
 body_posture_controller:
   ros__parameters:
