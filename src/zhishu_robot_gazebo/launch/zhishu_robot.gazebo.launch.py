@@ -14,7 +14,8 @@ from launch import LaunchDescription
 from launch.actions import (
     AppendEnvironmentVariable,
     DeclareLaunchArgument,
-    IncludeLaunchDescription
+    IncludeLaunchDescription,
+    SetEnvironmentVariable,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -65,10 +66,12 @@ def generate_launch_description():
         pkg_share_moveit, 'config', 'zhishu_robot.urdf.xacro')
     controllers_yaml = os.path.join(
         pkg_share_moveit, 'config', 'ros2_controllers.yaml')
+    initial_positions_file = LaunchConfiguration('initial_positions_file')
     robot_description = ParameterValue(
         Command([
             FindExecutable(name='xacro'), ' ', robot_xacro,
-            ' use_gazebo:=true use_fake_hardware:=false',
+            ' use_gazebo:=true use_fake_hardware:=false initial_positions_file:=',
+            initial_positions_file,
         ]),
         value_type=str,
     )
@@ -76,6 +79,10 @@ def generate_launch_description():
     # Launch configuration variables
     load_controllers = LaunchConfiguration('load_controllers')
     headless = LaunchConfiguration('headless')
+    paused = LaunchConfiguration('paused')
+    force_x11 = LaunchConfiguration('force_x11')
+    render_engine_gui = LaunchConfiguration('render_engine_gui')
+    software_rendering = LaunchConfiguration('software_rendering')
     robot_name = LaunchConfiguration('robot_name')
     use_camera = LaunchConfiguration('use_camera')
     use_gazebo = LaunchConfiguration('use_gazebo')
@@ -113,6 +120,26 @@ def generate_launch_description():
         default_value='false',
         description='Run only the Gazebo server (no GUI)')
 
+    declare_paused_cmd = DeclareLaunchArgument(
+        name='paused',
+        default_value='false',
+        description='Start Gazebo paused so controllers can activate before gravity')
+
+    declare_force_x11_cmd = DeclareLaunchArgument(
+        name='force_x11',
+        default_value='false',
+        description='Force Qt to use X11; useful for Gazebo GUI in VMware/Wayland')
+
+    declare_render_engine_gui_cmd = DeclareLaunchArgument(
+        name='render_engine_gui',
+        default_value='ogre2',
+        description='Gazebo GUI rendering engine (ogre2 or compatibility engine ogre)')
+
+    declare_software_rendering_cmd = DeclareLaunchArgument(
+        name='software_rendering',
+        default_value='false',
+        description='Use Mesa software OpenGL; slower but stable in virtual machines')
+
     declare_use_robot_state_pub_cmd = DeclareLaunchArgument(
         name='use_robot_state_pub',
         default_value='true',
@@ -148,6 +175,11 @@ def generate_launch_description():
         name='world_file',
         default_value=default_world_file,
         description='World file name (e.g., empty.world, house.world, pick_and_place_demo.world)')
+
+    declare_initial_positions_cmd = DeclareLaunchArgument(
+        name='initial_positions_file',
+        default_value=os.path.join(pkg_share_moveit, 'config', 'initial_positions.yaml'),
+        description='Absolute path to the ros2_control initial joint positions YAML')
 
     # Pose arguments
     declare_x_cmd = DeclareLaunchArgument(
@@ -223,11 +255,27 @@ def generate_launch_description():
         'GZ_SIM_RESOURCE_PATH',
         os.path.dirname(pkg_share_description))
 
+    set_qt_x11 = SetEnvironmentVariable(
+        'QT_QPA_PLATFORM',
+        'xcb',
+        condition=IfCondition(force_x11),
+    )
+    set_software_rendering = SetEnvironmentVariable(
+        'LIBGL_ALWAYS_SOFTWARE',
+        '1',
+        condition=IfCondition(software_rendering),
+    )
+
     # Start Gazebo
     start_gazebo_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
-        launch_arguments=[('gz_args', [' -r -v 4 ', world_path])],
+        launch_arguments=[('gz_args', [
+            ' -v 4 ',
+            PythonExpression(["'' if '", paused, "' == 'true' else '-r'"]),
+            ' --render-engine-gui ', render_engine_gui,
+            ' ', world_path,
+        ])],
         condition=IfCondition(PythonExpression([
             "'", use_gazebo, "' == 'true' and '", headless, "' != 'true'",
         ])))
@@ -235,7 +283,11 @@ def generate_launch_description():
     start_gazebo_headless_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
-        launch_arguments=[('gz_args', [' -s -r -v 4 ', world_path])],
+        launch_arguments=[('gz_args', [
+            ' -s -v 4 ',
+            PythonExpression(["'' if '", paused, "' == 'true' else '-r'"]),
+            ' ', world_path,
+        ])],
         condition=IfCondition(PythonExpression([
             "'", use_gazebo, "' == 'true' and '", headless, "' == 'true'",
         ])))
@@ -290,6 +342,10 @@ def generate_launch_description():
     # Declare the launch options
     ld.add_action(declare_robot_name_cmd)
     ld.add_action(declare_headless_cmd)
+    ld.add_action(declare_paused_cmd)
+    ld.add_action(declare_force_x11_cmd)
+    ld.add_action(declare_render_engine_gui_cmd)
+    ld.add_action(declare_software_rendering_cmd)
     ld.add_action(declare_jsp_gui_cmd)
     ld.add_action(declare_load_controllers_cmd)
     ld.add_action(declare_use_camera_cmd)
@@ -298,6 +354,7 @@ def generate_launch_description():
     ld.add_action(declare_use_robot_state_pub_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_world_cmd)
+    ld.add_action(declare_initial_positions_cmd)
 
     # Add pose arguments
     ld.add_action(declare_x_cmd)
@@ -310,6 +367,8 @@ def generate_launch_description():
     # Add the actions to the launch description
     ld.add_action(set_env_vars_model_resources)
     ld.add_action(set_env_vars_robot_resources)
+    ld.add_action(set_qt_x11)
+    ld.add_action(set_software_rendering)
     ld.add_action(robot_state_publisher_cmd)
     ld.add_action(start_gazebo_cmd)
     ld.add_action(start_gazebo_headless_cmd)

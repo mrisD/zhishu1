@@ -5,6 +5,34 @@
     <xacro:include filename="$(find zhishu_robot_description)/urdf/gripper.xacro"/>
     <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot_description_dh.urdf"/>
 
+    <!-- Preserve the wrist-to-hand fixed joints in Gazebo so their reaction
+         wrench can be measured by simulated six-axis force/torque sensors. -->
+    <gazebo reference="L_hand_joint">
+        <preserveFixedJoint>true</preserveFixedJoint>
+        <sensor name="left_wrist_ft" type="force_torque">
+            <always_on>true</always_on>
+            <update_rate>250</update_rate>
+            <topic>/left_wrist_ft</topic>
+            <force_torque>
+                <frame>child</frame>
+                <measure_direction>child_to_parent</measure_direction>
+            </force_torque>
+        </sensor>
+    </gazebo>
+
+    <gazebo reference="R_hand_joint">
+        <preserveFixedJoint>true</preserveFixedJoint>
+        <sensor name="right_wrist_ft" type="force_torque">
+            <always_on>true</always_on>
+            <update_rate>250</update_rate>
+            <topic>/right_wrist_ft</topic>
+            <force_torque>
+                <frame>child</frame>
+                <measure_direction>child_to_parent</measure_direction>
+            </force_torque>
+        </sensor>
+    </gazebo>
+
 
     <joint name="left_gripper_joint" type="fixed">
         <parent link="L_hand_link" />

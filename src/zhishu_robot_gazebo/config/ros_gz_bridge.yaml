@@ -21,5 +21,18 @@
   gz_type_name: "gz.msgs.Clock"
   direction: GZ_TO_ROS
   lazy: false
-  
 
+# Gazebo six-axis wrist sensors.
+- ros_topic_name: "/left_wrist_ft"
+  gz_topic_name: "/left_wrist_ft"
+  ros_type_name: "geometry_msgs/msg/WrenchStamped"
+  gz_type_name: "gz.msgs.Wrench"
+  direction: GZ_TO_ROS
+  lazy: false
+
+- ros_topic_name: "/right_wrist_ft"
+  gz_topic_name: "/right_wrist_ft"
+  ros_type_name: "geometry_msgs/msg/WrenchStamped"
+  gz_type_name: "gz.msgs.Wrench"
+  direction: GZ_TO_ROS
+  lazy: false

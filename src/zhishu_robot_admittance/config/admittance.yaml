@@ -1,0 +1,48 @@
+dual_arm_admittance:
+  ros__parameters:
+    base_frame: base_link
+    left_sensor_frame: L_hand_link
+    right_sensor_frame: R_hand_link
+
+    left_wrench_topic: /left_wrist_ft
+    right_wrench_topic: /right_wrist_ft
+    reference_twist_topic: /dual_arm_admittance/reference_twist
+    left_command_topic: /left_servo/delta_twist_cmds
+    right_command_topic: /right_servo/delta_twist_cmds
+
+    control_rate_hz: 100.0
+    sensor_timeout: 0.10
+    # Reject a left/right pair if their source timestamps differ by more than this.
+    max_sensor_skew_sec: 0.02
+    reference_timeout: 0.25
+    transform_timeout: 0.05
+    wrench_filter_cutoff_hz: 12.0
+    tare_samples: 100
+    enable_on_start: false
+
+    # M*x_ddot + D*x_dot + K*x = F_external - F_desired
+    # First three axes are translation; last three are rotation.
+    mass: [8.0, 8.0, 8.0, 1.5, 1.5, 1.5]
+    damping: [80.0, 80.0, 100.0, 10.0, 10.0, 10.0]
+    stiffness: [150.0, 150.0, 200.0, 15.0, 15.0, 15.0]
+    wrench_deadband: [1.0, 1.0, 1.5, 0.10, 0.10, 0.10]
+    desired_common_wrench: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+    # Half of (left wrench - right wrench). Opposite velocity corrections keep
+    # the two wrists load-balanced without changing the commanded box motion.
+    desired_internal_wrench: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    internal_balance_gain: [0.0002, 0.0002, 0.0002, 0.001, 0.001, 0.001]
+    # Never allow load balancing to overpower the common box motion.
+    max_internal_balance_velocity: [0.005, 0.005, 0.005, 0.01, 0.01, 0.01]
+    # Bound contact impulses before feeding them into the virtual dynamics.
+    max_common_wrench: [100.0, 100.0, 100.0, 20.0, 20.0, 20.0]
+
+    # Change an axis to -1 if the real sensor's positive direction is opposite
+    # to the Gazebo child-to-parent convention.
+    left_wrench_sign: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    right_wrench_sign: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+    max_admittance_displacement: [0.03, 0.03, 0.03, 0.15, 0.15, 0.15]
+    max_admittance_velocity: [0.005, 0.005, 0.005, 0.02, 0.02, 0.02]
+    max_linear_velocity: 0.025
+    max_angular_velocity: 0.05

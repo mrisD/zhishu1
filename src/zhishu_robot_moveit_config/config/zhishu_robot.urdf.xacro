@@ -33,6 +33,10 @@
         <gazebo>
             <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
                 <parameters>$(find zhishu_robot_moveit_config)/config/ros2_controllers.yaml</parameters>
+                <!-- Hold all joints at their configured initial positions while
+                     the admittance launch loads and atomically activates controllers. -->
+                <hold_joints>true</hold_joints>
+                <position_proportional_gain>1.0</position_proportional_gain>
             </plugin>
         </gazebo>
     </xacro:if>

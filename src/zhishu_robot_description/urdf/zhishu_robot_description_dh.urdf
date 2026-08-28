@@ -405,6 +405,13 @@
     <limit lower="-1.309" upper="1.309" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="L_hand_link">
+    <!-- This wrist adapter must remain a physical link in Gazebo so the
+         preserved L_hand_joint can expose its reaction wrench. -->
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.08"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
     <!--
     <inertial>
       <origin xyz="0.0073255 -0.010181 -0.087072" rpy="0 0 0"/>
@@ -638,6 +645,12 @@
     <limit lower="-1.309" upper="1.309" effort="100.0" velocity="1.0"/>
   </joint>
   <link name="R_hand_link">
+    <!-- Mirror of the left wrist adapter; required by the right force sensor. -->
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.08"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
     <!-- <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <mass value="0.066293"/>

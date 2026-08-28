@@ -1,0 +1,122 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="admittance_box">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics">
+      <engine>
+        <filename>gz-physics-bullet-featherstone-plugin</filename>
+      </engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-forcetorque-system" name="gz::sim::systems::ForceTorque"/>
+
+    <gravity>0 0 -9.81</gravity>
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <scene>
+      <ambient>0.45 0.45 0.45 1</ambient>
+      <background>0.72 0.80 0.90 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <light type="directional" name="sun">
+      <pose>0 0 8 0 0 0</pose>
+      <direction>-0.4 0.2 -0.9</direction>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+          <material><ambient>0.62 0.62 0.62 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- The narrow pedestal supports only the box body; it stays clear of the
+         fingers while the side handles are grasped. Its top is at z=0.839 m. -->
+    <model name="box_support_table">
+      <static>true</static>
+      <pose>0.2445 0 0.814 0 0 0</pose>
+      <link name="top">
+        <collision name="collision">
+          <geometry><box><size>0.18 0.30 0.05</size></box></geometry>
+          <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.18 0.30 0.05</size></box></geometry>
+          <material><ambient>0.30 0.32 0.35 1</ambient><diffuse>0.38 0.40 0.44 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="carry_box">
+      <pose>0.2445 0 0.939 0 0 0</pose>
+      <link name="box_link">
+        <inertial>
+          <mass>0.5</mass>
+          <inertia>
+            <ixx>0.012083</ixx><iyy>0.003683</iyy><izz>0.012433</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="body_collision">
+          <geometry><box><size>0.22 0.50 0.20</size></box></geometry>
+          <surface>
+            <friction><ode><mu>1.2</mu><mu2>1.2</mu2></ode></friction>
+            <contact><ode><kp>200000</kp><kd>100</kd></ode></contact>
+          </surface>
+        </collision>
+        <visual name="body_visual">
+          <geometry><box><size>0.22 0.50 0.20</size></box></geometry>
+          <material><ambient>0.48 0.28 0.10 1</ambient><diffuse>0.66 0.42 0.18 1</diffuse></material>
+        </visual>
+        <!-- The spherical handles sit at the measured centers of the open
+             grippers. Their 60 mm diameter matches the documented 0.04 m
+             close position without excessive contact preload. -->
+        <collision name="left_handle_collision">
+          <pose>0 0.370 0 0 0 0</pose>
+          <geometry><sphere><radius>0.03</radius></sphere></geometry>
+          <surface><friction><ode><mu>2.0</mu><mu2>2.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="left_handle_visual">
+          <pose>0 0.370 0 0 0 0</pose>
+          <geometry><sphere><radius>0.03</radius></sphere></geometry>
+          <material><ambient>0.05 0.30 0.75 1</ambient><diffuse>0.08 0.42 0.95 1</diffuse></material>
+        </visual>
+        <visual name="left_handle_neck_visual">
+          <pose>0 0.310 0 0 0 0</pose>
+          <geometry><box><size>0.025 0.120 0.025</size></box></geometry>
+          <material><ambient>0.05 0.30 0.75 1</ambient><diffuse>0.08 0.42 0.95 1</diffuse></material>
+        </visual>
+        <collision name="right_handle_collision">
+          <pose>0 -0.370 0 0 0 0</pose>
+          <geometry><sphere><radius>0.03</radius></sphere></geometry>
+          <surface><friction><ode><mu>2.0</mu><mu2>2.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="right_handle_visual">
+          <pose>0 -0.370 0 0 0 0</pose>
+          <geometry><sphere><radius>0.03</radius></sphere></geometry>
+          <material><ambient>0.05 0.30 0.75 1</ambient><diffuse>0.08 0.42 0.95 1</diffuse></material>
+        </visual>
+        <visual name="right_handle_neck_visual">
+          <pose>0 -0.310 0 0 0 0</pose>
+          <geometry><box><size>0.025 0.120 0.025</size></box></geometry>
+          <material><ambient>0.05 0.30 0.75 1</ambient><diffuse>0.08 0.42 0.95 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>
