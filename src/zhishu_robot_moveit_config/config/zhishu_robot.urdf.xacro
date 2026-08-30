@@ -4,6 +4,9 @@
     <xacro:arg name="use_gazebo" default="false" />
     <xacro:arg name="use_fake_hardware" default="true" />
     <xacro:arg name="enable_motors_on_activate" default="true" />
+    <xacro:arg name="use_head_camera" default="false" />
+    <xacro:arg name="hide_head_pitch_visual" default="false" />
+    <xacro:arg name="handeye_target_enabled" default="false" />
 
     <!-- Import zhishu_robot urdf file -->
     <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot.urdf.xacro" />

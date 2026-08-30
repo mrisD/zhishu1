@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find zhishu_robot_description)/urdf/handeye_target_pattern.xacro"/>
+  <!-- Add the REP-103 optical frame and, in simulation, the RGB sensor used
+       by MoveIt Calibration.  Gazebo cameras look along camera_link +X; this
+       fixed rotation exposes the conventional optical +Z-forward frame. -->
+  <xacro:macro name="head_camera_sensor" params="enabled">
+    <link name="head_camera_optical_frame"/>
+    <joint name="head_camera_optical_joint" type="fixed">
+      <parent link="head_camera_link"/>
+      <child link="head_camera_optical_frame"/>
+      <origin xyz="0 0 0" rpy="-${pi / 2} 0 -${pi / 2}"/>
+    </joint>
+
+    <xacro:if value="${enabled}">
+      <gazebo reference="head_camera_link">
+        <sensor name="head_handeye_camera" type="camera">
+          <always_on>true</always_on>
+          <update_rate>20</update_rate>
+          <visualize>true</visualize>
+          <topic>/camera_head/color/image_raw</topic>
+          <frame_id>head_camera_optical_frame</frame_id>
+          <camera name="head_handeye_camera">
+            <camera_info_topic>/camera_head/camera_info</camera_info_topic>
+            <optical_frame_id>head_camera_optical_frame</optical_frame_id>
+            <horizontal_fov>1.0471975512</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>480</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.05</near>
+              <far>5.0</far>
+            </clip>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>0.0005</stddev>
+            </noise>
+          </camera>
+        </sensor>
+      </gazebo>
+    </xacro:if>
+  </xacro:macro>
+
+  <!-- Calibration target is visual-only and fixed to the left TCP.  It is
+       named *_truth so the detector can publish handeye_target independently. -->
+  <xacro:macro name="left_handeye_target" params="enabled">
+    <xacro:if value="${enabled}">
+      <link name="handeye_target_truth">
+        <!-- The board's local normal is +X. The generated macro uses colored
+             box geometry instead of a texture for headless OGRE compatibility. -->
+        <xacro:handeye_target_pattern/>
+      </link>
+      <joint name="handeye_target_mount_joint" type="fixed">
+        <parent link="left_gripper_tcp"/>
+        <child link="handeye_target_truth"/>
+        <!-- Simulated bracket keeps the board clear of the forearm silhouette. -->
+        <origin xyz="0.25 0.15 0" rpy="0 0 0"/>
+      </joint>
+    </xacro:if>
+  </xacro:macro>
+</robot>
