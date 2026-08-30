@@ -67,11 +67,17 @@ def generate_launch_description():
     controllers_yaml = os.path.join(
         pkg_share_moveit, 'config', 'ros2_controllers.yaml')
     initial_positions_file = LaunchConfiguration('initial_positions_file')
+    use_head_camera = LaunchConfiguration('use_head_camera')
+    hide_head_pitch_visual = LaunchConfiguration('hide_head_pitch_visual')
+    handeye_target_enabled = LaunchConfiguration('handeye_target_enabled')
     robot_description = ParameterValue(
         Command([
             FindExecutable(name='xacro'), ' ', robot_xacro,
             ' use_gazebo:=true use_fake_hardware:=false initial_positions_file:=',
             initial_positions_file,
+            ' use_head_camera:=', use_head_camera,
+            ' hide_head_pitch_visual:=', hide_head_pitch_visual,
+            ' handeye_target_enabled:=', handeye_target_enabled,
         ]),
         value_type=str,
     )
@@ -155,6 +161,21 @@ def generate_launch_description():
         name='use_camera',
         default_value='false',
         description='Flag to enable the RGBD camera for Gazebo point cloud simulation')
+
+    declare_use_head_camera_cmd = DeclareLaunchArgument(
+        name='use_head_camera',
+        default_value='false',
+        description='Enable the head RGB camera used by hand-eye calibration')
+
+    declare_hide_head_pitch_visual_cmd = DeclareLaunchArgument(
+        name='hide_head_pitch_visual',
+        default_value='false',
+        description='Hide only the rendered head_pitch_link mesh')
+
+    declare_handeye_target_enabled_cmd = DeclareLaunchArgument(
+        name='handeye_target_enabled',
+        default_value='false',
+        description='Attach the simulated ArUco target to left_gripper_tcp')
 
     declare_use_gazebo_cmd = DeclareLaunchArgument(
         name='use_gazebo',
@@ -349,6 +370,9 @@ def generate_launch_description():
     ld.add_action(declare_jsp_gui_cmd)
     ld.add_action(declare_load_controllers_cmd)
     ld.add_action(declare_use_camera_cmd)
+    ld.add_action(declare_use_head_camera_cmd)
+    ld.add_action(declare_hide_head_pitch_visual_cmd)
+    ld.add_action(declare_handeye_target_enabled_cmd)
     ld.add_action(declare_use_gazebo_cmd)
     ld.add_action(declare_use_rviz_cmd)
     ld.add_action(declare_use_robot_state_pub_cmd)

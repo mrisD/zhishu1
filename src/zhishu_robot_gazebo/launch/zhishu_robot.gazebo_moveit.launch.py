@@ -17,6 +17,10 @@ def generate_launch_description():
     headless = LaunchConfiguration("headless")
     use_rviz = LaunchConfiguration("use_rviz")
     world_file = LaunchConfiguration("world_file")
+    use_camera = LaunchConfiguration("use_camera")
+    use_head_camera = LaunchConfiguration("use_head_camera")
+    hide_head_pitch_visual = LaunchConfiguration("hide_head_pitch_visual")
+    handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
 
     gazebo_share = FindPackageShare("zhishu_robot_gazebo").find(
         "zhishu_robot_gazebo"
@@ -45,6 +49,10 @@ def generate_launch_description():
             "use_gazebo": "true",
             "use_robot_state_pub": "true",
             "use_sim_time": "true",
+            "use_camera": use_camera,
+            "use_head_camera": use_head_camera,
+            "hide_head_pitch_visual": hide_head_pitch_visual,
+            "handeye_target_enabled": handeye_target_enabled,
         }.items(),
     )
 
@@ -101,6 +109,26 @@ def generate_launch_description():
                 "world_file",
                 default_value="pick_and_place_demo.world",
                 description="Gazebo world file",
+            ),
+            DeclareLaunchArgument(
+                "use_camera",
+                default_value="false",
+                description="Start the legacy RGBD image bridge",
+            ),
+            DeclareLaunchArgument(
+                "use_head_camera",
+                default_value="false",
+                description="Enable the simulated head RGB camera",
+            ),
+            DeclareLaunchArgument(
+                "hide_head_pitch_visual",
+                default_value="false",
+                description="Hide head_pitch_link visual geometry only",
+            ),
+            DeclareLaunchArgument(
+                "handeye_target_enabled",
+                default_value="false",
+                description="Attach the hand-eye target to the left TCP",
             ),
             gazebo,
             start_visualization,
