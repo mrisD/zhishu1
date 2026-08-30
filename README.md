@@ -309,7 +309,9 @@ enable_kernel_ethercat_log:=false
 ### 7.5 Commander C++ SDK
 
 `zhishu_robot_commander_cpp` 提供 MoveIt 2 C++ SDK 和 ROS 2 话题桥接节点，支持
-左右臂、双臂以及两个夹爪。先启动真机或假硬件 bringup，再启动 Commander：
+左右臂、双臂以及两个夹爪。SDK 0.2 增加结构化错误、同步/异步调用、任务等待、
+状态查询和软件取消，并保持原 `Commander` 布尔接口兼容。先启动真机或假硬件
+bringup，再启动 Commander：
 
 ```bash
 ros2 launch zhishu_robot_commander_cpp commander.launch.py \
@@ -331,6 +333,81 @@ ros2 topic pub --once /zhishu_robot_commander/both_arms/named_target \
 
 Commander 不会自行启动控制器，启动参数必须和已经运行的 bringup 保持一致。
 完整接口和 C++ 示例见 `src/zhishu_robot_commander_cpp/README.md`。
+仅编译和单元测试可运行 `bash scripts/test_commander_sdk_build.sh`，该脚本不会发送运动命令。
+
+### 7.6 MCP C++ 读写接口
+
+`zhishu_robot_mcp` 使用 `ament_cmake + rclcpp + cxxmcp` 提供本地 stdio MCP
+Server。它可以读取 ROS 节点、话题、控制器、关节、EtherCAT 和日志状态，也可以在
+显式解锁后通过 MoveIt 控制机械臂和夹爪，或调用固定的故障复位与电机使能服务。
+
+编译：
+
+```bash
+colcon build --symlink-install --packages-up-to zhishu_robot_mcp
+source install/setup.bash
+```
+
+默认只读启动：
+
+```bash
+export ZHISHU_MCP_WORKSPACE=/home/pi/Documents/zhul/guohua_ws
+ros2 run zhishu_robot_mcp zhishu_robot_mcp_server
+```
+
+仿真写接口需要设置：
+
+```bash
+export ZHISHU_MCP_ENABLE_WRITES=1
+export ZHISHU_MCP_ROBOT_MODE=simulation
+```
+
+真机写接口还需要额外设置 `ZHISHU_MCP_ALLOW_PHYSICAL=1`。写接口默认关闭、固定
+白名单并有限流；机械臂运动异步执行，`stop_motion` 不能代替实体急停。完整工具、
+确认短语和 MCP 客户端进程配置见 `src/zhishu_robot_mcp/README.md`。
+
+### 7.7 独立 REST API
+
+`zhishu_robot_rest_api` 是与 MCP 完全独立的 `ament_cmake + rclcpp` 包，使用
+`cpp-httplib` 提供版本化 HTTP JSON 接口，并通过现有 Commander SDK/MoveIt 控制
+机械臂。默认只监听 `127.0.0.1:8088` 且只读。
+
+```bash
+colcon build --symlink-install --packages-up-to zhishu_robot_rest_api
+source install/setup.bash
+export ZHISHU_REST_WORKSPACE=/home/pi/Documents/zhul/guohua_ws
+ros2 run zhishu_robot_rest_api zhishu_robot_rest_api_server
+```
+
+运行后可以访问：
+
+```text
+GET http://127.0.0.1:8088/api/v1/health
+GET http://127.0.0.1:8088/api/v1/openapi.json
+GET http://127.0.0.1:8088/api/v1/robot/status
+```
+
+写接口必须配置 `ZHISHU_REST_ENABLE_WRITES=1` 和 Bearer Token；真机还需要
+`ZHISHU_REST_ROBOT_MODE=physical` 与 `ZHISHU_REST_ALLOW_PHYSICAL=1`。非回环监听
+需要单独设置 `ZHISHU_REST_ALLOW_REMOTE=1`，并应通过 HTTPS 反向代理或可信 VPN
+访问。完整路由、环境变量和 `curl` 示例见 `src/zhishu_robot_rest_api/README.md`。
+
+### 7.8 LES 收货流程 Gazebo 仿真
+
+`zhishu_robot_receiving_sim` 按照 LES 收货流程图串联 LES Mock、扫码 Mock、Gazebo
+差速 AGV 和现有 Commander/MoveIt。默认会故意产生一次零件箱错码，反馈 LES 后
+重新匹配，再完成放箱和 AGV 返回；真实 LES、真实扫码和夹持接触物理均保留为明确
+可替换边界。
+
+```bash
+colcon build --symlink-install --packages-up-to zhishu_robot_receiving_sim
+source install/setup.bash
+ros2 launch zhishu_robot_receiving_sim receiving_demo.launch.py
+```
+
+流程状态可通过 `/receiving_sim/state` 和 `/receiving_sim/events` 查看。完整仿真范围、
+手动启动、故障注入参数及限制见 `src/zhishu_robot_receiving_sim/README.md`。完成编译后
+也可以运行 `bash scripts/test_receiving_workflow_sim.sh` 做一键黑盒验收。
 
 ## 8. Meta Quest 3S 双臂遥操作
 
