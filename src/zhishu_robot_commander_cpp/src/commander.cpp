@@ -2,6 +2,7 @@
 
 #include <moveit_msgs/msg/robot_trajectory.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <map>
 #include <stdexcept>
@@ -24,6 +25,69 @@ bool succeeded(const moveit::core::MoveItErrorCode & code)
 {
   return code == moveit::core::MoveItErrorCode::SUCCESS;
 }
+
+Result moveItFailure(
+  const moveit::core::MoveItErrorCode & code,
+  ErrorCode fallback,
+  const std::string & message)
+{
+  auto sdk_code = fallback;
+  if (code.val == moveit::core::MoveItErrorCode::TIMED_OUT) {
+    sdk_code = ErrorCode::kTimeout;
+  } else if (code.val == moveit::core::MoveItErrorCode::PREEMPTED) {
+    sdk_code = ErrorCode::kCancelled;
+  }
+  auto detail = message + " (MoveIt code " + std::to_string(code.val) + ")";
+  if (!code.message.empty()) {
+    detail += ": " + code.message;
+  }
+  return Result::failure(sdk_code, std::move(detail), code.val);
+}
+
+void validateOptions(const Commander::Options & options)
+{
+  const std::vector<std::string> required_names{
+    options.left_arm_group,
+    options.right_arm_group,
+    options.both_arms_group,
+    options.left_gripper_group,
+    options.right_gripper_group,
+    options.both_grippers_group,
+    options.left_end_effector_link,
+    options.right_end_effector_link,
+  };
+  if (std::any_of(required_names.begin(), required_names.end(), [](const auto & value) {
+      return value.empty();
+    }))
+  {
+    throw std::invalid_argument("Commander group and end-effector names must not be empty");
+  }
+
+  const std::vector<double> numeric_options{
+    options.velocity_scaling,
+    options.acceleration_scaling,
+    options.planning_time,
+    options.cartesian_eef_step,
+    options.minimum_cartesian_fraction,
+  };
+  if (!std::all_of(numeric_options.begin(), numeric_options.end(), [](double value) {
+      return std::isfinite(value);
+    }))
+  {
+    throw std::invalid_argument("Commander numeric options must be finite");
+  }
+  if (options.velocity_scaling <= 0.0 || options.velocity_scaling > 1.0 ||
+    options.acceleration_scaling <= 0.0 || options.acceleration_scaling > 1.0)
+  {
+    throw std::invalid_argument("Commander velocity and acceleration scaling must be in (0, 1]");
+  }
+  if (options.planning_time <= 0.0 || options.planning_attempts < 1 ||
+    options.cartesian_eef_step <= 0.0 || options.minimum_cartesian_fraction <= 0.0 ||
+    options.minimum_cartesian_fraction > 1.0)
+  {
+    throw std::invalid_argument("Commander planning options are outside their valid ranges");
+  }
+}
 }  // namespace
 
 Commander::Commander(const rclcpp::Node::SharedPtr & node)
@@ -37,6 +101,7 @@ Commander::Commander(const rclcpp::Node::SharedPtr & node, const Options & optio
   if (!node_) {
     throw std::invalid_argument("Commander requires a valid rclcpp node");
   }
+  validateOptions(options_);
 
   left_arm_ = std::make_unique<MoveGroupInterface>(node_, options_.left_arm_group);
   right_arm_ = std::make_unique<MoveGroupInterface>(node_, options_.right_arm_group);
@@ -72,38 +137,32 @@ void Commander::configureMoveGroup(MoveGroupInterface & group)
 
 bool Commander::moveLeftArmNamed(const std::string & target_name)
 {
-  std::lock_guard<std::mutex> lock(command_mutex_);
-  return moveNamed(*left_arm_, target_name);
+  return moveLeftArmNamedResult(target_name).ok();
 }
 
 bool Commander::moveRightArmNamed(const std::string & target_name)
 {
-  std::lock_guard<std::mutex> lock(command_mutex_);
-  return moveNamed(*right_arm_, target_name);
+  return moveRightArmNamedResult(target_name).ok();
 }
 
 bool Commander::moveBothArmsNamed(const std::string & target_name)
 {
-  std::lock_guard<std::mutex> lock(command_mutex_);
-  return moveNamed(*both_arms_, target_name);
+  return moveBothArmsNamedResult(target_name).ok();
 }
 
 bool Commander::moveLeftArmJoints(const std::vector<double> & joints)
 {
-  std::lock_guard<std::mutex> lock(command_mutex_);
-  return moveJoints(*left_arm_, joints, kSingleArmJointCount, "left arm");
+  return moveLeftArmJointsResult(joints).ok();
 }
 
 bool Commander::moveRightArmJoints(const std::vector<double> & joints)
 {
-  std::lock_guard<std::mutex> lock(command_mutex_);
-  return moveJoints(*right_arm_, joints, kSingleArmJointCount, "right arm");
+  return moveRightArmJointsResult(joints).ok();
 }
 
 bool Commander::moveBothArmsJoints(const std::vector<double> & joints)
 {
-  std::lock_guard<std::mutex> lock(command_mutex_);
-  return moveJoints(*both_arms_, joints, kDualArmJointCount, "both arms");
+  return moveBothArmsJointsResult(joints).ok();
 }
 
 bool Commander::moveLeftArmPose(
@@ -111,9 +170,7 @@ bool Commander::moveLeftArmPose(
   bool cartesian,
   const std::string & end_effector_link)
 {
-  std::lock_guard<std::mutex> lock(command_mutex_);
-  const auto & link = end_effector_link.empty() ? options_.left_end_effector_link : end_effector_link;
-  return movePose(*left_arm_, target, cartesian, link, "left arm");
+  return moveLeftArmPoseResult(target, cartesian, end_effector_link).ok();
 }
 
 bool Commander::moveRightArmPose(
@@ -121,9 +178,7 @@ bool Commander::moveRightArmPose(
   bool cartesian,
   const std::string & end_effector_link)
 {
-  std::lock_guard<std::mutex> lock(command_mutex_);
-  const auto & link = end_effector_link.empty() ? options_.right_end_effector_link : end_effector_link;
-  return movePose(*right_arm_, target, cartesian, link, "right arm");
+  return moveRightArmPoseResult(target, cartesian, end_effector_link).ok();
 }
 
 bool Commander::moveBothArmsPoses(
@@ -132,7 +187,125 @@ bool Commander::moveBothArmsPoses(
   const std::string & left_end_effector_link,
   const std::string & right_end_effector_link)
 {
+  return moveBothArmsPosesResult(
+    left_target, right_target, left_end_effector_link, right_end_effector_link).ok();
+}
+
+bool Commander::moveLeftGripper(double position)
+{
+  return moveLeftGripperResult(position).ok();
+}
+
+bool Commander::moveRightGripper(double position)
+{
+  return moveRightGripperResult(position).ok();
+}
+
+bool Commander::moveBothGrippers(double left_position, double right_position)
+{
+  return moveBothGrippersResult(left_position, right_position).ok();
+}
+
+bool Commander::openLeftGripper()
+{
+  return openLeftGripperResult().ok();
+}
+
+bool Commander::closeLeftGripper()
+{
+  return closeLeftGripperResult().ok();
+}
+
+bool Commander::openRightGripper()
+{
+  return openRightGripperResult().ok();
+}
+
+bool Commander::closeRightGripper()
+{
+  return closeRightGripperResult().ok();
+}
+
+bool Commander::openBothGrippers()
+{
+  return openBothGrippersResult().ok();
+}
+
+bool Commander::closeBothGrippers()
+{
+  return closeBothGrippersResult().ok();
+}
+
+Result Commander::moveLeftArmNamedResult(const std::string & target_name)
+{
   std::lock_guard<std::mutex> lock(command_mutex_);
+  return moveNamed(*left_arm_, target_name);
+}
+
+Result Commander::moveRightArmNamedResult(const std::string & target_name)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return moveNamed(*right_arm_, target_name);
+}
+
+Result Commander::moveBothArmsNamedResult(const std::string & target_name)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return moveNamed(*both_arms_, target_name);
+}
+
+Result Commander::moveLeftArmJointsResult(const std::vector<double> & joints)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return moveJoints(*left_arm_, joints, kSingleArmJointCount, "left arm");
+}
+
+Result Commander::moveRightArmJointsResult(const std::vector<double> & joints)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return moveJoints(*right_arm_, joints, kSingleArmJointCount, "right arm");
+}
+
+Result Commander::moveBothArmsJointsResult(const std::vector<double> & joints)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return moveJoints(*both_arms_, joints, kDualArmJointCount, "both arms");
+}
+
+Result Commander::moveLeftArmPoseResult(
+  const geometry_msgs::msg::PoseStamped & target,
+  bool cartesian,
+  const std::string & end_effector_link)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  const auto & link = end_effector_link.empty() ?
+    options_.left_end_effector_link : end_effector_link;
+  return movePose(*left_arm_, target, cartesian, link, "left arm");
+}
+
+Result Commander::moveRightArmPoseResult(
+  const geometry_msgs::msg::PoseStamped & target,
+  bool cartesian,
+  const std::string & end_effector_link)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  const auto & link = end_effector_link.empty() ?
+    options_.right_end_effector_link : end_effector_link;
+  return movePose(*right_arm_, target, cartesian, link, "right arm");
+}
+
+Result Commander::moveBothArmsPosesResult(
+  const geometry_msgs::msg::PoseStamped & left_target,
+  const geometry_msgs::msg::PoseStamped & right_target,
+  const std::string & left_end_effector_link,
+  const std::string & right_end_effector_link)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  if (!isFinitePose(left_target) || !isFinitePose(right_target)) {
+    RCLCPP_ERROR(node_->get_logger(), "Dual-arm pose target contains NaN or infinity");
+    return Result::failure(
+      ErrorCode::kInvalidArgument, "dual-arm pose target contains NaN or infinity");
+  }
   const auto left_link = left_end_effector_link.empty() ?
     options_.left_end_effector_link : left_end_effector_link;
   const auto right_link = right_end_effector_link.empty() ?
@@ -145,52 +318,58 @@ bool Commander::moveBothArmsPoses(
   {
     RCLCPP_ERROR(node_->get_logger(), "Rejected one or both dual-arm pose targets");
     both_arms_->clearPoseTargets();
-    return false;
+    return Result::failure(
+      ErrorCode::kTargetRejected, "one or both dual-arm pose targets were rejected");
   }
-  const bool result = planAndExecute(*both_arms_, "both-arm pose target");
+  const auto result = planAndExecute(*both_arms_, "both-arm pose target");
   both_arms_->clearPoseTargets();
   return result;
 }
 
-bool Commander::moveLeftGripper(double position)
+Result Commander::moveLeftGripperResult(double position)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
-  if (!validGripperPosition(position, "left gripper")) {
-    return false;
+  const auto validation = validateGripperPosition(position, "left gripper");
+  if (!validation) {
+    return validation;
   }
   left_gripper_->setStartStateToCurrentState();
   if (!left_gripper_->setJointValueTarget(
       std::map<std::string, double>{{kLeftGripperJoint, position}}))
   {
     RCLCPP_ERROR(node_->get_logger(), "Rejected left gripper target %.4f", position);
-    return false;
+    return Result::failure(ErrorCode::kTargetRejected, "left gripper target was rejected");
   }
   return planAndExecute(*left_gripper_, "left gripper");
 }
 
-bool Commander::moveRightGripper(double position)
+Result Commander::moveRightGripperResult(double position)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
-  if (!validGripperPosition(position, "right gripper")) {
-    return false;
+  const auto validation = validateGripperPosition(position, "right gripper");
+  if (!validation) {
+    return validation;
   }
   right_gripper_->setStartStateToCurrentState();
   if (!right_gripper_->setJointValueTarget(
       std::map<std::string, double>{{kRightGripperJoint, position}}))
   {
     RCLCPP_ERROR(node_->get_logger(), "Rejected right gripper target %.4f", position);
-    return false;
+    return Result::failure(ErrorCode::kTargetRejected, "right gripper target was rejected");
   }
   return planAndExecute(*right_gripper_, "right gripper");
 }
 
-bool Commander::moveBothGrippers(double left_position, double right_position)
+Result Commander::moveBothGrippersResult(double left_position, double right_position)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
-  if (!validGripperPosition(left_position, "left gripper") ||
-    !validGripperPosition(right_position, "right gripper"))
-  {
-    return false;
+  const auto left_validation = validateGripperPosition(left_position, "left gripper");
+  if (!left_validation) {
+    return left_validation;
+  }
+  const auto right_validation = validateGripperPosition(right_position, "right gripper");
+  if (!right_validation) {
+    return right_validation;
   }
 
   both_grippers_->setStartStateToCurrentState();
@@ -200,39 +379,39 @@ bool Commander::moveBothGrippers(double left_position, double right_position)
   };
   if (!both_grippers_->setJointValueTarget(targets)) {
     RCLCPP_ERROR(node_->get_logger(), "Rejected dual-gripper target");
-    return false;
+    return Result::failure(ErrorCode::kTargetRejected, "dual-gripper target was rejected");
   }
   return planAndExecute(*both_grippers_, "both grippers");
 }
 
-bool Commander::openLeftGripper()
+Result Commander::openLeftGripperResult()
 {
-  return moveLeftGripper(kGripperMinimum);
+  return moveLeftGripperResult(kGripperMinimum);
 }
 
-bool Commander::closeLeftGripper()
+Result Commander::closeLeftGripperResult()
 {
-  return moveLeftGripper(kGripperMaximum);
+  return moveLeftGripperResult(kGripperMaximum);
 }
 
-bool Commander::openRightGripper()
+Result Commander::openRightGripperResult()
 {
-  return moveRightGripper(kGripperMinimum);
+  return moveRightGripperResult(kGripperMinimum);
 }
 
-bool Commander::closeRightGripper()
+Result Commander::closeRightGripperResult()
 {
-  return moveRightGripper(kGripperMaximum);
+  return moveRightGripperResult(kGripperMaximum);
 }
 
-bool Commander::openBothGrippers()
+Result Commander::openBothGrippersResult()
 {
-  return moveBothGrippers(kGripperMinimum, kGripperMinimum);
+  return moveBothGrippersResult(kGripperMinimum, kGripperMinimum);
 }
 
-bool Commander::closeBothGrippers()
+Result Commander::closeBothGrippersResult()
 {
-  return moveBothGrippers(kGripperMaximum, kGripperMaximum);
+  return moveBothGrippersResult(kGripperMaximum, kGripperMaximum);
 }
 
 std::vector<double> Commander::getLeftArmJoints() const
@@ -251,6 +430,24 @@ std::vector<double> Commander::getBothArmsJoints() const
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
   return both_arms_->getCurrentJointValues();
+}
+
+std::vector<double> Commander::getLeftGripperJoints() const
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return left_gripper_->getCurrentJointValues();
+}
+
+std::vector<double> Commander::getRightGripperJoints() const
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return right_gripper_->getCurrentJointValues();
+}
+
+std::vector<double> Commander::getBothGrippersJoints() const
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return both_grippers_->getCurrentJointValues();
 }
 
 geometry_msgs::msg::PoseStamped Commander::getLeftArmPose(const std::string & link) const
@@ -284,21 +481,22 @@ void Commander::clearTargets()
   both_arms_->clearPoseTargets();
 }
 
-bool Commander::moveNamed(MoveGroupInterface & group, const std::string & target_name)
+Result Commander::moveNamed(MoveGroupInterface & group, const std::string & target_name)
 {
   if (target_name.empty()) {
     RCLCPP_ERROR(node_->get_logger(), "Named target must not be empty");
-    return false;
+    return Result::failure(ErrorCode::kInvalidArgument, "named target must not be empty");
   }
   group.setStartStateToCurrentState();
   if (!group.setNamedTarget(target_name)) {
     RCLCPP_ERROR(node_->get_logger(), "Unknown named target: %s", target_name.c_str());
-    return false;
+    return Result::failure(
+      ErrorCode::kTargetRejected, "unknown named target: " + target_name);
   }
   return planAndExecute(group, target_name);
 }
 
-bool Commander::moveJoints(
+Result Commander::moveJoints(
   MoveGroupInterface & group,
   const std::vector<double> & joints,
   std::size_t expected_size,
@@ -308,7 +506,15 @@ bool Commander::moveJoints(
     RCLCPP_ERROR(
       node_->get_logger(), "%s requires %zu joints, received %zu",
       label.c_str(), expected_size, joints.size());
-    return false;
+    return Result::failure(
+      ErrorCode::kInvalidArgument,
+      label + " requires " + std::to_string(expected_size) + " joints, received " +
+      std::to_string(joints.size()));
+  }
+  if (!std::all_of(joints.begin(), joints.end(), [](double value) {return std::isfinite(value);})) {
+    RCLCPP_ERROR(node_->get_logger(), "%s joint target contains NaN or infinity", label.c_str());
+    return Result::failure(
+      ErrorCode::kInvalidArgument, label + " joint target contains NaN or infinity");
   }
   static const std::vector<std::string> left_joint_names{
     "left_shoulder_pitch_joint",
@@ -345,18 +551,24 @@ bool Commander::moveJoints(
   group.setStartStateToCurrentState();
   if (!group.setJointValueTarget(targets)) {
     RCLCPP_ERROR(node_->get_logger(), "Rejected %s joint target", label.c_str());
-    return false;
+    return Result::failure(
+      ErrorCode::kTargetRejected, label + " joint target was rejected");
   }
   return planAndExecute(group, label + " joint target");
 }
 
-bool Commander::movePose(
+Result Commander::movePose(
   MoveGroupInterface & group,
   const geometry_msgs::msg::PoseStamped & target,
   bool cartesian,
   const std::string & end_effector_link,
   const std::string & label)
 {
+  if (!isFinitePose(target)) {
+    RCLCPP_ERROR(node_->get_logger(), "%s pose target contains NaN or infinity", label.c_str());
+    return Result::failure(
+      ErrorCode::kInvalidArgument, label + " pose target contains NaN or infinity");
+  }
   group.setStartStateToCurrentState();
   group.clearPoseTargets();
   const auto normalized_target = normalizedPose(target);
@@ -366,9 +578,11 @@ bool Commander::movePose(
       RCLCPP_ERROR(
         node_->get_logger(), "Rejected pose target for %s using link '%s'",
         label.c_str(), end_effector_link.c_str());
-      return false;
+      group.clearPoseTargets();
+      return Result::failure(
+        ErrorCode::kTargetRejected, label + " pose target was rejected");
     }
-    const bool result = planAndExecute(group, label + " pose target");
+    const auto result = planAndExecute(group, label + " pose target");
     group.clearPoseTargets();
     return result;
   }
@@ -377,7 +591,8 @@ bool Commander::movePose(
     RCLCPP_ERROR(
       node_->get_logger(), "Invalid end-effector link '%s' for %s",
       end_effector_link.c_str(), label.c_str());
-    return false;
+    return Result::failure(
+      ErrorCode::kInvalidArgument, "invalid end-effector link: " + end_effector_link);
   }
 
   moveit_msgs::msg::RobotTrajectory trajectory;
@@ -391,49 +606,69 @@ bool Commander::movePose(
     RCLCPP_ERROR(
       node_->get_logger(), "%s Cartesian path fraction %.3f is below required %.3f",
       label.c_str(), fraction, options_.minimum_cartesian_fraction);
-    return false;
+    return Result::failure(
+      ErrorCode::kPlanningFailed,
+      label + " Cartesian path fraction " + std::to_string(fraction) +
+      " is below required " + std::to_string(options_.minimum_cartesian_fraction));
   }
 
   const auto result = group.execute(trajectory);
   if (!succeeded(result)) {
     RCLCPP_ERROR(node_->get_logger(), "%s Cartesian trajectory execution failed", label.c_str());
-    return false;
+    return moveItFailure(
+      result, ErrorCode::kExecutionFailed,
+      label + " Cartesian trajectory execution failed");
   }
 
   RCLCPP_INFO(
     node_->get_logger(), "%s Cartesian trajectory executed, fraction %.3f",
     label.c_str(), fraction);
-  return true;
+  return Result::success(label + " Cartesian trajectory completed");
 }
 
-bool Commander::planAndExecute(MoveGroupInterface & group, const std::string & label)
+Result Commander::planAndExecute(MoveGroupInterface & group, const std::string & label)
 {
   MoveGroupInterface::Plan plan;
   const auto planning_result = group.plan(plan);
   if (!succeeded(planning_result)) {
     RCLCPP_ERROR(node_->get_logger(), "Planning failed for %s", label.c_str());
-    return false;
+    return moveItFailure(
+      planning_result, ErrorCode::kPlanningFailed, "planning failed for " + label);
   }
 
   const auto execution_result = group.execute(plan);
   if (!succeeded(execution_result)) {
     RCLCPP_ERROR(node_->get_logger(), "Execution failed for %s", label.c_str());
-    return false;
+    return moveItFailure(
+      execution_result, ErrorCode::kExecutionFailed, "execution failed for " + label);
   }
 
   RCLCPP_INFO(node_->get_logger(), "Completed %s", label.c_str());
-  return true;
+  return Result::success("completed " + label);
 }
 
-bool Commander::validGripperPosition(double position, const std::string & label) const
+Result Commander::validateGripperPosition(double position, const std::string & label) const
 {
   if (!std::isfinite(position) || position < kGripperMinimum || position > kGripperMaximum) {
     RCLCPP_ERROR(
       node_->get_logger(), "%s position must be in [%.3f, %.3f] m, received %.4f",
       label.c_str(), kGripperMinimum, kGripperMaximum, position);
-    return false;
+    return Result::failure(
+      ErrorCode::kInvalidArgument,
+      label + " position must be in [" + std::to_string(kGripperMinimum) + ", " +
+      std::to_string(kGripperMaximum) + "] m");
   }
-  return true;
+  return Result::success();
+}
+
+bool Commander::isFinitePose(const geometry_msgs::msg::PoseStamped & pose)
+{
+  const auto & position = pose.pose.position;
+  const auto & orientation = pose.pose.orientation;
+  return std::isfinite(position.x) && std::isfinite(position.y) &&
+         std::isfinite(position.z) && std::isfinite(orientation.x) &&
+         std::isfinite(orientation.y) && std::isfinite(orientation.z) &&
+         std::isfinite(orientation.w);
 }
 
 geometry_msgs::msg::PoseStamped Commander::normalizedPose(

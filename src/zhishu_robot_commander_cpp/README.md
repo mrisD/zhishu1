@@ -15,7 +15,7 @@
 ## 编译与启动
 
 ```bash
-cd /home/zhul/online/guohua_ws
+cd /home/pi/Documents/zhul/guohua_ws
 source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install --packages-up-to zhishu_robot_commander_cpp
 source install/setup.bash
@@ -134,14 +134,88 @@ ros2 topic pub --once /zhishu_robot_commander/stop std_msgs/msg/Empty "{}"
 
 ## C++ SDK
 
+推荐新代码使用 `RobotSdk`。它提供结构化错误、同步/异步运动、单任务互斥、状态查询、
+等待和取消；原有 `Commander` 的 `bool` 接口继续保留，REST、MCP 和旧程序无需立即
+修改。
+
+### 同步调用
+
+```cpp
+#include <zhishu_robot_commander_cpp/sdk.hpp>
+
+// node 必须由 MultiThreadedExecutor 持续 spin。
+zhishu_robot_commander_cpp::RobotSdk robot(node);
+
+auto result = robot.moveNamed(
+  zhishu_robot_commander_cpp::ArmGroup::kBoth,
+  "both_arms_home");
+if (!result) {
+  RCLCPP_ERROR(
+    node->get_logger(), "motion failed [%s]: %s",
+    zhishu_robot_commander_cpp::toString(result.code),
+    result.message.c_str());
+}
+```
+
+`Result.code` 可以区分：
+
+- `kInvalidArgument`：参数数量、范围或数值无效；
+- `kTargetRejected`：MoveIt 不接受目标；
+- `kPlanningFailed`：规划失败；
+- `kExecutionFailed`：轨迹执行失败；
+- `kBusy`：已有同步或异步运动；
+- `kCancelled`、`kTimeout`：取消或等待超时；
+- `kNotReady`、`kInternalError`：状态未就绪或 SDK 内部异常。
+
+### 异步调用
+
+```cpp
+using namespace std::chrono_literals;
+
+auto motion = robot.moveNamedAsync(
+  zhishu_robot_commander_cpp::ArmGroup::kBoth,
+  "both_arms_crate_safe");
+
+auto result = motion.waitFor(20s);
+if (result.code == zhishu_robot_commander_cpp::ErrorCode::kTimeout) {
+  motion.cancel();
+  result = motion.wait();
+}
+
+const auto snapshot = motion.snapshot();
+RCLCPP_INFO(
+  node->get_logger(), "task=%lu operation=%s status=%s",
+  static_cast<unsigned long>(snapshot.id),
+  snapshot.operation.c_str(),
+  zhishu_robot_commander_cpp::toString(snapshot.status));
+```
+
+一个 `RobotSdk` 实例同一时刻只允许一个运动任务。忙碌时新的同步调用返回
+`kBusy`，新的异步调用返回一个已经结束且结果为 `kBusy` 的句柄。`cancel()` 调用
+MoveIt 软件停止，它不能代替实体急停、安全 PLC 或驱动器 STO。
+
+### 状态读取
+
+```cpp
+auto sdk_status = robot.status();
+auto robot_state = robot.readState();
+if (robot_state.result) {
+  const auto & left_joints = robot_state.left_arm_joints;
+  const auto & left_gripper = robot_state.left_gripper_joints;
+}
+```
+
+`RobotState` 一次返回左右臂关节、左右夹爪关节以及左右末端位姿。运动执行期间调用
+`readState()` 会等待当前 Commander 操作释放互斥锁，适合任务前后快照，不作为实时
+遥测接口使用。
+
+旧接口仍可使用：
+
 ```cpp
 #include <zhishu_robot_commander_cpp/commander.hpp>
 
-// node 必须由 MultiThreadedExecutor 持续 spin。
 zhishu_robot_commander_cpp::Commander commander(node);
 commander.moveBothArmsNamed("both_arms_home");
-commander.moveLeftArmJoints({0.0, -0.2, 0.0, 0.8, 0.0, 0.0, 0.0});
-commander.openBothGrippers();
 ```
 
 依赖本 SDK 的包需要添加：
@@ -153,6 +227,19 @@ ament_target_dependencies(your_target zhishu_robot_commander_cpp)
 
 ```xml
 <depend>zhishu_robot_commander_cpp</depend>
+```
+
+安装后的安全示例默认不运动；确认使用仿真或完成真机安全检查后再执行：
+
+```bash
+ros2 run zhishu_robot_commander_cpp sdk_example --ros-args \
+  -p execute_motion:=true
+```
+
+Ubuntu 24.04 / ROS 2 Jazzy 上的一键编译和单元测试（不会发送运动命令）：
+
+```bash
+bash scripts/test_commander_sdk_build.sh
 ```
 
 普通 MoveIt bringup 激活的是覆盖双臂 14 轴的 `dual_arm_controller`，不要同时

@@ -13,6 +13,7 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(moveit_msgs REQUIRED)
+find_package(Threads REQUIRED)
 
 set(CMAKE_WARN_DEPRECATED OFF)
 find_package(moveit_ros_planning_interface REQUIRED)
@@ -20,6 +21,9 @@ unset(CMAKE_WARN_DEPRECATED)
 
 add_library(${PROJECT_NAME} SHARED
   src/commander.cpp
+  src/motion_handle.cpp
+  src/result.cpp
+  src/robot_sdk.cpp
 )
 target_include_directories(${PROJECT_NAME}
   PUBLIC
@@ -32,6 +36,7 @@ ament_target_dependencies(${PROJECT_NAME}
   moveit_msgs
   moveit_ros_planning_interface
 )
+target_link_libraries(${PROJECT_NAME} Threads::Threads)
 target_compile_definitions(${PROJECT_NAME} PRIVATE SILENCE_DEPRECATION_WARNINGS)
 
 add_executable(commander_node src/commander_node.cpp)
@@ -66,7 +71,16 @@ install(
   DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
-install(FILES README.md DESTINATION share/${PROJECT_NAME})
+install(FILES README.md CHANGELOG.rst DESTINATION share/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_sdk_types test/test_sdk_types.cpp)
+  if(TARGET test_sdk_types)
+    target_link_libraries(test_sdk_types ${PROJECT_NAME})
+  endif()
+endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_libraries(${PROJECT_NAME})

@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+#include "zhishu_robot_commander_cpp/result.hpp"
+
 namespace zhishu_robot_commander_cpp
 {
 
@@ -77,9 +79,46 @@ public:
   bool openBothGrippers();
   bool closeBothGrippers();
 
+  // Structured-result variants for SDK users. The bool methods above remain
+  // source-compatible wrappers around these methods.
+  Result moveLeftArmNamedResult(const std::string & target_name);
+  Result moveRightArmNamedResult(const std::string & target_name);
+  Result moveBothArmsNamedResult(const std::string & target_name);
+
+  Result moveLeftArmJointsResult(const std::vector<double> & joints);
+  Result moveRightArmJointsResult(const std::vector<double> & joints);
+  Result moveBothArmsJointsResult(const std::vector<double> & joints);
+
+  Result moveLeftArmPoseResult(
+    const geometry_msgs::msg::PoseStamped & target,
+    bool cartesian = false,
+    const std::string & end_effector_link = "");
+  Result moveRightArmPoseResult(
+    const geometry_msgs::msg::PoseStamped & target,
+    bool cartesian = false,
+    const std::string & end_effector_link = "");
+  Result moveBothArmsPosesResult(
+    const geometry_msgs::msg::PoseStamped & left_target,
+    const geometry_msgs::msg::PoseStamped & right_target,
+    const std::string & left_end_effector_link = "",
+    const std::string & right_end_effector_link = "");
+
+  Result moveLeftGripperResult(double position);
+  Result moveRightGripperResult(double position);
+  Result moveBothGrippersResult(double left_position, double right_position);
+  Result openLeftGripperResult();
+  Result closeLeftGripperResult();
+  Result openRightGripperResult();
+  Result closeRightGripperResult();
+  Result openBothGrippersResult();
+  Result closeBothGrippersResult();
+
   std::vector<double> getLeftArmJoints() const;
   std::vector<double> getRightArmJoints() const;
   std::vector<double> getBothArmsJoints() const;
+  std::vector<double> getLeftGripperJoints() const;
+  std::vector<double> getRightGripperJoints() const;
+  std::vector<double> getBothGrippersJoints() const;
   geometry_msgs::msg::PoseStamped getLeftArmPose(const std::string & link = "") const;
   geometry_msgs::msg::PoseStamped getRightArmPose(const std::string & link = "") const;
 
@@ -88,20 +127,21 @@ public:
 
 private:
   void configureMoveGroup(MoveGroupInterface & group);
-  bool moveNamed(MoveGroupInterface & group, const std::string & target_name);
-  bool moveJoints(
+  Result moveNamed(MoveGroupInterface & group, const std::string & target_name);
+  Result moveJoints(
     MoveGroupInterface & group,
     const std::vector<double> & joints,
     std::size_t expected_size,
     const std::string & label);
-  bool movePose(
+  Result movePose(
     MoveGroupInterface & group,
     const geometry_msgs::msg::PoseStamped & target,
     bool cartesian,
     const std::string & end_effector_link,
     const std::string & label);
-  bool planAndExecute(MoveGroupInterface & group, const std::string & label);
-  bool validGripperPosition(double position, const std::string & label) const;
+  Result planAndExecute(MoveGroupInterface & group, const std::string & label);
+  Result validateGripperPosition(double position, const std::string & label) const;
+  static bool isFinitePose(const geometry_msgs::msg::PoseStamped & pose);
   static geometry_msgs::msg::PoseStamped normalizedPose(
     const geometry_msgs::msg::PoseStamped & pose);
 
