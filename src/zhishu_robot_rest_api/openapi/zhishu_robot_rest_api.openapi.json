@@ -1,0 +1,250 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Zhishu Robot REST API",
+    "version": "0.1.0",
+    "description": "Independent guarded REST API for the Zhishu dual-arm ROS 2 robot. Write operations require a Bearer token, startup opt-in and exact confirmation text."
+  },
+  "servers": [
+    {"url": "http://127.0.0.1:8088", "description": "Default loopback server"}
+  ],
+  "tags": [
+    {"name": "System"},
+    {"name": "Diagnostics"},
+    {"name": "Logs"},
+    {"name": "Motion"},
+    {"name": "Recovery"}
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": ["System"],
+        "operationId": "getHealth",
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}}
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": ["System"],
+        "operationId": "getOpenApi",
+        "responses": {"200": {"description": "OpenAPI document"}}
+      }
+    },
+    "/api/v1/server": {
+      "get": {
+        "tags": ["System"],
+        "operationId": "getServerInfo",
+        "security": [{"BearerAuth": []}, {}],
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}, "401": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/robot/status": {
+      "get": {
+        "tags": ["Diagnostics"],
+        "operationId": "getRobotStatus",
+        "security": [{"BearerAuth": []}, {}],
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}, "401": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/ethercat/status": {
+      "get": {
+        "tags": ["Diagnostics"],
+        "operationId": "getEthercatStatus",
+        "security": [{"BearerAuth": []}, {}],
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}, "503": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/ros/nodes": {
+      "get": {
+        "tags": ["Diagnostics"],
+        "operationId": "listRosNodes",
+        "security": [{"BearerAuth": []}, {}],
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}}
+      }
+    },
+    "/api/v1/ros/topics": {
+      "get": {
+        "tags": ["Diagnostics"],
+        "operationId": "listRosTopics",
+        "security": [{"BearerAuth": []}, {}],
+        "parameters": [
+          {"name": "filter", "in": "query", "schema": {"type": "string", "default": ""}},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 500, "default": 200}}
+        ],
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}, "400": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/logs": {
+      "get": {
+        "tags": ["Logs"],
+        "operationId": "listRecentLogs",
+        "security": [{"BearerAuth": []}, {}],
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50}}
+        ],
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}}
+      }
+    },
+    "/api/v1/logs/read": {
+      "post": {
+        "tags": ["Logs"],
+        "operationId": "readLogTail",
+        "security": [{"BearerAuth": []}, {}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LogReadRequest"}}}
+        },
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}, "400": {"$ref": "#/components/responses/ErrorResponse"}, "403": {"$ref": "#/components/responses/ErrorResponse"}, "404": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/motions/current": {
+      "get": {
+        "tags": ["Motion"],
+        "operationId": "getCurrentMotion",
+        "security": [{"BearerAuth": []}, {}],
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}}
+      }
+    },
+    "/api/v1/motions/named": {
+      "post": {
+        "tags": ["Motion"],
+        "operationId": "moveNamedTarget",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NamedMotionRequest"}}}},
+        "responses": {"202": {"$ref": "#/components/responses/JsonResponse"}, "400": {"$ref": "#/components/responses/ErrorResponse"}, "401": {"$ref": "#/components/responses/ErrorResponse"}, "403": {"$ref": "#/components/responses/ErrorResponse"}, "409": {"$ref": "#/components/responses/ErrorResponse"}, "429": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/motions/joints": {
+      "post": {
+        "tags": ["Motion"],
+        "operationId": "moveJointTarget",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JointMotionRequest"}}}},
+        "responses": {"202": {"$ref": "#/components/responses/JsonResponse"}, "400": {"$ref": "#/components/responses/ErrorResponse"}, "401": {"$ref": "#/components/responses/ErrorResponse"}, "403": {"$ref": "#/components/responses/ErrorResponse"}, "409": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/grippers": {
+      "post": {
+        "tags": ["Motion"],
+        "operationId": "setGripper",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GripperRequest"}}}},
+        "responses": {"202": {"$ref": "#/components/responses/JsonResponse"}, "400": {"$ref": "#/components/responses/ErrorResponse"}, "401": {"$ref": "#/components/responses/ErrorResponse"}, "403": {"$ref": "#/components/responses/ErrorResponse"}, "409": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/motions/stop": {
+      "post": {
+        "tags": ["Motion"],
+        "operationId": "stopMotion",
+        "security": [{"BearerAuth": []}],
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}, "401": {"$ref": "#/components/responses/ErrorResponse"}, "403": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/faults/reset": {
+      "post": {
+        "tags": ["Recovery"],
+        "operationId": "resetFault",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FaultResetRequest"}}}},
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}, "400": {"$ref": "#/components/responses/ErrorResponse"}, "401": {"$ref": "#/components/responses/ErrorResponse"}, "403": {"$ref": "#/components/responses/ErrorResponse"}, "503": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    },
+    "/api/v1/motors/enabled": {
+      "put": {
+        "tags": ["Recovery"],
+        "operationId": "setMotorsEnabled",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MotorEnableRequest"}}}},
+        "responses": {"200": {"$ref": "#/components/responses/JsonResponse"}, "400": {"$ref": "#/components/responses/ErrorResponse"}, "401": {"$ref": "#/components/responses/ErrorResponse"}, "403": {"$ref": "#/components/responses/ErrorResponse"}, "503": {"$ref": "#/components/responses/ErrorResponse"}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "opaque"}
+    },
+    "responses": {
+      "JsonResponse": {
+        "description": "Successful response envelope",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope"}}}
+      },
+      "ErrorResponse": {
+        "description": "Error response envelope",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope"}}}
+      }
+    },
+    "schemas": {
+      "Envelope": {
+        "type": "object",
+        "required": ["ok", "code", "message", "data", "request_id", "timestamp"],
+        "properties": {
+          "ok": {"type": "boolean"},
+          "code": {"type": "string"},
+          "message": {"type": "string"},
+          "data": {},
+          "request_id": {"type": "string"},
+          "timestamp": {"type": "string", "format": "date-time"}
+        }
+      },
+      "LogReadRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["root", "path"],
+        "properties": {
+          "root": {"type": "string", "enum": ["robot", "stability"]},
+          "path": {"type": "string", "minLength": 1},
+          "tail_lines": {"type": "integer", "minimum": 1, "maximum": 2000, "default": 200}
+        }
+      },
+      "NamedMotionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["group", "target", "confirmation"],
+        "properties": {
+          "group": {"type": "string", "enum": ["left_arm", "right_arm", "both_arms"]},
+          "target": {"type": "string", "minLength": 1},
+          "confirmation": {"type": "string", "const": "MOVE ROBOT"}
+        }
+      },
+      "JointMotionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["group", "positions", "confirmation"],
+        "properties": {
+          "group": {"type": "string", "enum": ["left_arm", "right_arm", "both_arms"]},
+          "positions": {"type": "array", "items": {"type": "number"}, "minItems": 7, "maxItems": 14},
+          "confirmation": {"type": "string", "const": "MOVE ROBOT"}
+        }
+      },
+      "GripperRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["side", "position", "confirmation"],
+        "properties": {
+          "side": {"type": "string", "enum": ["left", "right", "both"]},
+          "position": {"type": "number", "minimum": 0.0, "maximum": 0.06},
+          "confirmation": {"type": "string", "const": "MOVE ROBOT"}
+        }
+      },
+      "FaultResetRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["arm", "confirmation"],
+        "properties": {
+          "arm": {"type": "string", "enum": ["left", "right", "both"]},
+          "confirmation": {"type": "string", "const": "RESET FAULT"}
+        }
+      },
+      "MotorEnableRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["arm", "enabled", "confirmation"],
+        "properties": {
+          "arm": {"type": "string", "enum": ["left", "right", "both"]},
+          "enabled": {"type": "boolean"},
+          "confirmation": {"type": "string", "enum": ["ENABLE MOTORS", "DISABLE MOTORS"]}
+        }
+      }
+    }
+  }
+}
