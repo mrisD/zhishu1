@@ -1,0 +1,21 @@
+handeye:
+  calibration_type: eye_to_hand
+  planning_group: left_arm
+  robot_base_frame: base_link
+  end_effector_frame: left_gripper_tcp
+  sensor_frame: head_camera_optical_frame
+  target_frame: handeye_target
+  target_truth_frame: handeye_target_truth
+  image_topic: /camera_head/color/image_raw
+  camera_info_topic: /camera_head/camera_info
+  head_lock:
+    head_yaw_joint: 0.0
+    head_pitch_joint: 0.0
+    tolerance: 0.002
+  aruco:
+    dictionary: DICT_5X5_250
+    markers_x: 3
+    markers_y: 4
+    marker_size: 0.06
+    marker_separation: 0.015
+    first_marker_id: 0

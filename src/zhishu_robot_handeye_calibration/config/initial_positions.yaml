@@ -1,0 +1,26 @@
+initial_positions:
+  gripper_left_finger_joint: 0.0
+  left_gripper_left_finger_joint: 0.0
+  # Start with the board already inside the head-camera calibration volume.
+  left_shoulder_pitch_joint: -2.270
+  left_shoulder_roll_joint: -0.296
+  left_shoulder_yaw_joint: 2.320
+  left_elbow_pitch_joint: 1.343
+  left_wrist_yaw_joint: 0.715
+  left_wrist_pitch_joint: 0.977
+  left_wrist_roll_joint: 0.663
+  right_shoulder_pitch_joint: 0.0
+  right_shoulder_roll_joint: 0.0
+  right_shoulder_yaw_joint: 0.0
+  right_elbow_pitch_joint: 0.001
+  right_wrist_pitch_joint: 0.0
+  right_wrist_roll_joint: 0.0
+  right_wrist_yaw_joint: 0.0
+  waist_up_down_joint: 0.0
+  waist_pitch_joint: 0.0
+  # Fixed calibration view toward the left arm. These must not change between
+  # samples or the Eye-to-Hand transform becomes invalid.
+  head_yaw_joint: 0.5
+  head_pitch_joint: 0.15
+  left_wheel_joint: 0.0
+  right_wheel_joint: 0.0
