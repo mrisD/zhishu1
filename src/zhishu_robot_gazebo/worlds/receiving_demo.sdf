@@ -1,0 +1,216 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="receiving_demo">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics">
+      <engine><filename>gz-physics-bullet-featherstone-plugin</filename></engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <gravity>0 0 -9.8</gravity>
+    <physics name="receiving_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <scene>
+      <ambient>0.55 0.55 0.55 1</ambient>
+      <background>0.92 0.94 0.98 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <light type="directional" name="sun">
+      <pose>0 0 10 0 0 0</pose>
+      <cast_shadows>true</cast_shadows>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.2 -0.9</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="ground">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>12 8</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>12 8</size></plane></geometry>
+          <material>
+            <ambient>0.58 0.60 0.62 1</ambient>
+            <diffuse>0.68 0.70 0.72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Blue inbound AGV. Positive cmd_vel.x drives it toward the robot. -->
+    <model name="receiving_agv">
+      <pose>2.4 0 0 0 0 3.14159265359</pose>
+      <link name="base_link">
+        <inertial>
+          <mass>35.0</mass>
+          <inertia>
+            <ixx>1.1</ixx><iyy>1.5</iyy><izz>2.0</izz>
+          </inertia>
+        </inertial>
+        <collision name="base_collision">
+          <pose>0 0 0.20 0 0 0</pose>
+          <geometry><box><size>0.72 0.54 0.18</size></box></geometry>
+        </collision>
+        <visual name="base_visual">
+          <pose>0 0 0.20 0 0 0</pose>
+          <geometry><box><size>0.72 0.54 0.18</size></box></geometry>
+          <material>
+            <ambient>0.04 0.25 0.70 1</ambient>
+            <diffuse>0.05 0.35 0.90 1</diffuse>
+          </material>
+        </visual>
+        <collision name="deck_collision">
+          <pose>0 0 0.325 0 0 0</pose>
+          <geometry><box><size>0.64 0.48 0.05</size></box></geometry>
+        </collision>
+        <visual name="deck_visual">
+          <pose>0 0 0.325 0 0 0</pose>
+          <geometry><box><size>0.64 0.48 0.05</size></box></geometry>
+          <material>
+            <ambient>0.15 0.18 0.22 1</ambient>
+            <diffuse>0.22 0.25 0.30 1</diffuse>
+          </material>
+        </visual>
+        <!-- The cyan basket is the material frame delivered by the AGV. -->
+        <collision name="basket_left_collision"><pose>0 0.225 0.49 0 0 0</pose><geometry><box><size>0.56 0.03 0.28</size></box></geometry></collision>
+        <collision name="basket_right_collision"><pose>0 -0.225 0.49 0 0 0</pose><geometry><box><size>0.56 0.03 0.28</size></box></geometry></collision>
+        <collision name="basket_front_collision"><pose>0.295 0 0.49 0 0 0</pose><geometry><box><size>0.03 0.48 0.28</size></box></geometry></collision>
+        <collision name="basket_rear_collision"><pose>-0.295 0 0.49 0 0 0</pose><geometry><box><size>0.03 0.48 0.28</size></box></geometry></collision>
+        <visual name="basket_left"><pose>0 0.225 0.49 0 0 0</pose><geometry><box><size>0.56 0.03 0.28</size></box></geometry><material><ambient>0.05 0.55 0.68 1</ambient><diffuse>0.08 0.75 0.88 1</diffuse></material></visual>
+        <visual name="basket_right"><pose>0 -0.225 0.49 0 0 0</pose><geometry><box><size>0.56 0.03 0.28</size></box></geometry><material><ambient>0.05 0.55 0.68 1</ambient><diffuse>0.08 0.75 0.88 1</diffuse></material></visual>
+        <visual name="basket_front"><pose>0.295 0 0.49 0 0 0</pose><geometry><box><size>0.03 0.48 0.28</size></box></geometry><material><ambient>0.05 0.55 0.68 1</ambient><diffuse>0.08 0.75 0.88 1</diffuse></material></visual>
+        <visual name="basket_rear"><pose>-0.295 0 0.49 0 0 0</pose><geometry><box><size>0.03 0.48 0.28</size></box></geometry><material><ambient>0.05 0.55 0.68 1</ambient><diffuse>0.08 0.75 0.88 1</diffuse></material></visual>
+      </link>
+
+      <link name="left_wheel">
+        <pose>0 0.31 0.10 -1.57079632679 0 0</pose>
+        <inertial>
+          <mass>2.0</mass>
+          <inertia><ixx>0.01</ixx><iyy>0.01</iyy><izz>0.01</izz></inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.10</radius><length>0.06</length></cylinder></geometry>
+          <surface><friction><ode><mu>1.2</mu><mu2>1.2</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.10</radius><length>0.06</length></cylinder></geometry>
+          <material><ambient>0.03 0.03 0.03 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
+        </visual>
+      </link>
+      <link name="right_wheel">
+        <pose>0 -0.31 0.10 -1.57079632679 0 0</pose>
+        <inertial>
+          <mass>2.0</mass>
+          <inertia><ixx>0.01</ixx><iyy>0.01</iyy><izz>0.01</izz></inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.10</radius><length>0.06</length></cylinder></geometry>
+          <surface><friction><ode><mu>1.2</mu><mu2>1.2</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.10</radius><length>0.06</length></cylinder></geometry>
+          <material><ambient>0.03 0.03 0.03 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
+        </visual>
+      </link>
+      <joint name="left_wheel_joint" type="revolute">
+        <pose relative_to="left_wheel"/>
+        <parent>base_link</parent><child>left_wheel</child>
+        <axis><xyz expressed_in="__model__">0 1 0</xyz></axis>
+      </joint>
+      <joint name="right_wheel_joint" type="revolute">
+        <pose relative_to="right_wheel"/>
+        <parent>base_link</parent><child>right_wheel</child>
+        <axis><xyz expressed_in="__model__">0 1 0</xyz></axis>
+      </joint>
+
+      <link name="front_caster">
+        <pose>0.27 0 0.075 0 0 0</pose>
+        <inertial><mass>0.5</mass><inertia><ixx>0.002</ixx><iyy>0.002</iyy><izz>0.002</izz></inertia></inertial>
+        <collision name="collision"><geometry><sphere><radius>0.075</radius></sphere></geometry></collision>
+        <visual name="visual"><geometry><sphere><radius>0.075</radius></sphere></geometry></visual>
+      </link>
+      <joint name="front_caster_joint" type="ball">
+        <parent>base_link</parent><child>front_caster</child>
+      </joint>
+      <link name="rear_caster">
+        <pose>-0.27 0 0.075 0 0 0</pose>
+        <inertial><mass>0.5</mass><inertia><ixx>0.002</ixx><iyy>0.002</iyy><izz>0.002</izz></inertia></inertial>
+        <collision name="collision"><geometry><sphere><radius>0.075</radius></sphere></geometry></collision>
+        <visual name="visual"><geometry><sphere><radius>0.075</radius></sphere></geometry></visual>
+      </link>
+      <joint name="rear_caster_joint" type="ball">
+        <parent>base_link</parent><child>rear_caster</child>
+      </joint>
+
+      <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+        <left_joint>left_wheel_joint</left_joint>
+        <right_joint>right_wheel_joint</right_joint>
+        <wheel_separation>0.62</wheel_separation>
+        <wheel_radius>0.10</wheel_radius>
+        <topic>/receiving_agv/cmd_vel</topic>
+        <odom_topic>/receiving_agv/odometry</odom_topic>
+        <tf_topic>/receiving_agv/tf</tf_topic>
+        <frame_id>receiving_agv/odom</frame_id>
+        <child_frame_id>receiving_agv/base_link</child_frame_id>
+        <odom_publish_frequency>30</odom_publish_frequency>
+      </plugin>
+    </model>
+
+    <!-- The part box starts on the source pallet. After the MoveIt placement
+         sequence it is teleported into the AGV basket, then rides back through
+         normal Gazebo contact physics. -->
+    <model name="received_part_box">
+      <pose>0.55 -0.85 0.24 0 0 0</pose>
+      <link name="box_link">
+        <inertial>
+          <mass>1.2</mass>
+          <inertia><ixx>0.012</ixx><iyy>0.018</iyy><izz>0.024</izz></inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.36 0.26 0.24</size></box></geometry>
+          <surface><friction><ode><mu>1.1</mu><mu2>1.1</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.36 0.26 0.24</size></box></geometry>
+          <material><ambient>0.70 0.38 0.08 1</ambient><diffuse>0.90 0.55 0.12 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Green workstation docking area in front of the robot. -->
+    <model name="workstation_slot">
+      <static>true</static>
+      <pose>0.92 0 0.006 0 0 0</pose>
+      <link name="slot">
+        <visual name="visual">
+          <geometry><box><size>0.90 0.85 0.012</size></box></geometry>
+          <material><ambient>0.05 0.55 0.18 1</ambient><diffuse>0.08 0.75 0.25 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Source pallet / stacking position for the incoming part box. -->
+    <model name="source_pallet">
+      <static>true</static>
+      <pose>0.55 -0.85 0 0 0 0</pose>
+      <link name="pallet">
+        <collision name="pallet_collision">
+          <pose>0 0 0.06 0 0 0</pose>
+          <geometry><box><size>0.62 0.52 0.12</size></box></geometry>
+        </collision>
+        <visual name="pallet_visual">
+          <pose>0 0 0.06 0 0 0</pose>
+          <geometry><box><size>0.62 0.52 0.12</size></box></geometry>
+          <material><ambient>0.38 0.20 0.06 1</ambient><diffuse>0.58 0.32 0.10 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

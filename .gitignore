@@ -7,3 +7,5 @@
 /zhishu_robot_logs/
 *.zip
 *.STL
+__pycache__/
+*.py[cod]
