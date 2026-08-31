@@ -3,7 +3,7 @@
 `zhishu_robot_mcp` 是智枢双臂机器人的 C++17 MCP Server。它通过 `rclcpp`
 读取 ROS 2 状态，并复用 `zhishu_robot_commander_cpp` 通过 MoveIt 规划运动。MCP
 协议层使用社区维护的 [`cxxmcp`](https://github.com/caomengxuan666/cxxmcp)，固定为
-`v1.2.8` 的确定性源码包并校验 SHA-256。
+随包提供的 `v1.2.8` SDK 源码。
 
 Server 使用本地 `stdio` 传输，不监听网络端口。标准输出只传输 MCP JSON-RPC，
 ROS 日志被强制写到标准错误。
@@ -49,8 +49,8 @@ ROS 日志被强制写到标准错误。
 
 ## 编译
 
-第一次编译如果系统尚未安装 `cxxmcp`，CMake 会从 GitHub 下载固定的 `v1.2.8`
-源码发布包：
+`cxxmcp v1.2.8` 的完整 SDK 源码和许可证已放在 `third_party/cxxmcp/` 中，
+首次构建和清理后重建均不需要访问 GitHub：
 
 ```bash
 cd /home/pi/Documents/zhul/guohua_ws
@@ -59,8 +59,7 @@ colcon build --symlink-install --packages-up-to zhishu_robot_mcp
 source install/setup.bash
 ```
 
-若机器需要离线编译，可提前从同一版本源码安装 `cxxmcp`，确保
-`find_package(cxxmcp CONFIG REQUIRED)` 可以找到它。
+依赖来源和发布归档校验值记录在 `third_party/README.md`。
 
 ## 启动模式
 

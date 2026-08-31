@@ -28,8 +28,8 @@ colcon build --symlink-install --packages-up-to zhishu_robot_rest_api
 source install/setup.bash
 ```
 
-如果系统没有对应 CMake 包，首次构建会下载固定版本的 `nlohmann/json v3.12.0`
-和 `cpp-httplib v0.54.0` 源码。
+`nlohmann/json v3.12.0` 和 `cpp-httplib v0.46.0` 的单头文件及许可证已随包放在
+`third_party/` 中。首次构建和清理后重建均不需要访问 GitHub。
 
 ## 启动
 

@@ -17,40 +17,23 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(zhishu_robot_commander_cpp REQUIRED)
 
-include(FetchContent)
+set(THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
-find_package(nlohmann_json 3.12.0 EXACT CONFIG QUIET)
-if(NOT TARGET nlohmann_json::nlohmann_json)
-  set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
-  set(JSON_Install OFF CACHE BOOL "" FORCE)
-  FetchContent_Declare(
-    nlohmann_json
-    URL https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz
-    URL_HASH SHA256=4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-  )
-  FetchContent_MakeAvailable(nlohmann_json)
-endif()
+# Keep these header-only dependencies in the source tree so clean and offline
+# builds never depend on GitHub availability.
+add_library(nlohmann_json_vendor INTERFACE)
+target_include_directories(
+  nlohmann_json_vendor SYSTEM INTERFACE
+  "${THIRD_PARTY_DIR}/nlohmann_json/include"
+)
+add_library(nlohmann_json::nlohmann_json ALIAS nlohmann_json_vendor)
 
-find_package(httplib 0.54.0 EXACT CONFIG QUIET)
-if(NOT TARGET httplib::httplib)
-  set(HTTPLIB_COMPILE OFF CACHE BOOL "" FORCE)
-  set(HTTPLIB_TEST OFF CACHE BOOL "" FORCE)
-  set(HTTPLIB_INSTALL OFF CACHE BOOL "" FORCE)
-  set(HTTPLIB_USE_OPENSSL_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
-  set(HTTPLIB_USE_ZLIB_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
-  set(HTTPLIB_USE_BROTLI_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
-  set(HTTPLIB_USE_ZSTD_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
-  FetchContent_Declare(
-    httplib
-    URL
-      https://github.com/yhirose/cpp-httplib/archive/9185fdb6ae4f7aaa3a78a3ec7289c606c7c5d951.tar.gz
-    URL_HASH
-      SHA256=583ee4190ae32d7b114f8ad40f04c3dfbfd46cf73ab3fcaf5ab2be478f309aad
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-  )
-  FetchContent_MakeAvailable(httplib)
-endif()
+add_library(cpp_httplib_vendor INTERFACE)
+target_include_directories(
+  cpp_httplib_vendor SYSTEM INTERFACE
+  "${THIRD_PARTY_DIR}/cpp_httplib/include"
+)
+add_library(httplib::httplib ALIAS cpp_httplib_vendor)
 
 add_library(${PROJECT_NAME}_core STATIC
   src/access_policy.cpp

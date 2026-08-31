@@ -1,0 +1,99 @@
+PROJECT_NAME           = "cxxmcp"
+PROJECT_NUMBER         = 1.2.8
+PROJECT_BRIEF          = "C++ MCP SDK"
+
+OUTPUT_DIRECTORY       = docs/doxygen
+HTML_OUTPUT            = html
+
+INPUT                  = README.md \
+                         README_zh.md \
+                         CHANGELOG.md \
+                         CONTRIBUTING.md \
+                         SECURITY.md \
+                         docs/auth_design.md \
+                         docs/auth_user_guide.md \
+                         docs/compatibility_policy.md \
+                         docs/dependency_policy.md \
+                         docs/capability_lifecycles.md \
+                         docs/official_sdk_candidate_process.md \
+                         docs/package_consumption.md \
+                         docs/package_consumption_zh.md \
+                         docs/protocol_model_audit.md \
+                         docs/public_api_stability.md \
+                         docs/release_process.md \
+                         docs/release_gates.md \
+                         docs/release_candidate_checklist.md \
+                         docs/release_notes_template.md \
+                         docs/request_lifecycle.md \
+                         todo.md \
+                         sdk/include \
+                         sdk/auth/include \
+                         sdk/core/include \
+                         sdk/protocol/include \
+                         sdk/transport/include \
+                         sdk/client/include \
+                         sdk/server/include
+USE_MDFILE_AS_MAINPAGE = README.md
+RECURSIVE              = YES
+
+FILE_PATTERNS          = *.h \
+                         *.hh \
+                         *.hpp \
+                         *.hxx \
+                         *.inl \
+                         *.ipp \
+                         *.ixx \
+                         *.c \
+                         *.cc \
+                         *.cpp \
+                         *.cxx \
+                         *.md
+
+EXCLUDE                = .cache \
+                         .git \
+                         .vs \
+                         .vscode \
+                         build \
+                         out \
+                         reference \
+                         third_party
+EXCLUDE_PATTERNS       = */.cache/* \
+                         */.git/* \
+                         */.vs/* \
+                         */.vscode/* \
+                         */build/* \
+                         */build-*/* \
+                         */cmake-build-*/* \
+                         */out/* \
+                         */reference/* \
+                         */third_party/*
+
+MARKDOWN_SUPPORT       = YES
+MARKDOWN_ID_STYLE      = GITHUB
+TOC_INCLUDE_HEADINGS   = 5
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+MULTILINE_CPP_IS_BRIEF = NO
+
+OPTIMIZE_OUTPUT_FOR_C  = NO
+BUILTIN_STL_SUPPORT    = YES
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = .
+
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_LOGFILE           = docs/doxygen/warnings.log
+
+GENERATE_HTML          = YES
+GENERATE_TREEVIEW      = YES
+SEARCHENGINE           = YES
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+HAVE_DOT               = NO

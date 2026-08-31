@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Auth | cxxmcp</title>
+    <meta name="description" content="OAuth 2.1, bearer tokens, DPoP, and OpenSSL auth in cxxmcp.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css" media="(prefers-color-scheme: light)">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/cmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/bash.min.js"></script>
+    <script>document.addEventListener('DOMContentLoaded',()=>hljs.highlightAll());</script>
+  </head>
+  <body>
+    <button class="sidebar-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+    <div class="page">
+      <nav class="sidebar">
+        <div class="sidebar-brand"><a href="./">cxxmcp</a></div>
+        <div class="sidebar-section">Guide</div>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./tutorials.html">Tutorials</a>
+        <a href="./concepts.html">Concepts</a>
+        <a href="./cookbook.html">Cookbook</a>
+        <a href="./transports.html">Transports</a>
+        <div class="sidebar-section">Reference</div>
+        <a href="./api/">API Reference</a>
+        <a href="./troubleshooting.html">Troubleshooting</a>
+        <a href="./migration.html">Migration</a>
+        <a href="./changelog.html">Changelog</a>
+        <div class="sidebar-section">Project</div>
+        <a href="./auth.html">Auth</a>
+        <a href="./security.html">Security</a>
+        <a href="./stability.html">Stability</a>
+        <a href="./contributing.html">Contributing</a>
+        <a href="./roadmap.html">Roadmap</a>
+        <div class="sidebar-section">External</div>
+        <a href="https://github.com/caomengxuan666/cxxmcp">GitHub</a>
+        <a href="https://modelcontextprotocol.io/">MCP Spec</a>
+      </nav>
+
+      <div class="main-wrap">
+        <main>
+      <section class="hero">
+        <div class="eyebrow">Auth</div>
+        <h1>Use lightweight bearer-token hooks today and opt into OAuth contracts deliberately.</h1>
+        <p class="lede">
+          The default SDK package does not enable optional auth or pull OpenSSL.
+          Server auth extension points are available through
+          <code>cxxmcp::server</code>, while OAuth/JWT/DPoP surfaces stay behind
+          explicit feature gates.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Default Package Behavior</h2>
+        <p>
+          Auth is split between always-available server dispatch contracts and
+          optional OAuth protocol scaffolding.
+        </p>
+        <ul>
+          <li><code>CXXMCP_ENABLE_AUTH=OFF</code> is the default.</li>
+          <li>The default package does not export <code>cxxmcp::auth</code> or <code>cxxmcp::auth_openssl</code>.</li>
+          <li>The default package does not call <code class="language-cmake">find_package(OpenSSL)</code>.</li>
+          <li>HTTP server auth hooks remain available through <code>cxxmcp::server</code>.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Optional Auth Contracts</h2>
+        <p>
+          Enable auth only when consumers need the transport-neutral OAuth,
+          metadata, lifecycle, token, registration, WWW-Authenticate, JWKS, JWT,
+          and DPoP contract headers exposed by the <code>cxxmcp::auth</code>
+          target. This option does not require OpenSSL by itself.
+        </p>
+        <pre><code class="language-bash">cmake -S . -B build-auth -DCXXMCP_ENABLE_AUTH=ON
+cmake --build build-auth</code></pre>
+        <pre><code class="language-bash">vcpkg install "cxxmcp-sdk[auth]" --overlay-ports=C:\path\to\cxxmcp\packaging\vcpkg\ports</code></pre>
+      </section>
+
+      <section class="section">
+        <h2>OpenSSL Crypto Option</h2>
+        <p>
+          Set <code>CXXMCP_AUTH_CRYPTO=OpenSSL</code> with
+          <code>CXXMCP_ENABLE_AUTH=ON</code> when consumers need first-party
+          crypto-backed helpers. This is the path that resolves OpenSSL and
+          exports <code>cxxmcp::auth_openssl</code>.
+        </p>
+        <ul>
+          <li>JOSE/JWK/JWS/JWT helpers cover compact JWS parsing, public JWK import, RS256/ES256 signature verification, and trusted JWKS JWT validation.</li>
+          <li><code>FetchingJwksJwtVerifier</code> adds transport-neutral JWKS fetch/cache integration for key rotation; applications still supply the HTTP fetcher.</li>
+          <li><code>OpenSslDpopSigner</code> and <code>OpenSslDpopVerifier</code> sign and verify ES256/RS256 DPoP proof JWTs.</li>
+          <li>Server auth provider presets wire the OpenSSL JWT verifier, DPoP verifier, access-token hash helper, replay cache, and required-claim checks.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Server-Side Auth Hook</h2>
+        <p>
+          Server authentication is implemented by application code through
+          <code class="language-cpp">mcp::server::AuthProvider</code>. The dispatcher authenticates
+          the request before invoking typed tool, prompt, and resource handlers.
+        </p>
+        <div class="grid">
+          <article class="card">
+            <h3>AuthRequest</h3>
+            <p>
+              Carries transport-neutral request data such as headers and remote
+              address.
+            </p>
+          </article>
+          <article class="card">
+            <h3>AuthIdentity</h3>
+            <p>
+              Stores the authenticated subject and claims for handler policy
+              checks.
+            </p>
+          </article>
+          <article class="card">
+            <h3>AuthProvider</h3>
+            <p>
+              Application-owned interface for bearer-token validation, custom
+              schemes, or OAuth verifier integration.
+            </p>
+          </article>
+          <article class="card">
+            <h3>HTTP Mapping</h3>
+            <p>
+              Auth-category failures map to HTTP 401 responses with a
+              configurable <code>WWW-Authenticate</code> challenge.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Server-Side OAuth Endpoints</h2>
+        <p>
+          When <code>CXXMCP_ENABLE_AUTH=ON</code>, <code>HttpTransport</code>
+          can serve RFC 8414 authorization server metadata and wire
+          application-provided callbacks to standard OAuth HTTP routes.
+        </p>
+        <ul>
+          <li><code>/.well-known/oauth-authorization-server</code> &mdash; RFC 8414 metadata discovery.</li>
+          <li><code>/authorize</code> &mdash; Authorization endpoint (GET). Redirects with authorization code.</li>
+          <li><code>/token</code> &mdash; Token endpoint (POST). Exchanges code for access token.</li>
+          <li><code>/register</code> &mdash; Dynamic client registration (POST, RFC 7591).</li>
+          <li><code>/revoke</code> &mdash; Token revocation (POST, RFC 7009).</li>
+        </ul>
+        <p>
+          The transport owns the HTTP routing; the application owns the
+          authorization logic through <code>std::function</code> callbacks
+          configured in <code>AuthorizationServerConfig</code>.
+        </p>
+        <pre><code class="language-cpp">mcp::auth::AuthorizationServerConfig as_config;
+as_config.issuer = "https://auth.example.com";
+as_config.authorization_handler = [](const auto&amp; params) { /* ... */ };
+as_config.token_handler = [](const auto&amp; params) { /* ... */ };
+
+mcp::server::HttpTransportOptions options;
+options.authorization_server = std::move(as_config);</code></pre>
+      </section>
+
+      <section class="section">
+        <h2>Client Bearer Token Helper</h2>
+        <p>
+          <code class="language-cpp">mcp::client::HttpTransportOptions::auth_header</code> and
+          <code class="language-cpp">mcp::transport::StreamableHttpClientTransportOptions::auth_header</code>
+          accept a token value, not a raw header. When set, the transport sends
+          <code>Authorization: Bearer &lt;token&gt;</code> on outbound
+          Streamable HTTP requests.
+        </p>
+        <p>
+          If the custom header map already contains <code>Authorization</code>,
+          that explicit value wins. This keeps custom auth schemes and
+          preformatted DPoP experiments possible without changing the bearer
+          helper contract.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>HTTPS and Real Deployments</h2>
+        <p>
+          Streamable HTTP auth is intended for HTTPS in production. The SDK can
+          run behind a TLS-terminating reverse proxy, and OpenSSL-backed auth
+          helpers use the normal package manager dependency graph when
+          explicitly enabled. OpenSSL must not be vendored into the repository.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Explicit Non-Goals</h2>
+        <p>
+          The SDK still does not provide a built-in HTTP JWKS client,
+          browser-opening or localhost loopback UX, or persistent credential
+          storage. Those remain application responsibilities or future
+          integration points.
+        </p>
+      </section>
+    </main>
+
+        <footer>
+          cxxmcp is a community C++ MCP SDK. It is not an official MCP SDK unless
+          accepted or listed by the MCP maintainers.
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>

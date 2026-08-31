@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Stability | cxxmcp</title>
+    <meta name="description" content="Release and API stability policy for cxxmcp.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css" media="(prefers-color-scheme: light)">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/cmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/bash.min.js"></script>
+    <script>document.addEventListener('DOMContentLoaded',()=>hljs.highlightAll());</script>
+  </head>
+  <body>
+    <button class="sidebar-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+    <div class="page">
+      <nav class="sidebar">
+        <div class="sidebar-brand"><a href="./">cxxmcp</a></div>
+        <div class="sidebar-section">Guide</div>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./tutorials.html">Tutorials</a>
+        <a href="./concepts.html">Concepts</a>
+        <a href="./cookbook.html">Cookbook</a>
+        <a href="./transports.html">Transports</a>
+        <div class="sidebar-section">Reference</div>
+        <a href="./api/">API Reference</a>
+        <a href="./troubleshooting.html">Troubleshooting</a>
+        <a href="./migration.html">Migration</a>
+        <a href="./changelog.html">Changelog</a>
+        <div class="sidebar-section">Project</div>
+        <a href="./auth.html">Auth</a>
+        <a href="./security.html">Security</a>
+        <a href="./stability.html">Stability</a>
+        <a href="./contributing.html">Contributing</a>
+        <a href="./roadmap.html">Roadmap</a>
+        <div class="sidebar-section">External</div>
+        <a href="https://github.com/caomengxuan666/cxxmcp">GitHub</a>
+        <a href="https://modelcontextprotocol.io/">MCP Spec</a>
+      </nav>
+
+      <div class="main-wrap">
+        <main>
+      <section class="hero">
+        <div class="eyebrow">Release and API Stability</div>
+        <h1>Stability claims are tied to release evidence, not intent.</h1>
+        <p class="lede">
+          cxxmcp treats API compatibility, protocol support, package-smoke
+          evidence, and release-gate artifacts as one release decision.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Canonical SDK Surface</h2>
+        <p>
+          New application code should use <code>Peer</code> and
+          <code>Service</code> over public headers under <code>cxxmcp/...</code>
+          and public CMake targets.
+        </p>
+        <div class="grid">
+          <article class="card">
+            <h3>Stable SDK targets</h3>
+            <p>
+              <code>cxxmcp::protocol</code>, <code>cxxmcp::transport</code>,
+              <code>cxxmcp::handler</code>, <code>cxxmcp::peer</code>,
+              <code>cxxmcp::service</code>, <code>cxxmcp::client</code>,
+              <code>cxxmcp::server</code>, and <code>cxxmcp::sdk</code>.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Outside the core contract</h3>
+            <p>
+              Gateway/runtime/CLI/plugin tooling is released outside this SDK
+              repository and does not define the core contract.
+            </p>
+          </article>
+        </div>
+        <p>
+          The package, repository, installed include path, and CMake target
+          prefix use <code>cxxmcp</code>. The C++ namespace is intentionally
+          <code>mcp</code> and is part of the stable source API; changing it is
+          a breaking rename, not a cosmetic cleanup.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Source Compatibility</h2>
+        <p>
+          Public SDK headers compile as C++17 by default. Once a stable release
+          line is declared, source compatibility follows semantic versioning:
+          minor releases add compatible APIs, patch releases fix behavior or
+          packaging, and source-breaking removals wait for a major release.
+        </p>
+        <p>
+          Public renames are expected to be additive first: add the new spelling,
+          keep the old spelling as an alias or forwarding wrapper, mark it
+          deprecated where possible, document the migration, and remove it only
+          in the next major release.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>ABI Policy</h2>
+        <p>
+          cxxmcp builds and releases static libraries by default. ABI stability
+          is not claimed for static-library releases. If shared libraries become
+          stable release artifacts later, they need a separate ABI policy before
+          ABI compatibility is advertised.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Protocol Compatibility</h2>
+        <p>
+          cxxmcp follows published MCP protocol snapshots. It does not mint
+          custom MCP protocol versions or alternate wire formats. Unsupported
+          protocol versions fail fast with protocol or transport validation
+          errors instead of silently downgrading to an unadvertised dialect.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Release Evidence</h2>
+        <p>
+          A release may claim support only for matrix entries where the
+          release-blocking gates passed for that exact commit. The intended
+          public matrix covers Windows/MSVC, Linux/GCC, Linux/Clang, and
+          macOS/AppleClang with the documented generator and runtime-library
+          combinations.
+        </p>
+        <ul>
+          <li>Release-blocking CTest, JUnit, and log evidence for advertised matrix legs.</li>
+          <li>Installed-package <code>package_smoke</code> evidence.</li>
+          <li>Independent public-header compile evidence.</li>
+          <li>RMCP, TypeScript SDK, and Python SDK interoperability evidence where advertised.</li>
+          <li>Generated public API documentation, source archive, checksums, and release evidence bundle.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Ecosystem Evidence</h2>
+        <p>
+          Fact-standard or curated-registry claims require evidence beyond this
+          repository. Project-owned examples are useful smoke tests, but they do
+          not count as independent public downstream adoption.
+          <code>docs/adoption_ledger.md</code> records the current adoption
+          evidence and must stay conservative until real external users can be
+          cited.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Stage Rules</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Alpha and beta</h3>
+            <p>
+              Alpha may move APIs with changelog visibility. Beta APIs should be
+              mostly settled, and breaking changes need migration text.
+            </p>
+          </article>
+          <article class="card">
+            <h3>RC and stable</h3>
+            <p>
+              RC is for fixes and release evidence. Stable freezes public source
+              compatibility for the minor line except for unavoidable security
+              or protocol compliance fixes.
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+        <footer>
+          cxxmcp is a community C++ MCP SDK. It is not an official MCP SDK unless
+          accepted or listed by the MCP maintainers.
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>
