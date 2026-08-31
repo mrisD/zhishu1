@@ -63,22 +63,24 @@ ros2 topic echo --once /dual_arm_admittance/common_wrench
 始终输出零速度。默认要求左右样本时间戳相差不超过 `0.02 s`；超时、不同步、
 TF 丢失或出现 `NaN/Inf` 时会输出零速度并清空导纳动态状态。
 
-初始姿态只用于把两只手放到箱体两侧，不等于已经可靠抓住箱体。当前工程的夹爪
-由关节轨迹控制器驱动，确认两侧夹爪与蓝色抓取区域对准后，将两个主动指关节
-从 `0.0 m` 闭合到 `0.04 m`；该位置与仿真箱体直径 `0.06 m` 的把手匹配，
-可避免指爪穿透把手产生过大的接触力：
+默认启动会复用 MTC 求得的上沿夹持 IK，将两只夹爪放在左右侧壁中心，并以同一个
+轨迹起始时间在 4 秒内同步闭合到 `0.054 m`。低冲击闭合成功后，程序会按 MTC 的
+处理方式在 `L_hand_link` 与料箱之间动态建立可拆卸关节，避免仅靠接触摩擦搬运时
+出现对拉、抖动或箱体飞出。导纳节点会等待夹持和附着完成、接触稳定后再启动去皮。
+
+调试时可以关闭自动夹持，或调整闭合位置和持续时间：
 
 ```bash
-ros2 action send_goal /left_gripper_controller/follow_joint_trajectory \
-  control_msgs/action/FollowJointTrajectory \
-  "{trajectory: {joint_names: [left_gripper_left_finger_joint], points: [{positions: [0.04], time_from_start: {sec: 2}}]}}"
+ros2 launch zhishu_robot_admittance dual_arm_box_admittance_sim.launch.py \\
+  auto_grasp:=false
 
-ros2 action send_goal /right_gripper_controller/follow_joint_trajectory \
-  control_msgs/action/FollowJointTrajectory \
-  "{trajectory: {joint_names: [gripper_left_finger_joint], points: [{positions: [0.04], time_from_start: {sec: 2}}]}}"
+ros2 launch zhishu_robot_admittance dual_arm_box_admittance_sim.launch.py \\
+  gripper_position:=0.054 grasp_duration:=6.0
 ```
 
-确认箱体已夹稳后必须重新去皮，再启用导纳：
+如需只检查 Gazebo 接触、不建立搬运连接，可设置 `attach_box:=false`。
+
+自动夹持完成后控制器会自动去皮；确认箱体稳定后再启用导纳：
 
 ```bash
 ros2 service call /dual_arm_admittance/tare std_srvs/srv/Trigger "{}"

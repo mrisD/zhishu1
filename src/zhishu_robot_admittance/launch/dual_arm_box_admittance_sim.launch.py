@@ -7,7 +7,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, LogInfo
 from launch.actions import IncludeLaunchDescription, RegisterEventHandler, TimerAction
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -49,6 +49,10 @@ def generate_launch_description():
     headless = LaunchConfiguration("headless")
     use_rviz = LaunchConfiguration("use_rviz")
     enable_on_start = LaunchConfiguration("enable_on_start")
+    auto_grasp = LaunchConfiguration("auto_grasp")
+    gripper_position = LaunchConfiguration("gripper_position")
+    grasp_duration = LaunchConfiguration("grasp_duration")
+    attach_box = LaunchConfiguration("attach_box")
     force_x11 = LaunchConfiguration("force_x11")
     render_engine_gui = LaunchConfiguration("render_engine_gui")
     software_rendering = LaunchConfiguration("software_rendering")
@@ -133,6 +137,10 @@ def generate_launch_description():
     right_servo_params = {
         "moveit_servo": load_yaml("quest_dual_arm_teleop", "config/right_servo.yaml")
     }
+    # Gazebo and MoveIt share simulation time, but a loaded VM can delay ROS
+    # delivery beyond the hardware-oriented 100 ms trajectory horizon.
+    for servo_params in (left_servo_params, right_servo_params):
+        servo_params["moveit_servo"]["max_expected_latency"] = 0.5
     servo_common_parameters = [
         moveit_config.robot_description,
         moveit_config.robot_description_semantic,
@@ -165,6 +173,20 @@ def generate_launch_description():
             {"use_sim_time": True},
             {"enable_on_start": ParameterValue(enable_on_start, value_type=bool)},
         ],
+    )
+
+    grasp_box = Node(
+        package=package_name,
+        executable="coordinate_admittance_grasp",
+        name="admittance_grasp_coordinator",
+        output="screen",
+        parameters=[
+            {"use_sim_time": True},
+            {"gripper_position": ParameterValue(gripper_position, value_type=float)},
+            {"motion_duration": ParameterValue(grasp_duration, value_type=float)},
+            {"attach_box": ParameterValue(attach_box, value_type=bool)},
+        ],
+        condition=IfCondition(auto_grasp),
     )
 
     rviz = Node(
@@ -203,7 +225,12 @@ def generate_launch_description():
             ),
         ],
     )
-    start_admittance = TimerAction(period=2.5, actions=[admittance])
+    start_auto_grasp = TimerAction(period=1.0, actions=[grasp_box])
+    start_admittance_without_grasp = TimerAction(
+        period=7.0,
+        actions=[admittance],
+        condition=UnlessCondition(auto_grasp),
+    )
 
     unpause_gazebo = ExecuteProcess(
         cmd=[
@@ -275,6 +302,14 @@ def generate_launch_description():
             on_exit=continue_if_success(activate_controllers, "Gazebo unpause"),
         )
     )
+    start_admittance_after_grasp = RegisterEventHandler(
+        OnProcessExit(
+            target_action=grasp_box,
+            on_exit=continue_if_success(
+                TimerAction(period=1.0, actions=[admittance]), "automatic grasp"
+            ),
+        )
+    )
     start_nodes_after_activation = RegisterEventHandler(
         OnProcessExit(
             target_action=activate_controllers,
@@ -285,7 +320,8 @@ def generate_launch_description():
                     right_servo,
                     rviz,
                     switch_servo_to_twist,
-                    start_admittance,
+                    start_auto_grasp,
+                    start_admittance_without_grasp,
                 ],
                 "controller activation",
             ),
@@ -320,6 +356,26 @@ def generate_launch_description():
                 default_value="false",
                 description="Enable compliant motion immediately after automatic tare",
             ),
+            DeclareLaunchArgument(
+                "attach_box",
+                default_value="true",
+                description="Attach the crate to the left hand as in the MTC task",
+            ),
+            DeclareLaunchArgument(
+                "auto_grasp",
+                default_value="true",
+                description="Synchronously close both grippers on the crate side rims",
+            ),
+            DeclareLaunchArgument(
+                "gripper_position",
+                default_value="0.054",
+                description="Finger joint target matching the 10 mm crate wall",
+            ),
+            DeclareLaunchArgument(
+                "grasp_duration",
+                default_value="4.0",
+                description="Slow synchronized closing duration in seconds",
+            ),
             gazebo,
             after_joint_state,
             after_body_posture,
@@ -328,6 +384,7 @@ def generate_launch_description():
             after_left_gripper,
             unpause_after_loading,
             activate_after_unpause,
+            start_admittance_after_grasp,
             start_nodes_after_activation,
             joint_state_spawner,
         ]

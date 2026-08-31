@@ -3,21 +3,22 @@ initial_positions:
   left_gripper_left_finger_joint: 0.0
   gripper_left_finger_joint: 0.0
 
-  # Non-singular, limit-valid seed from the both_arms_crate_safe SRDF state.
-  left_shoulder_pitch_joint: 0.523599
-  left_shoulder_roll_joint: -0.436300
-  left_shoulder_yaw_joint: -0.314159
-  left_elbow_pitch_joint: 2.094395
-  left_wrist_yaw_joint: 0.034907
-  left_wrist_pitch_joint: 0.0
-  left_wrist_roll_joint: 0.0
-  right_shoulder_pitch_joint: -0.523599
-  right_shoulder_roll_joint: 0.436300
-  right_shoulder_yaw_joint: 0.314159
-  right_elbow_pitch_joint: 2.094395
-  right_wrist_yaw_joint: 0.0
-  right_wrist_pitch_joint: 0.0
-  right_wrist_roll_joint: 0.0
+  # Dual-arm IK solution for the MTC upper-rim grasp:
+  # crate=(0.42, 0.0, 0.60), size=(0.17, 0.35, 0.20), wall=0.01.
+  left_shoulder_pitch_joint: -0.836658229279
+  left_shoulder_roll_joint: -0.660324311500
+  left_shoulder_yaw_joint: 1.540545033163
+  left_elbow_pitch_joint: 1.632295680847
+  left_wrist_yaw_joint: 1.305912915286
+  left_wrist_pitch_joint: -0.203855686901
+  left_wrist_roll_joint: 1.003006062398
+  right_shoulder_pitch_joint: 0.836768635765
+  right_shoulder_roll_joint: 0.660324188731
+  right_shoulder_yaw_joint: -1.540477481400
+  right_elbow_pitch_joint: 1.632296033778
+  right_wrist_yaw_joint: -1.306061507240
+  right_wrist_pitch_joint: -0.203761265484
+  right_wrist_roll_joint: -1.002983416857
 
   # Passive body joints still need valid initial values in the combined xacro.
   waist_up_down_joint: 0.0

@@ -28,21 +28,23 @@ dual_arm_admittance:
     wrench_deadband: [1.0, 1.0, 1.5, 0.10, 0.10, 0.10]
     desired_common_wrench: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-    # Half of (left wrench - right wrench). Opposite velocity corrections keep
-    # the two wrists load-balanced without changing the commanded box motion.
+    # The simulated crate is rigidly attached after contact, matching MTC. A
+    # differential force loop would fight that closed constraint, so balancing
+    # is disabled here; common admittance remains active for compliant handling.
     desired_internal_wrench: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    internal_balance_gain: [0.0002, 0.0002, 0.0002, 0.001, 0.001, 0.001]
-    # Never allow load balancing to overpower the common box motion.
-    max_internal_balance_velocity: [0.005, 0.005, 0.005, 0.01, 0.01, 0.01]
+    internal_balance_gain: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    max_internal_balance_velocity: [0.001, 0.001, 0.001, 0.002, 0.002, 0.002]
     # Bound contact impulses before feeding them into the virtual dynamics.
-    max_common_wrench: [100.0, 100.0, 100.0, 20.0, 20.0, 20.0]
+    max_common_wrench: [40.0, 40.0, 40.0, 8.0, 8.0, 8.0]
 
     # Change an axis to -1 if the real sensor's positive direction is opposite
     # to the Gazebo child-to-parent convention.
     left_wrench_sign: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
     right_wrench_sign: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
-    max_admittance_displacement: [0.03, 0.03, 0.03, 0.15, 0.15, 0.15]
-    max_admittance_velocity: [0.005, 0.005, 0.005, 0.02, 0.02, 0.02]
+    # Conservative bounds prevent a closed-chain tracking error from winding up
+    # into sustained motion while still allowing the box to yield to hand force.
+    max_admittance_displacement: [0.01, 0.01, 0.01, 0.03, 0.03, 0.03]
+    max_admittance_velocity: [0.0015, 0.0015, 0.0015, 0.003, 0.003, 0.003]
     max_linear_velocity: 0.025
-    max_angular_velocity: 0.05
+    max_angular_velocity: 0.02
