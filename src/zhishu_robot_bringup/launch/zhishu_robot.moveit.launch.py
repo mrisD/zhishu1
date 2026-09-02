@@ -84,6 +84,9 @@ def generate_launch_description():
     # ==============================
     controllers_yaml = os.path.join(robot_moveit_config_share, "config", "ros2_controllers.yaml")
     rviz_config = os.path.join(robot_moveit_config_share, "config", "moveit.rviz")
+    move_group_common_params = os.path.join(
+        robot_moveit_config_share, "config", "move_group_common.yaml"
+    )
 
     # ==============================
     # MoveIt 配置构建
@@ -250,6 +253,7 @@ def generate_launch_description():
             {"use_sim_time": False},
             {"allow_trajectory_execution": True},
             {"moveit_manage_controllers": True},
+            move_group_common_params,
         ],
     )
 

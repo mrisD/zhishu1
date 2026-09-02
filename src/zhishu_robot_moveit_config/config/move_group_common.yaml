@@ -1,0 +1,6 @@
+# Common runtime parameters for every custom move_group launch.
+# Keep remote RViz/MoveIt clients able to obtain the URDF and SRDF over ROS 2.
+/**:
+  ros__parameters:
+    publish_robot_description: true
+    publish_robot_description_semantic: true

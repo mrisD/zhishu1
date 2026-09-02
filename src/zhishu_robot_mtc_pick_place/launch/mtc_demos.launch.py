@@ -25,6 +25,9 @@ def generate_launch_description():
         "config",
         "ros2_controllers.yaml",
     )
+    move_group_common_params = os.path.join(
+        moveit_config_share, "config", "move_group_common.yaml"
+    )
 
     rviz_config = os.path.join(
         moveit_config_share,
@@ -155,6 +158,7 @@ def generate_launch_description():
         output="screen",
         parameters=[
             moveit_all_params,
+            move_group_common_params,
             {"use_sim_time": False},
             {"allow_trajectory_execution": True},
             {"moveit_manage_controllers": True},

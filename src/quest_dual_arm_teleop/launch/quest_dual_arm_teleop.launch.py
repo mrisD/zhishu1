@@ -24,6 +24,9 @@ def generate_launch_description():
 
     package_share = get_package_share_directory(package_name)
     moveit_share = get_package_share_directory(moveit_package)
+    move_group_common_params = os.path.join(
+        moveit_share, "config", "move_group_common.yaml"
+    )
 
     launch_rviz = LaunchConfiguration("launch_rviz")
     tcp_port = LaunchConfiguration("tcp_port")
@@ -143,6 +146,7 @@ def generate_launch_description():
         parameters=[
             moveit_all_params,
             moveit_teleop_controllers,
+            move_group_common_params,
             {"use_sim_time": False},
             {"allow_trajectory_execution": True},
             {"moveit_manage_controllers": False},

@@ -28,6 +28,9 @@ def generate_launch_description():
     moveit_share = FindPackageShare("zhishu_robot_moveit_config").find(
         "zhishu_robot_moveit_config"
     )
+    move_group_common_params = os.path.join(
+        moveit_share, "config", "move_group_common.yaml"
+    )
 
     moveit_config = (
         MoveItConfigsBuilder(
@@ -62,6 +65,7 @@ def generate_launch_description():
         output="screen",
         parameters=[
             moveit_config.to_dict(),
+            move_group_common_params,
             {"use_sim_time": True},
         ],
     )

@@ -79,6 +79,9 @@ def generate_launch_description():
     )
     moveit_params = moveit_config.to_dict()
     controllers_yaml = os.path.join(moveit_share, "config", "ros2_controllers.yaml")
+    move_group_common_params = os.path.join(
+        moveit_share, "config", "move_group_common.yaml"
+    )
     admittance_yaml = os.path.join(package_share, "config", "admittance.yaml")
 
     gazebo = IncludeLaunchDescription(
@@ -128,7 +131,11 @@ def generate_launch_description():
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
-        parameters=[moveit_params, {"use_sim_time": True}],
+        parameters=[
+            moveit_params,
+            move_group_common_params,
+            {"use_sim_time": True},
+        ],
     )
 
     left_servo_params = {
