@@ -43,13 +43,13 @@ public:
     };
 
     declare_if_missing("world_frame", std::string("base_link"));
-    declare_if_missing("crate_x", 0.48);
+    declare_if_missing("crate_x", 0.32);
     declare_if_missing("crate_y", 0.0);
-    declare_if_missing("crate_z", 0.72);
-    declare_if_missing("crate_size_x", 0.14);
-    declare_if_missing("crate_size_y", 0.12);
-    declare_if_missing("crate_size_z", 0.14);
-    declare_if_missing("wall_thickness", 0.006);
+    declare_if_missing("crate_z", 0.572);
+    declare_if_missing("crate_size_x", 0.30);
+    declare_if_missing("crate_size_y", 0.40);
+    declare_if_missing("crate_size_z", 0.15);
+    declare_if_missing("wall_thickness", 0.01);
     declare_if_missing("move_x", 0.0);
     declare_if_missing("move_y", 0.0);
     declare_if_missing("move_z", 0.30);
@@ -62,12 +62,12 @@ public:
     // Grip the side-wall rim this distance below the crate's top edge.
     declare_if_missing("rim_grasp_depth", 0.02);
     // The local TCP X axes are the finger-closing axes. Point them toward
-    // +/-Y (the two side-wall normals). The unequal rolls keep the fingertips
-    // angled downward while remaining reachable throughout the 0.30 m lift.
-    declare_if_missing("left_tcp_roll", -2.09439510239);
+    // +/-Y (the two side-wall normals), while both local Y axes point straight
+    // down so that the gripper stems remain vertical during the grasp.
+    declare_if_missing("left_tcp_roll", -1.57079632679);
     declare_if_missing("left_tcp_pitch", 0.0);
     declare_if_missing("left_tcp_yaw", 1.57079632679);
-    declare_if_missing("right_tcp_roll", -1.04719755120);
+    declare_if_missing("right_tcp_roll", -1.57079632679);
     declare_if_missing("right_tcp_pitch", 0.0);
     declare_if_missing("right_tcp_yaw", -1.57079632679);
     declare_if_missing("carry_steps", 15);
@@ -582,7 +582,11 @@ private:
     const double grasp_y = wall_center_y + grasp_center_offset;
     // Finger inner gap is 0.12 - 2*q for this URDF. Match it to the wall
     // thickness instead of commanding q=0.06, which would interpenetrate it.
-    const double gripper_contact_position = 0.5 * (0.12 - wall_thickness);
+    // Leave 5 mm clearance per side around the 10 mm box wall.  The detachable
+    // fixed joint carries the box after grasping, so forcing exact rigid-body
+    // contact here only introduces numerical penetration in Gazebo.
+    const double gripper_contact_position =
+      0.5 * (0.12 - wall_thickness) - 0.005;
     moveit::core::RobotState seed(task.getRobotModel());
     seed.setToDefaultValues();
     const auto* both_arms = task.getRobotModel()->getJointModelGroup("both_arms");

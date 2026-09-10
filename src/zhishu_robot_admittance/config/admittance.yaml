@@ -22,10 +22,13 @@ dual_arm_admittance:
 
     # M*x_ddot + D*x_dot + K*x = F_external - F_desired
     # First three axes are translation; last three are rotation.
-    mass: [8.0, 8.0, 8.0, 1.5, 1.5, 1.5]
-    damping: [80.0, 80.0, 100.0, 10.0, 10.0, 10.0]
-    stiffness: [150.0, 150.0, 200.0, 15.0, 15.0, 15.0]
-    wrench_deadband: [1.0, 1.0, 1.5, 0.10, 0.10, 0.10]
+    # Match the validated reference workspace dynamics. The higher virtual
+    # damping prevents the rigidly attached Gazebo box from rebounding during
+    # the final hold while retaining measurable compliance.
+    mass: [20.0, 20.0, 20.0, 5.0, 5.0, 5.0]
+    damping: [250.0, 250.0, 300.0, 40.0, 40.0, 40.0]
+    stiffness: [600.0, 600.0, 800.0, 80.0, 80.0, 80.0]
+    wrench_deadband: [2.0, 2.0, 2.5, 0.20, 0.20, 0.20]
     desired_common_wrench: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
     # The simulated crate is rigidly attached after contact, matching MTC. A
@@ -44,7 +47,7 @@ dual_arm_admittance:
 
     # Conservative bounds prevent a closed-chain tracking error from winding up
     # into sustained motion while still allowing the box to yield to hand force.
-    max_admittance_displacement: [0.01, 0.01, 0.01, 0.03, 0.03, 0.03]
-    max_admittance_velocity: [0.0015, 0.0015, 0.0015, 0.003, 0.003, 0.003]
+    max_admittance_displacement: [0.005, 0.005, 0.005, 0.02, 0.02, 0.02]
+    max_admittance_velocity: [0.0005, 0.0005, 0.0005, 0.002, 0.002, 0.002]
     max_linear_velocity: 0.025
     max_angular_velocity: 0.02

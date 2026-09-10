@@ -16,6 +16,7 @@ M * x_ddot + D * x_dot + K * x = F_external - F_desired
 ## 仿真组成
 
 - Gazebo Harmonic 世界：`dual_arm_box_admittance.sdf`；
+- 中空箱外形尺寸：`0.30 × 0.40 × 0.15 m`（X × Y × Z），壁厚 `0.01 m`；
 - 腕部六维力传感器：`/left_wrist_ft`、`/right_wrist_ft`；
 - 双 MoveIt Servo：分别控制左右夹爪 TCP；
 - 导纳控制节点：`dual_arm_admittance`；
@@ -75,7 +76,7 @@ ros2 launch zhishu_robot_admittance dual_arm_box_admittance_sim.launch.py \\
   auto_grasp:=false
 
 ros2 launch zhishu_robot_admittance dual_arm_box_admittance_sim.launch.py \\
-  gripper_position:=0.054 grasp_duration:=6.0
+  gripper_position:=0.050 grasp_duration:=6.0
 ```
 
 如需只检查 Gazebo 接触、不建立搬运连接，可设置 `attach_box:=false`。
@@ -85,6 +86,25 @@ ros2 launch zhishu_robot_admittance dual_arm_box_admittance_sim.launch.py \\
 ```bash
 ros2 service call /dual_arm_admittance/tare std_srvs/srv/Trigger "{}"
 ros2 service call /dual_arm_admittance/enable std_srvs/srv/SetBool "{data: true}"
+```
+
+自动执行沿 `base_link` 的 +Z 方向、梯形速度的 200 mm 单段直线搬运，
+以及停止保持验收。双臂导纳默认贡献 40 mm，腰部升降轴按同一梯形进度
+同步贡献 160 mm；协调运动可避开腕关节限位和水平奇异区，并且不会与
+箱体支撑台产生水平摩擦：
+
+```bash
+ros2 run zhishu_robot_admittance run_admittance_validation
+```
+
+直线距离、峰值速度和方向可通过参数覆盖；默认验收范围为 200±10 mm，
+最大横向偏离不超过 5 mm：
+
+```bash
+ros2 run zhishu_robot_admittance run_admittance_validation --ros-args \
+  -p linear_distance_m:=0.200 -p linear_speed_mps:=0.020 \
+  -p arm_linear_distance_m:=0.040 -p linear_axis:=z \
+  -p linear_direction:=1.0
 ```
 
 ## 箱体共同运动命令

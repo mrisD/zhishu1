@@ -31,6 +31,8 @@ setup(
             "zhishu_robot_admittance.controller_activation:main",
             "coordinate_admittance_grasp = "
             "zhishu_robot_admittance.grasp_coordinator:main",
+            "run_admittance_validation = "
+            "zhishu_robot_admittance.validation_runner:main",
         ],
     },
 )

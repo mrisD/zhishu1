@@ -144,10 +144,18 @@ def generate_launch_description():
     right_servo_params = {
         "moveit_servo": load_yaml("quest_dual_arm_teleop", "config/right_servo.yaml")
     }
-    # Gazebo and MoveIt share simulation time, but a loaded VM can delay ROS
-    # delivery beyond the hardware-oriented 100 ms trajectory horizon.
+    # Match the reference validation workspace's 100 Hz Servo output. Gazebo's
+    # position interface already interpolates JointTrajectory commands, so a
+    # second Butterworth trajectory horizon halves the Cartesian travel. Keep
+    # the controller-side admittance filtering and all Servo safety limits,
+    # but disable that duplicate output smoothing for this simulation.
     for servo_params in (left_servo_params, right_servo_params):
-        servo_params["moveit_servo"]["max_expected_latency"] = 0.5
+        servo_params["moveit_servo"]["publish_period"] = 0.01
+        servo_params["moveit_servo"]["max_expected_latency"] = 0.1
+        servo_params["moveit_servo"]["use_smoothing"] = False
+        servo_params["moveit_servo"]["scale"]["linear"] = 0.25
+        servo_params["moveit_servo"]["scale"]["rotational"] = 1.0
+        servo_params["moveit_servo"]["scale"]["joint"] = 2.0
     servo_common_parameters = [
         moveit_config.robot_description,
         moveit_config.robot_description_semantic,
@@ -375,7 +383,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "gripper_position",
-                default_value="0.054",
+                default_value="0.050",
                 description="Finger joint target matching the 10 mm crate wall",
             ),
             DeclareLaunchArgument(

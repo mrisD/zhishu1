@@ -3,22 +3,27 @@ initial_positions:
   left_gripper_left_finger_joint: 0.0
   gripper_left_finger_joint: 0.0
 
-  # Dual-arm IK solution for the MTC upper-rim grasp:
-  # crate=(0.42, 0.0, 0.60), size=(0.17, 0.35, 0.20), wall=0.01.
-  left_shoulder_pitch_joint: -0.836658229279
-  left_shoulder_roll_joint: -0.660324311500
-  left_shoulder_yaw_joint: 1.540545033163
-  left_elbow_pitch_joint: 1.632295680847
-  left_wrist_yaw_joint: 1.305912915286
-  left_wrist_pitch_joint: -0.203855686901
-  left_wrist_roll_joint: 1.003006062398
-  right_shoulder_pitch_joint: 0.836768635765
-  right_shoulder_roll_joint: 0.660324188731
-  right_shoulder_yaw_joint: -1.540477481400
-  right_elbow_pitch_joint: 1.632296033778
-  right_wrist_yaw_joint: -1.306061507240
-  right_wrist_pitch_joint: -0.203761265484
-  right_wrist_roll_joint: -1.002983416857
+  # Dual-arm IK solution for a vertical upper-rim grasp of the reference box:
+  # crate=(0.32, 0.0, 0.572), size=(0.30, 0.40, 0.15), wall=0.01.
+  # Both gripper stems point straight down and their closing axes face the
+  # +/-Y side walls (TCP RPY: left=-pi/2,0,+pi/2; right=-pi/2,0,-pi/2).
+  # Both TCPs use x=0.32 m, exactly the longitudinal centre of the box. Moving
+  # the complete box/support assembly 0.10 m toward the robot preserves the
+  # reference dimensions while staying below Servo's singularity limit.
+  left_shoulder_pitch_joint: -0.864377350899
+  left_shoulder_roll_joint: -0.625786571976
+  left_shoulder_yaw_joint: 1.540072762647
+  left_elbow_pitch_joint: 1.383314452675
+  left_wrist_yaw_joint: 0.885375507471
+  left_wrist_pitch_joint: -0.609182349755
+  left_wrist_roll_joint: 0.992468633915
+  right_shoulder_pitch_joint: 0.864492488914
+  right_shoulder_roll_joint: 0.625784180601
+  right_shoulder_yaw_joint: -1.540031491874
+  right_elbow_pitch_joint: 1.383316571706
+  right_wrist_yaw_joint: -0.885526226137
+  right_wrist_pitch_joint: -0.609101991786
+  right_wrist_roll_joint: -0.992400475830
 
   # Passive body joints still need valid initial values in the combined xacro.
   waist_up_down_joint: 0.0

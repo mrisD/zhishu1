@@ -48,7 +48,7 @@ class GraspCoordinator(Node):
 
     def __init__(self):
         super().__init__("admittance_grasp_coordinator")
-        self.declare_parameter("gripper_position", 0.055)
+        self.declare_parameter("gripper_position", 0.050)
         self.declare_parameter("motion_duration", 4.0)
         self.declare_parameter("start_delay", 0.5)
         self.declare_parameter("attach_box", True)

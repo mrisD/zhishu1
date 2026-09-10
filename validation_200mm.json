@@ -1,0 +1,36 @@
+{
+  "passed": true,
+  "checks": {
+    "straight_line_200_plus_minus_10_mm": true,
+    "linear_cross_track_error_at_most_5_mm": true,
+    "tcp_distance_change_at_most_5_mm": true,
+    "box_rpy_change_at_most_3_deg": true,
+    "stop_speed_below_2_mm_s": true,
+    "final_hold_drift_at_most_3_mm": true,
+    "sensor_data_finite": true
+  },
+  "metrics": {
+    "box_start_xyz_m": [0.31995670114352226, 2.01579168233811e-06, 0.5719993963417054],
+    "box_final_xyz_m": [0.322988086494777, 0.001424367191457865, 0.7714709662861585],
+    "linear_axis": "z",
+    "requested_linear_distance_m": 0.2,
+    "commanded_arm_distance_m": 0.04,
+    "commanded_waist_distance_m": 0.16,
+    "linear_axis_displacement_m": 0.19947156994445314,
+    "linear_distance_m": 0.19949967317456213,
+    "max_linear_cross_track_error_m": 0.003350503933209752,
+    "max_tcp_distance_change_m": 3.361588450062625e-05,
+    "max_box_rpy_change_deg": [0.20625071034545864, 0.015505303601689863, 0.5460033540825303],
+    "stop_speed_mps": 3.22791515449465e-05,
+    "final_hold_drift_m": 3.858142283424787e-06,
+    "left_sensor_samples": 3946,
+    "right_sensor_samples": 3946,
+    "max_observed_sensor_skew_s": 0.07600000000000051,
+    "sensor_nonfinite": false,
+    "gazebo_pose_samples": 800,
+    "left_servo_command_integral_xyz_m": [-0.0017950742777281565, 0.0004112481252545289, 0.039873297502760224],
+    "right_servo_command_integral_xyz_m": [0.0017950745085037433, 0.0004277633341324918, 0.038989588781163015],
+    "left_servo_command_samples": 1351,
+    "right_servo_command_samples": 1351
+  }
+}
