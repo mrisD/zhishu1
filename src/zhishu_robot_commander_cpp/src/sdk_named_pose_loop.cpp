@@ -1,0 +1,462 @@
+#include "zhishu_robot_commander_cpp/sdk.hpp"
+
+#include <rclcpp/rclcpp.hpp>
+
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <csignal>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <string>
+#include <thread>
+
+namespace
+{
+using SteadyClock = std::chrono::steady_clock;
+using namespace std::chrono_literals;
+
+// Keep the ROS context alive after Ctrl+C long enough to cancel the active
+// MoveIt action cleanly. The signal handler itself must remain async-signal-safe.
+volatile std::sig_atomic_t stop_requested = 0;
+
+void requestStop(int)
+{
+  stop_requested = 1;
+}
+
+bool shutdownRequested()
+{
+  return stop_requested != 0 || !rclcpp::ok();
+}
+
+template<typename ParameterT>
+ParameterT getOrDeclareParameter(
+  const rclcpp::Node::SharedPtr & node,
+  const std::string & name,
+  const ParameterT & default_value)
+{
+  if (node->has_parameter(name)) {
+    return node->get_parameter(name).get_value<ParameterT>();
+  }
+  return node->declare_parameter<ParameterT>(name, default_value);
+}
+
+zhishu_robot_commander_cpp::Commander::Options commanderOptions(
+  const rclcpp::Node::SharedPtr & node)
+{
+  zhishu_robot_commander_cpp::Commander::Options options;
+  options.left_end_effector_link = getOrDeclareParameter<std::string>(
+    node, "commander.left_end_effector_link", "L_hand_link");
+  options.right_end_effector_link = getOrDeclareParameter<std::string>(
+    node, "commander.right_end_effector_link", "R_hand_link");
+  options.left_tcp_link = getOrDeclareParameter<std::string>(
+    node, "commander.left_tcp_link", "left_gripper_tcp");
+  options.right_tcp_link = getOrDeclareParameter<std::string>(
+    node, "commander.right_tcp_link", "right_gripper_tcp");
+  options.velocity_scaling = getOrDeclareParameter<double>(
+    node, "commander.velocity_scaling", 0.30);
+  options.acceleration_scaling = getOrDeclareParameter<double>(
+    node, "commander.acceleration_scaling", 0.30);
+  options.planning_time = getOrDeclareParameter<double>(
+    node, "commander.planning_time", 5.0);
+  options.planning_attempts = static_cast<int>(getOrDeclareParameter<std::int64_t>(
+      node, "commander.planning_attempts", 5));
+  options.cartesian_eef_step = getOrDeclareParameter<double>(
+    node, "commander.cartesian_eef_step", 0.005);
+  options.minimum_cartesian_fraction = getOrDeclareParameter<double>(
+    node, "commander.minimum_cartesian_fraction", 0.95);
+  return options;
+}
+
+struct TargetStatistics
+{
+  std::uint64_t successes{0};
+  std::uint64_t failures{0};
+  double total_duration_sec{0.0};
+  double min_duration_sec{std::numeric_limits<double>::infinity()};
+  double max_duration_sec{0.0};
+
+  void addSuccess(double duration_sec)
+  {
+    ++successes;
+    total_duration_sec += duration_sec;
+    min_duration_sec = std::min(min_duration_sec, duration_sec);
+    max_duration_sec = std::max(max_duration_sec, duration_sec);
+  }
+
+  void addFailure()
+  {
+    ++failures;
+  }
+
+  double averageDurationSec() const
+  {
+    return successes == 0U ? 0.0 : total_duration_sec / static_cast<double>(successes);
+  }
+};
+
+struct TestStatistics
+{
+  SteadyClock::time_point test_start{SteadyClock::now()};
+  std::uint64_t completed_cycles{0};
+  std::uint64_t attempted_motions{0};
+  std::uint64_t successful_motions{0};
+  std::uint64_t failed_motions{0};
+  std::array<TargetStatistics, 3> target_stats{};
+  std::string stop_reason{"completed"};
+  std::string failed_target{};
+  std::int64_t failed_cycle{0};
+  zhishu_robot_commander_cpp::Result failed_result{};
+};
+
+struct MotionAttempt
+{
+  zhishu_robot_commander_cpp::Result result;
+  double duration_sec{0.0};
+  bool interrupted{false};
+};
+
+double elapsedSeconds(const SteadyClock::time_point & start)
+{
+  return std::chrono::duration<double>(SteadyClock::now() - start).count();
+}
+
+bool interruptibleSleep(double seconds)
+{
+  if (seconds <= 0.0) {
+    return !shutdownRequested();
+  }
+
+  const auto deadline = SteadyClock::now() +
+    std::chrono::duration_cast<SteadyClock::duration>(std::chrono::duration<double>(seconds));
+  while (!shutdownRequested() && SteadyClock::now() < deadline) {
+    const auto remaining = deadline - SteadyClock::now();
+    const auto chunk = std::min(
+      remaining,
+      std::chrono::duration_cast<SteadyClock::duration>(std::chrono::milliseconds(50)));
+    if (chunk > SteadyClock::duration::zero()) {
+      std::this_thread::sleep_for(chunk);
+    }
+  }
+  return !shutdownRequested();
+}
+
+MotionAttempt executeNamedMotion(
+  const rclcpp::Node::SharedPtr & node,
+  zhishu_robot_commander_cpp::RobotSdk & robot,
+  const std::string & target_name,
+  std::int64_t cycle,
+  std::int64_t loop_count)
+{
+  if (loop_count == 0) {
+    RCLCPP_INFO(
+      node->get_logger(),
+      "[STABILITY][MOVE_START] cycle=%ld/infinite target=%s",
+      static_cast<long>(cycle), target_name.c_str());
+  } else {
+    RCLCPP_INFO(
+      node->get_logger(),
+      "[STABILITY][MOVE_START] cycle=%ld/%ld target=%s",
+      static_cast<long>(cycle), static_cast<long>(loop_count), target_name.c_str());
+  }
+
+  const auto start = SteadyClock::now();
+  auto motion = robot.moveNamedAsync(
+    zhishu_robot_commander_cpp::ArmGroup::kBoth, target_name);
+
+  while (!motion.done() && !shutdownRequested()) {
+    motion.waitFor(50ms);
+  }
+
+  if (shutdownRequested()) {
+    RCLCPP_WARN(
+      node->get_logger(),
+      "[STABILITY][SAFE_STOP_REQUESTED] cycle=%ld target=%s; cancelling active motion",
+      static_cast<long>(cycle), target_name.c_str());
+
+    if (!motion.done()) {
+      motion.cancel();
+      const auto cancel_deadline = SteadyClock::now() + 5s;
+      while (!motion.done() && SteadyClock::now() < cancel_deadline) {
+        motion.waitFor(50ms);
+      }
+    }
+
+    const double duration_sec =
+      std::chrono::duration<double>(SteadyClock::now() - start).count();
+    if (motion.done()) {
+      RCLCPP_WARN(
+        node->get_logger(),
+        "[STABILITY][SAFE_STOP_COMPLETE] cycle=%ld target=%s; "
+        "trajectory cancellation acknowledged and controller left active",
+        static_cast<long>(cycle), target_name.c_str());
+      return MotionAttempt{motion.result(), duration_sec, true};
+    }
+
+    RCLCPP_ERROR(
+      node->get_logger(),
+      "[STABILITY][SAFE_STOP_TIMEOUT] cycle=%ld target=%s; "
+      "cancellation was not acknowledged within 5 seconds",
+      static_cast<long>(cycle), target_name.c_str());
+    return MotionAttempt{
+      zhishu_robot_commander_cpp::Result::failure(
+        zhishu_robot_commander_cpp::ErrorCode::kTimeout,
+        "timed out waiting for safe motion cancellation"),
+      duration_sec,
+      true};
+  }
+
+  const auto result = motion.result();
+  const double duration_sec =
+    std::chrono::duration<double>(SteadyClock::now() - start).count();
+
+  if (result) {
+    RCLCPP_INFO(
+      node->get_logger(),
+      "[STABILITY][MOVE_OK] cycle=%ld target=%s duration=%.3f s",
+      static_cast<long>(cycle), target_name.c_str(), duration_sec);
+  } else if (rclcpp::ok()) {
+    RCLCPP_ERROR(
+      node->get_logger(),
+      "[STABILITY][MOVE_FAIL] cycle=%ld target=%s duration=%.3f s code=%s native=%d message=%s",
+      static_cast<long>(cycle), target_name.c_str(), duration_sec,
+      zhishu_robot_commander_cpp::toString(result.code), result.native_code,
+      result.message.c_str());
+  } else {
+    RCLCPP_WARN(
+      node->get_logger(),
+      "[STABILITY][MOVE_INTERRUPTED] cycle=%ld target=%s duration=%.3f s",
+      static_cast<long>(cycle), target_name.c_str(), duration_sec);
+  }
+
+  return MotionAttempt{result, duration_sec, false};
+}
+
+void printTestSummary(
+  const rclcpp::Node::SharedPtr & node,
+  const TestStatistics & statistics,
+  const std::array<std::string, 3> & targets,
+  std::int64_t loop_count,
+  double interval_sec,
+  double velocity_scaling,
+  double acceleration_scaling)
+{
+  const double elapsed_sec = elapsedSeconds(statistics.test_start);
+  const double elapsed_hours = elapsed_sec / 3600.0;
+  const std::string requested_cycles =
+    loop_count == 0 ? "infinite" : std::to_string(loop_count);
+  RCLCPP_INFO(
+    node->get_logger(),
+    "[STABILITY][SUMMARY] reason=%s runtime=%.1f s (%.3f h) completed_cycles=%lu "
+    "requested_cycles=%s attempted_motions=%lu success=%lu failure=%lu interval=%.3f s "
+    "velocity_scaling=%.3f acceleration_scaling=%.3f",
+    statistics.stop_reason.c_str(), elapsed_sec, elapsed_hours,
+    static_cast<unsigned long>(statistics.completed_cycles),
+    requested_cycles.c_str(),
+    static_cast<unsigned long>(statistics.attempted_motions),
+    static_cast<unsigned long>(statistics.successful_motions),
+    static_cast<unsigned long>(statistics.failed_motions), interval_sec,
+    velocity_scaling, acceleration_scaling);
+
+  for (std::size_t index = 0; index < targets.size(); ++index) {
+    const auto & target_stats = statistics.target_stats[index];
+    const double min_sec = target_stats.successes == 0U ? 0.0 : target_stats.min_duration_sec;
+    RCLCPP_INFO(
+      node->get_logger(),
+      "[STABILITY][SUMMARY_TARGET] target=%s success=%lu failure=%lu avg=%.3f s min=%.3f s max=%.3f s",
+      targets[index].c_str(), static_cast<unsigned long>(target_stats.successes),
+      static_cast<unsigned long>(target_stats.failures), target_stats.averageDurationSec(),
+      min_sec, target_stats.max_duration_sec);
+  }
+
+  if (statistics.failed_motions > 0U) {
+    RCLCPP_ERROR(
+      node->get_logger(),
+      "[STABILITY][SUMMARY_FAILURE] cycle=%ld target=%s code=%s native=%d message=%s",
+      static_cast<long>(statistics.failed_cycle), statistics.failed_target.c_str(),
+      zhishu_robot_commander_cpp::toString(statistics.failed_result.code),
+      statistics.failed_result.native_code, statistics.failed_result.message.c_str());
+  }
+}
+}  // namespace
+
+int main(int argc, char ** argv)
+{
+  stop_requested = 0;
+  rclcpp::init(
+    argc, argv, rclcpp::InitOptions(), rclcpp::SignalHandlerOptions::None);
+  if (std::signal(SIGINT, requestStop) == SIG_ERR ||
+    std::signal(SIGTERM, requestStop) == SIG_ERR)
+  {
+    rclcpp::shutdown();
+    return 1;
+  }
+  auto node = std::make_shared<rclcpp::Node>(
+    "zhishu_robot_named_pose_loop",
+    rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
+
+  rclcpp::executors::MultiThreadedExecutor executor;
+  executor.add_node(node);
+  std::thread spinner([&executor]() {executor.spin();});
+
+  int exit_code = 0;
+  const std::array<std::string, 3> targets{
+    "both_arms_home",
+    "both_arms_pose1",
+    "both_arms_home",
+  };
+  TestStatistics statistics;
+
+  try {
+    const auto loop_count = getOrDeclareParameter<std::int64_t>(node, "loop_count", 10);
+    const auto interval_sec = getOrDeclareParameter<double>(node, "interval_sec", 1.5);
+    const auto options = commanderOptions(node);
+
+    if (loop_count < 0) {
+      RCLCPP_ERROR(
+        node->get_logger(), "loop_count must be >= 0 (0 means loop forever), got %ld",
+        static_cast<long>(loop_count));
+      statistics.stop_reason = "invalid_parameter";
+      exit_code = 2;
+    } else if (interval_sec < 0.0) {
+      RCLCPP_ERROR(
+        node->get_logger(), "interval_sec must be >= 0.0, got %.3f", interval_sec);
+      statistics.stop_reason = "invalid_parameter";
+      exit_code = 2;
+    } else {
+      zhishu_robot_commander_cpp::RobotSdk robot(node, options);
+
+      const auto state = robot.readState();
+      if (!state.result) {
+        RCLCPP_ERROR(
+          node->get_logger(), "robot state is not ready [%s]: %s",
+          zhishu_robot_commander_cpp::toString(state.result.code),
+          state.result.message.c_str());
+        statistics.stop_reason = "robot_not_ready";
+        exit_code = 1;
+      } else {
+        statistics.test_start = SteadyClock::now();
+        RCLCPP_INFO(
+          node->get_logger(),
+          "[STABILITY][TEST_START] sequence=both_arms_home->both_arms_pose1->both_arms_home "
+          "loop_count=%ld%s interval_sec=%.3f velocity_scaling=%.3f acceleration_scaling=%.3f",
+          static_cast<long>(loop_count), loop_count == 0 ? " (infinite)" : "",
+          interval_sec, options.velocity_scaling, options.acceleration_scaling);
+
+        std::int64_t cycle = 1;
+        while (!shutdownRequested() && (loop_count == 0 || cycle <= loop_count)) {
+          const auto cycle_start = SteadyClock::now();
+          if (loop_count == 0) {
+            RCLCPP_INFO(
+              node->get_logger(), "[STABILITY][CYCLE_START] cycle=%ld/infinite",
+              static_cast<long>(cycle));
+          } else {
+            RCLCPP_INFO(
+              node->get_logger(), "[STABILITY][CYCLE_START] cycle=%ld/%ld",
+              static_cast<long>(cycle), static_cast<long>(loop_count));
+          }
+
+          bool cycle_ok = true;
+          for (std::size_t target_index = 0; target_index < targets.size(); ++target_index) {
+            if (shutdownRequested()) {
+              cycle_ok = false;
+              statistics.stop_reason = "user_shutdown";
+              break;
+            }
+
+            ++statistics.attempted_motions;
+            const auto attempt = executeNamedMotion(
+              node, robot, targets[target_index], cycle, loop_count);
+
+            if (attempt.interrupted) {
+              cycle_ok = false;
+              statistics.stop_reason = "user_shutdown";
+              exit_code = 0;
+              break;
+            }
+
+            if (!attempt.result) {
+              cycle_ok = false;
+              if (!shutdownRequested()) {
+                ++statistics.failed_motions;
+                statistics.target_stats[target_index].addFailure();
+                statistics.stop_reason = "motion_failure";
+                statistics.failed_target = targets[target_index];
+                statistics.failed_cycle = cycle;
+                statistics.failed_result = attempt.result;
+                robot.cancelActiveMotion();
+                exit_code = 1;
+              } else {
+                statistics.stop_reason = "user_shutdown";
+                exit_code = 0;
+              }
+              break;
+            }
+
+            ++statistics.successful_motions;
+            statistics.target_stats[target_index].addSuccess(attempt.duration_sec);
+
+            const bool has_next_target_in_cycle = target_index + 1 < targets.size();
+            const bool has_next_cycle = loop_count == 0 || cycle < loop_count;
+            const bool has_next_action = has_next_target_in_cycle || has_next_cycle;
+            if (has_next_action && interval_sec > 0.0) {
+              RCLCPP_INFO(
+                node->get_logger(),
+                "[STABILITY][INTERVAL] waiting %.3f s before next motion", interval_sec);
+              if (!interruptibleSleep(interval_sec)) {
+                cycle_ok = false;
+                statistics.stop_reason = "user_shutdown";
+                break;
+              }
+            }
+          }
+
+          if (!cycle_ok) {
+            break;
+          }
+
+          ++statistics.completed_cycles;
+          const double cycle_duration_sec =
+            std::chrono::duration<double>(SteadyClock::now() - cycle_start).count();
+          RCLCPP_INFO(
+            node->get_logger(),
+            "[STABILITY][CYCLE_OK] cycle=%ld duration=%.3f s total_runtime=%.1f s "
+            "success=%lu failure=%lu",
+            static_cast<long>(cycle), cycle_duration_sec,
+            elapsedSeconds(statistics.test_start),
+            static_cast<unsigned long>(statistics.successful_motions),
+            static_cast<unsigned long>(statistics.failed_motions));
+          ++cycle;
+        }
+
+        if (shutdownRequested() && statistics.stop_reason == "completed") {
+          statistics.stop_reason = "user_shutdown";
+        }
+        if (statistics.stop_reason == "completed" && loop_count > 0 &&
+          statistics.completed_cycles == static_cast<std::uint64_t>(loop_count))
+        {
+          RCLCPP_INFO(
+            node->get_logger(), "[STABILITY][TEST_OK] all %ld cycles completed",
+            static_cast<long>(loop_count));
+        }
+
+        printTestSummary(
+          node, statistics, targets, loop_count, interval_sec,
+          options.velocity_scaling, options.acceleration_scaling);
+      }
+    }
+  } catch (const std::exception & exception) {
+    statistics.stop_reason = "exception";
+    RCLCPP_FATAL(node->get_logger(), "named-pose stability test failed: %s", exception.what());
+    exit_code = 1;
+  }
+
+  executor.cancel();
+  if (spinner.joinable()) {
+    spinner.join();
+  }
+  rclcpp::shutdown();
+  return exit_code;
+}

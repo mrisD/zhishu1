@@ -30,6 +30,8 @@ public:
     std::string both_grippers_group{"both_grippers"};
     std::string left_end_effector_link{"L_hand_link"};
     std::string right_end_effector_link{"R_hand_link"};
+    std::string left_tcp_link{"left_gripper_tcp"};
+    std::string right_tcp_link{"right_gripper_tcp"};
     double velocity_scaling{0.30};
     double acceleration_scaling{0.30};
     double planning_time{5.0};
@@ -69,6 +71,16 @@ public:
     const std::string & left_end_effector_link = "",
     const std::string & right_end_effector_link = "");
 
+  // True gripper-TCP targets. These are converted to the configured arm IK
+  // tip (L_hand_link/R_hand_link) through the rigid transform in RobotModel.
+  bool moveLeftTcpPose(
+    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false);
+  bool moveRightTcpPose(
+    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false);
+  bool moveBothTcpPoses(
+    const geometry_msgs::msg::PoseStamped & left_target,
+    const geometry_msgs::msg::PoseStamped & right_target);
+
   bool moveLeftGripper(double position);
   bool moveRightGripper(double position);
   bool moveBothGrippers(double left_position, double right_position);
@@ -103,6 +115,14 @@ public:
     const std::string & left_end_effector_link = "",
     const std::string & right_end_effector_link = "");
 
+  Result moveLeftTcpPoseResult(
+    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false);
+  Result moveRightTcpPoseResult(
+    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false);
+  Result moveBothTcpPosesResult(
+    const geometry_msgs::msg::PoseStamped & left_target,
+    const geometry_msgs::msg::PoseStamped & right_target);
+
   Result moveLeftGripperResult(double position);
   Result moveRightGripperResult(double position);
   Result moveBothGrippersResult(double left_position, double right_position);
@@ -121,6 +141,8 @@ public:
   std::vector<double> getBothGrippersJoints() const;
   geometry_msgs::msg::PoseStamped getLeftArmPose(const std::string & link = "") const;
   geometry_msgs::msg::PoseStamped getRightArmPose(const std::string & link = "") const;
+  geometry_msgs::msg::PoseStamped getLeftTcpPose() const;
+  geometry_msgs::msg::PoseStamped getRightTcpPose() const;
 
   void stop();
   void clearTargets();
@@ -140,6 +162,13 @@ private:
     const std::string & end_effector_link,
     const std::string & label);
   Result planAndExecute(MoveGroupInterface & group, const std::string & label);
+  Result tcpTargetToPlanningTarget(
+    MoveGroupInterface & group,
+    const geometry_msgs::msg::PoseStamped & tcp_target,
+    const std::string & planning_link,
+    const std::string & tcp_link,
+    const std::string & label,
+    geometry_msgs::msg::PoseStamped & planning_target);
   Result validateGripperPosition(double position, const std::string & label) const;
   static bool isFinitePose(const geometry_msgs::msg::PoseStamped & pose);
   static geometry_msgs::msg::PoseStamped normalizedPose(

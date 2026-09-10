@@ -2,8 +2,8 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>zhishu_robot_commander_cpp</name>
-  <version>0.2.0</version>
-  <description>C++ MoveIt commander SDK for the Zhishu dual-arm robot and grippers.</description>
+  <version>0.3.0</version>
+  <description>C++ MoveIt commander SDK for the dual-arm robot and grippers.</description>
   <maintainer email="zhu_liang@ota-os.com">zhul</maintainer>
   <license>Apache-2.0</license>
 
@@ -13,7 +13,9 @@
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
   <depend>moveit_msgs</depend>
+  <depend>zhishu_robot_interfaces</depend>
   <depend>moveit_ros_planning_interface</depend>
+  <depend>eigen</depend>
 
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>launch</exec_depend>

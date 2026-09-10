@@ -42,6 +42,8 @@ struct RobotState
   std::vector<double> right_gripper_joints;
   geometry_msgs::msg::PoseStamped left_arm_pose;
   geometry_msgs::msg::PoseStamped right_arm_pose;
+  geometry_msgs::msg::PoseStamped left_tcp_pose;
+  geometry_msgs::msg::PoseStamped right_tcp_pose;
 };
 
 struct SdkStatus
@@ -73,6 +75,13 @@ public:
     const geometry_msgs::msg::PoseStamped & right_target,
     const std::string & left_end_effector_link = "",
     const std::string & right_end_effector_link = "");
+  Result moveTcpPose(
+    ArmGroup group,
+    const geometry_msgs::msg::PoseStamped & target,
+    bool cartesian = false);
+  Result moveBothTcpPoses(
+    const geometry_msgs::msg::PoseStamped & left_target,
+    const geometry_msgs::msg::PoseStamped & right_target);
   Result moveGripper(GripperGroup group, double position);
   Result moveBothGrippers(double left_position, double right_position);
   Result openGripper(GripperGroup group);
@@ -90,6 +99,13 @@ public:
     geometry_msgs::msg::PoseStamped right_target,
     std::string left_end_effector_link = "",
     std::string right_end_effector_link = "");
+  MotionHandle moveTcpPoseAsync(
+    ArmGroup group,
+    geometry_msgs::msg::PoseStamped target,
+    bool cartesian = false);
+  MotionHandle moveBothTcpPosesAsync(
+    geometry_msgs::msg::PoseStamped left_target,
+    geometry_msgs::msg::PoseStamped right_target);
   MotionHandle moveGripperAsync(GripperGroup group, double position);
   MotionHandle moveBothGrippersAsync(double left_position, double right_position);
   MotionHandle openGripperAsync(GripperGroup group);

@@ -2,6 +2,8 @@
 
 #include <moveit_msgs/msg/robot_trajectory.hpp>
 
+#include <Eigen/Geometry>
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -44,6 +46,35 @@ Result moveItFailure(
   return Result::failure(sdk_code, std::move(detail), code.val);
 }
 
+Eigen::Isometry3d poseToEigen(const geometry_msgs::msg::Pose & pose)
+{
+  Eigen::Quaterniond orientation(
+    pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z);
+  orientation.normalize();
+
+  Eigen::Isometry3d transform = Eigen::Isometry3d::Identity();
+  transform.linear() = orientation.toRotationMatrix();
+  transform.translation() = Eigen::Vector3d(
+    pose.position.x, pose.position.y, pose.position.z);
+  return transform;
+}
+
+geometry_msgs::msg::Pose eigenToPose(const Eigen::Isometry3d & transform)
+{
+  geometry_msgs::msg::Pose pose;
+  pose.position.x = transform.translation().x();
+  pose.position.y = transform.translation().y();
+  pose.position.z = transform.translation().z();
+
+  Eigen::Quaterniond orientation(transform.rotation());
+  orientation.normalize();
+  pose.orientation.x = orientation.x();
+  pose.orientation.y = orientation.y();
+  pose.orientation.z = orientation.z();
+  pose.orientation.w = orientation.w();
+  return pose;
+}
+
 void validateOptions(const Commander::Options & options)
 {
   const std::vector<std::string> required_names{
@@ -55,6 +86,8 @@ void validateOptions(const Commander::Options & options)
     options.both_grippers_group,
     options.left_end_effector_link,
     options.right_end_effector_link,
+    options.left_tcp_link,
+    options.right_tcp_link,
   };
   if (std::any_of(required_names.begin(), required_names.end(), [](const auto & value) {
       return value.empty();
@@ -191,6 +224,25 @@ bool Commander::moveBothArmsPoses(
     left_target, right_target, left_end_effector_link, right_end_effector_link).ok();
 }
 
+bool Commander::moveLeftTcpPose(
+  const geometry_msgs::msg::PoseStamped & target, bool cartesian)
+{
+  return moveLeftTcpPoseResult(target, cartesian).ok();
+}
+
+bool Commander::moveRightTcpPose(
+  const geometry_msgs::msg::PoseStamped & target, bool cartesian)
+{
+  return moveRightTcpPoseResult(target, cartesian).ok();
+}
+
+bool Commander::moveBothTcpPoses(
+  const geometry_msgs::msg::PoseStamped & left_target,
+  const geometry_msgs::msg::PoseStamped & right_target)
+{
+  return moveBothTcpPosesResult(left_target, right_target).ok();
+}
+
 bool Commander::moveLeftGripper(double position)
 {
   return moveLeftGripperResult(position).ok();
@@ -322,6 +374,77 @@ Result Commander::moveBothArmsPosesResult(
       ErrorCode::kTargetRejected, "one or both dual-arm pose targets were rejected");
   }
   const auto result = planAndExecute(*both_arms_, "both-arm pose target");
+  both_arms_->clearPoseTargets();
+  return result;
+}
+
+Result Commander::moveLeftTcpPoseResult(
+  const geometry_msgs::msg::PoseStamped & target, bool cartesian)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  geometry_msgs::msg::PoseStamped planning_target;
+  const auto conversion = tcpTargetToPlanningTarget(
+    *left_arm_, target, options_.left_end_effector_link, options_.left_tcp_link,
+    "left gripper TCP", planning_target);
+  if (!conversion) {
+    return conversion;
+  }
+  return movePose(
+    *left_arm_, planning_target, cartesian, options_.left_end_effector_link,
+    "left gripper TCP");
+}
+
+Result Commander::moveRightTcpPoseResult(
+  const geometry_msgs::msg::PoseStamped & target, bool cartesian)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  geometry_msgs::msg::PoseStamped planning_target;
+  const auto conversion = tcpTargetToPlanningTarget(
+    *right_arm_, target, options_.right_end_effector_link, options_.right_tcp_link,
+    "right gripper TCP", planning_target);
+  if (!conversion) {
+    return conversion;
+  }
+  return movePose(
+    *right_arm_, planning_target, cartesian, options_.right_end_effector_link,
+    "right gripper TCP");
+}
+
+Result Commander::moveBothTcpPosesResult(
+  const geometry_msgs::msg::PoseStamped & left_target,
+  const geometry_msgs::msg::PoseStamped & right_target)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  if (!isFinitePose(left_target) || !isFinitePose(right_target)) {
+    return Result::failure(
+      ErrorCode::kInvalidArgument, "dual-arm TCP pose target contains NaN or infinity");
+  }
+
+  geometry_msgs::msg::PoseStamped left_planning_target;
+  geometry_msgs::msg::PoseStamped right_planning_target;
+  auto conversion = tcpTargetToPlanningTarget(
+    *both_arms_, left_target, options_.left_end_effector_link, options_.left_tcp_link,
+    "left gripper TCP", left_planning_target);
+  if (!conversion) {
+    return conversion;
+  }
+  conversion = tcpTargetToPlanningTarget(
+    *both_arms_, right_target, options_.right_end_effector_link, options_.right_tcp_link,
+    "right gripper TCP", right_planning_target);
+  if (!conversion) {
+    return conversion;
+  }
+
+  both_arms_->setStartStateToCurrentState();
+  both_arms_->clearPoseTargets();
+  if (!both_arms_->setPoseTarget(left_planning_target, options_.left_end_effector_link) ||
+    !both_arms_->setPoseTarget(right_planning_target, options_.right_end_effector_link))
+  {
+    both_arms_->clearPoseTargets();
+    return Result::failure(
+      ErrorCode::kTargetRejected, "one or both dual-arm TCP targets were rejected");
+  }
+  const auto result = planAndExecute(*both_arms_, "both-arm TCP pose target");
   both_arms_->clearPoseTargets();
   return result;
 }
@@ -460,6 +583,18 @@ geometry_msgs::msg::PoseStamped Commander::getRightArmPose(const std::string & l
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
   return right_arm_->getCurrentPose(link.empty() ? options_.right_end_effector_link : link);
+}
+
+geometry_msgs::msg::PoseStamped Commander::getLeftTcpPose() const
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return left_arm_->getCurrentPose(options_.left_tcp_link);
+}
+
+geometry_msgs::msg::PoseStamped Commander::getRightTcpPose() const
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return right_arm_->getCurrentPose(options_.right_tcp_link);
 }
 
 void Commander::stop()
@@ -645,6 +780,49 @@ Result Commander::planAndExecute(MoveGroupInterface & group, const std::string &
 
   RCLCPP_INFO(node_->get_logger(), "Completed %s", label.c_str());
   return Result::success("completed " + label);
+}
+
+Result Commander::tcpTargetToPlanningTarget(
+  MoveGroupInterface & group,
+  const geometry_msgs::msg::PoseStamped & tcp_target,
+  const std::string & planning_link,
+  const std::string & tcp_link,
+  const std::string & label,
+  geometry_msgs::msg::PoseStamped & planning_target)
+{
+  if (!isFinitePose(tcp_target)) {
+    return Result::failure(
+      ErrorCode::kInvalidArgument, label + " target contains NaN or infinity");
+  }
+
+  const auto state = group.getCurrentState(2.0);
+  if (!state) {
+    return Result::failure(
+      ErrorCode::kNotReady, "cannot read current robot state for " + label);
+  }
+  const auto * planning_link_model = state->getLinkModel(planning_link);
+  const auto * tcp_link_model = state->getLinkModel(tcp_link);
+  if (planning_link_model == nullptr || tcp_link_model == nullptr) {
+    return Result::failure(
+      ErrorCode::kInvalidArgument,
+      "invalid planning/TCP link for " + label + ": " + planning_link + " -> " + tcp_link);
+  }
+
+  const Eigen::Isometry3d model_to_planning =
+    state->getGlobalLinkTransform(planning_link_model);
+  const Eigen::Isometry3d model_to_tcp =
+    state->getGlobalLinkTransform(tcp_link_model);
+  const Eigen::Isometry3d planning_to_tcp =
+    model_to_planning.inverse() * model_to_tcp;
+
+  const auto normalized_tcp_target = normalizedPose(tcp_target);
+  const Eigen::Isometry3d frame_to_tcp = poseToEigen(normalized_tcp_target.pose);
+  const Eigen::Isometry3d frame_to_planning = frame_to_tcp * planning_to_tcp.inverse();
+
+  planning_target = normalized_tcp_target;
+  planning_target.pose = eigenToPose(frame_to_planning);
+  return Result::success(
+    label + " converted from " + tcp_link + " to IK tip " + planning_link);
 }
 
 Result Commander::validateGripperPosition(double position, const std::string & label) const

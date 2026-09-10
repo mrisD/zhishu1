@@ -38,6 +38,7 @@ def generate_launch_description():
     commander = Node(
         package="zhishu_robot_commander_cpp",
         executable="commander_node",
+        name="zhishu_robot_commander",
         output="screen",
         parameters=[
             moveit_config.robot_description,

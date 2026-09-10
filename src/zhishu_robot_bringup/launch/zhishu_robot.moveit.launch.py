@@ -68,6 +68,7 @@ def generate_launch_description():
     enable_motors_on_activate = LaunchConfiguration("enable_motors_on_activate")
     enable_log_recorder = LaunchConfiguration("enable_log_recorder")
     enable_kernel_ethercat_log = LaunchConfiguration("enable_kernel_ethercat_log")
+    enable_commander = LaunchConfiguration("enable_commander")
     log_root = LaunchConfiguration("log_root")
     log_session = LaunchConfiguration("log_session")
     log_max_file_size_mb = LaunchConfiguration("log_max_file_size_mb")
@@ -78,15 +79,14 @@ def generate_launch_description():
     # ==============================
     robot_bringup_share = FindPackageShare("zhishu_robot_bringup").find("zhishu_robot_bringup")
     robot_moveit_config_share = FindPackageShare("zhishu_robot_moveit_config").find("zhishu_robot_moveit_config")
+    commander_share = get_package_share_directory("zhishu_robot_commander_cpp")
 
     # ==============================
     # 配置文件路径
     # ==============================
     controllers_yaml = os.path.join(robot_moveit_config_share, "config", "ros2_controllers.yaml")
     rviz_config = os.path.join(robot_moveit_config_share, "config", "moveit.rviz")
-    move_group_common_params = os.path.join(
-        robot_moveit_config_share, "config", "move_group_common.yaml"
-    )
+    commander_yaml = os.path.join(commander_share, "config", "commander.yaml")
 
     # ==============================
     # MoveIt 配置构建
@@ -253,12 +253,35 @@ def generate_launch_description():
             {"use_sim_time": False},
             {"allow_trajectory_execution": True},
             {"moveit_manage_controllers": True},
-            move_group_common_params,
+            # Publish the MoveIt model descriptions so an RViz instance on a
+            # different ROS 2 host can build the same RobotModel.  Without
+            # these, robot_description(_semantic) only exist as move_group
+            # parameters and remote MotionPlanning reports an empty SRDF.
+            {"publish_robot_description": True},
+            {"publish_robot_description_semantic": True},
         ],
     )
 
     # ==============================
-    # 5. RViz2（修复崩溃 + 移除无效 wait 命令）
+    # 5. Commander SDK ROS bridge
+    # ==============================
+    # Reuse the exact robot_description/SRDF/MoveIt parameters from this bringup.
+    # The bridge is passive at startup and sends no motion until a command arrives.
+    commander_node = Node(
+        package="zhishu_robot_commander_cpp",
+        executable="commander_node",
+        name="zhishu_robot_commander",
+        output="screen",
+        parameters=[
+            moveit_all_params,
+            commander_yaml,
+            {"use_sim_time": False},
+        ],
+        condition=IfCondition(enable_commander),
+    )
+
+    # ==============================
+    # 6. RViz2（修复崩溃 + 移除无效 wait 命令）
     # ==============================
     rviz_node = Node(
         package="rviz2",
@@ -281,18 +304,23 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             "use_fake_hardware",
-            default_value="true",
+            default_value="false",
             description="Use mock joints instead of the EtherCAT arms",
         ),
         DeclareLaunchArgument(
             "use_rviz",
-            default_value="true",
+            default_value="false",
             description="Start RViz2",
         ),
         DeclareLaunchArgument(
             "enable_motors_on_activate",
             default_value="true",
             description="Enable CiA402 operation; false keeps EtherCAT communication-only mode",
+        ),
+        DeclareLaunchArgument(
+            "enable_commander",
+            default_value="false",
+            description="Start the Commander ROS bridge after move_group starts",
         ),
         DeclareLaunchArgument(
             "enable_log_recorder",
@@ -356,6 +384,11 @@ def generate_launch_description():
         RegisterEventHandler(
             OnProcessExit(target_action=right_gripper_controller_spawner,
                           on_exit=[move_group_node])
+        ),
+
+        RegisterEventHandler(
+            OnProcessStart(target_action=move_group_node,
+                           on_start=[commander_node])
         ),
 
         # 直接等 move_group 启动后开 RViz，不用 ros2 wait

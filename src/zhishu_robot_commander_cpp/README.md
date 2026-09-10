@@ -6,11 +6,13 @@
 
 ## 功能
 
-- 左/右臂：命名目标、7 关节目标、末端位姿目标、笛卡尔目标
+- 左/右臂：命名目标、7 关节目标、Hand 位姿目标、真实夹爪 TCP 位姿目标、笛卡尔目标
 - 双臂：命名目标、14 关节目标、左右末端双目标同步规划
 - 夹爪：左/右独立控制、双夹爪同步控制和打开/关闭快捷命令
 - C++ SDK 动态库：`libzhishu_robot_commander_cpp.so`
 - ROS 2 话题桥接节点：`commander_node`
+- 结构化状态：`zhishu_robot_interfaces/msg/CommanderStatus`
+- 稳定性测试：命名姿态循环、14 轴 Joint/EtherCAT 循环
 
 ## 编译与启动
 
@@ -45,7 +47,15 @@ ros2 launch zhishu_robot_commander_cpp commander.launch.py \
 ros2 topic echo /zhishu_robot_commander/status
 ```
 
-结果格式为 `SUCCESS: <command>` 或 `FAILED: <command>`。
+结果格式继续保持 `SUCCESS: <command>` 或 `FAILED: <command>`，用于兼容现有
+`receiving_sim` 等调用端。新增结构化结果：
+
+```bash
+ros2 topic echo /zhishu_robot_commander/status_structured
+```
+
+消息类型为 `zhishu_robot_interfaces/msg/CommanderStatus`，包含 `command`、`success`、
+`error_code`、`error_name`、`native_code` 和 `message`。
 
 ### 命名目标
 
@@ -98,6 +108,24 @@ ros2 topic pub --once /zhishu_robot_commander/left_arm/pose_command \
 
 双臂同步位姿使用 `/both_arms/pose_command`，消息类型为
 `geometry_msgs/msg/PoseArray`；`poses[0]` 是左臂目标，`poses[1]` 是右臂目标。
+
+### 真实夹爪 TCP 位姿目标
+
+原 `/pose_command` 仍表示 `L_hand_link` / `R_hand_link` 目标。抓取任务可直接给
+`left_gripper_tcp` / `right_gripper_tcp` 目标；Commander 从 MoveIt RobotModel 动态读取
+TCP 与 Hand 的固定变换，不硬编码夹爪长度。
+
+```bash
+ros2 topic pub --once /zhishu_robot_commander/left_arm/tcp_pose_command \
+  geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: base_link}, pose: {position: {x: 0.35, y: 0.30, z: 0.75}, orientation: {w: 1.0}}}"
+```
+
+新增话题：
+
+- `/left_arm/tcp_pose_command`、`/right_arm/tcp_pose_command`
+- `/both_arms/tcp_pose_command`（`PoseArray`）
+- `/left_arm/cartesian_tcp_pose_command`、`/right_arm/cartesian_tcp_pose_command`
 
 ### 夹爪
 
@@ -205,9 +233,19 @@ if (robot_state.result) {
 }
 ```
 
-`RobotState` 一次返回左右臂关节、左右夹爪关节以及左右末端位姿。运动执行期间调用
-`readState()` 会等待当前 Commander 操作释放互斥锁，适合任务前后快照，不作为实时
-遥测接口使用。
+`RobotState` 一次返回左右臂关节、左右夹爪关节、左右 Hand 位姿以及
+`left_gripper_tcp` / `right_gripper_tcp` 位姿。运动执行期间调用 `readState()` 会等待当前
+Commander 操作释放互斥锁，适合任务前后快照，不作为实时遥测接口使用。
+
+TCP C++ API：
+
+```cpp
+auto result = robot.moveTcpPose(
+  zhishu_robot_commander_cpp::ArmGroup::kLeft, left_tcp_target, false);
+auto both = robot.moveBothTcpPoses(left_tcp_target, right_tcp_target);
+```
+
+对应异步接口为 `moveTcpPoseAsync()` / `moveBothTcpPosesAsync()`。
 
 旧接口仍可使用：
 
@@ -240,6 +278,37 @@ Ubuntu 24.04 / ROS 2 Jazzy 上的一键编译和单元测试（不会发送运�
 
 ```bash
 bash scripts/test_commander_sdk_build.sh
+```
+
+
+### 稳定性循环测试
+
+命名姿态循环使用当前 SRDF 已存在的 `both_arms_home -> both_arms_pose1 -> both_arms_home`：
+
+```bash
+ros2 launch zhishu_robot_commander_cpp sdk_named_pose_loop.launch.py \
+  loop_count:=10 interval_sec:=1.5 use_fake_hardware:=true
+```
+
+Joint/EtherCAT 循环直接发送 14 轴 joint target，默认目标位于
+`config/joint_ethercat_loop.yaml`：
+
+```bash
+ros2 launch zhishu_robot_commander_cpp sdk_joint_ethercat_loop.launch.py \
+  loop_count:=1 interval_sec:=1.5 use_fake_hardware:=true
+```
+
+两种循环测试都会统计总运行时间、循环数、成功/失败次数、单目标平均/最小/最大耗时；
+任一动作失败立即停止。Ctrl+C 会请求取消当前 MoveIt 动作后退出。真机运行前必须先核对
+目标关节角、碰撞环境和急停/STO 状态。
+
+### Python SDK
+
+新增 `zhishu_robot_commander_py`。Python 端只作为 ROS 2 client，不重复加载 MoveIt；
+运动结果从 `/zhishu_robot_commander/status_structured` 获取。
+
+```bash
+colcon build --symlink-install --packages-up-to zhishu_robot_commander_py
 ```
 
 普通 MoveIt bringup 激活的是覆盖双臂 14 轴的 `dual_arm_controller`，不要同时

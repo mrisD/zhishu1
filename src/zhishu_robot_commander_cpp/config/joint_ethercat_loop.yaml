@@ -1,0 +1,11 @@
+/**:
+  ros__parameters:
+    # Joint-loop test pose. Values are degrees and are converted to radians.
+    # Left arm follows the RViz joint values; right arm uses a mirrored pose.
+    # Order:
+    #   shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch,
+    #   wrist_yaw, wrist_pitch, wrist_roll
+    left_target_joints:
+      [-15.0, -13.0, -24.0, 20.0, 32.0, -27.0, 19.0]
+    right_target_joints:
+      [15.0, 13.0, 24.0, 20.0, -32.0, 27.0, 19.0]

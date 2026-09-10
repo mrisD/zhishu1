@@ -103,6 +103,38 @@ Result RobotSdk::moveBothPoses(
     });
 }
 
+Result RobotSdk::moveTcpPose(
+  ArmGroup group,
+  const geometry_msgs::msg::PoseStamped & target,
+  bool cartesian)
+{
+  if (group == ArmGroup::kBoth) {
+    return Result::failure(
+      ErrorCode::kInvalidArgument, "moveTcpPose requires left or right; use moveBothTcpPoses");
+  }
+  if (group != ArmGroup::kLeft && group != ArmGroup::kRight) {
+    return Result::failure(ErrorCode::kInvalidArgument, "invalid arm group");
+  }
+  return runSynchronous(
+    armOperationName(group, cartesian ? "move_cartesian_tcp_pose" : "move_tcp_pose"),
+    [group, target, cartesian](Commander & commander) {
+      return group == ArmGroup::kLeft ?
+             commander.moveLeftTcpPoseResult(target, cartesian) :
+             commander.moveRightTcpPoseResult(target, cartesian);
+    });
+}
+
+Result RobotSdk::moveBothTcpPoses(
+  const geometry_msgs::msg::PoseStamped & left_target,
+  const geometry_msgs::msg::PoseStamped & right_target)
+{
+  return runSynchronous(
+    "both_arms.move_tcp_poses",
+    [left_target, right_target](Commander & commander) {
+      return commander.moveBothTcpPosesResult(left_target, right_target);
+    });
+}
+
 Result RobotSdk::moveGripper(GripperGroup group, double position)
 {
   if (group == GripperGroup::kBoth) {
@@ -222,6 +254,46 @@ MotionHandle RobotSdk::moveBothPosesAsync(
     });
 }
 
+MotionHandle RobotSdk::moveTcpPoseAsync(
+  ArmGroup group,
+  geometry_msgs::msg::PoseStamped target,
+  bool cartesian)
+{
+  if (group == ArmGroup::kBoth) {
+    return rejectedHandle(
+      "both_arms.move_tcp_pose",
+      Result::failure(
+        ErrorCode::kInvalidArgument,
+        "moveTcpPoseAsync requires left or right; use moveBothTcpPosesAsync"));
+  }
+  if (group != ArmGroup::kLeft && group != ArmGroup::kRight) {
+    return rejectedHandle(
+      "invalid_arm.move_tcp_pose",
+      Result::failure(ErrorCode::kInvalidArgument, "invalid arm group"));
+  }
+  const auto operation_name = armOperationName(
+    group, cartesian ? "move_cartesian_tcp_pose" : "move_tcp_pose");
+  return submit(
+    operation_name,
+    [group, target = std::move(target), cartesian](Commander & commander) {
+      return group == ArmGroup::kLeft ?
+             commander.moveLeftTcpPoseResult(target, cartesian) :
+             commander.moveRightTcpPoseResult(target, cartesian);
+    });
+}
+
+MotionHandle RobotSdk::moveBothTcpPosesAsync(
+  geometry_msgs::msg::PoseStamped left_target,
+  geometry_msgs::msg::PoseStamped right_target)
+{
+  return submit(
+    "both_arms.move_tcp_poses",
+    [left_target = std::move(left_target),
+      right_target = std::move(right_target)](Commander & commander) {
+      return commander.moveBothTcpPosesResult(left_target, right_target);
+    });
+}
+
 MotionHandle RobotSdk::moveGripperAsync(GripperGroup group, double position)
 {
   if (group == GripperGroup::kBoth) {
@@ -299,6 +371,8 @@ RobotState RobotSdk::readState() const
     state.right_gripper_joints = commander_->getRightGripperJoints();
     state.left_arm_pose = commander_->getLeftArmPose();
     state.right_arm_pose = commander_->getRightArmPose();
+    state.left_tcp_pose = commander_->getLeftTcpPose();
+    state.right_tcp_pose = commander_->getRightTcpPose();
     state.result = Result::success("robot state read successfully");
   } catch (const std::exception & error) {
     state.result = Result::failure(ErrorCode::kNotReady, error.what());

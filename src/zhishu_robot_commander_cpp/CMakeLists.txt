@@ -13,7 +13,9 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(moveit_msgs REQUIRED)
+find_package(zhishu_robot_interfaces REQUIRED)
 find_package(Threads REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 set(CMAKE_WARN_DEPRECATED OFF)
 find_package(moveit_ros_planning_interface REQUIRED)
@@ -36,7 +38,7 @@ ament_target_dependencies(${PROJECT_NAME}
   moveit_msgs
   moveit_ros_planning_interface
 )
-target_link_libraries(${PROJECT_NAME} Threads::Threads)
+target_link_libraries(${PROJECT_NAME} Threads::Threads Eigen3::Eigen)
 target_compile_definitions(${PROJECT_NAME} PRIVATE SILENCE_DEPRECATION_WARNINGS)
 
 add_executable(commander_node src/commander_node.cpp)
@@ -45,11 +47,20 @@ ament_target_dependencies(commander_node
   rclcpp
   geometry_msgs
   std_msgs
+  zhishu_robot_interfaces
 )
 
 add_executable(sdk_example src/sdk_example.cpp)
 target_link_libraries(sdk_example ${PROJECT_NAME})
 ament_target_dependencies(sdk_example rclcpp)
+
+add_executable(sdk_named_pose_loop src/sdk_named_pose_loop.cpp)
+target_link_libraries(sdk_named_pose_loop ${PROJECT_NAME})
+ament_target_dependencies(sdk_named_pose_loop rclcpp)
+
+add_executable(sdk_joint_ethercat_loop src/sdk_joint_loop.cpp)
+target_link_libraries(sdk_joint_ethercat_loop ${PROJECT_NAME})
+ament_target_dependencies(sdk_joint_ethercat_loop rclcpp)
 
 install(
   DIRECTORY include/
@@ -64,7 +75,7 @@ install(
   INCLUDES DESTINATION include
 )
 install(
-  TARGETS commander_node sdk_example
+  TARGETS commander_node sdk_example sdk_named_pose_loop sdk_joint_ethercat_loop
   DESTINATION lib/${PROJECT_NAME}
 )
 install(
@@ -79,6 +90,7 @@ if(BUILD_TESTING)
   ament_add_gtest(test_sdk_types test/test_sdk_types.cpp)
   if(TARGET test_sdk_types)
     target_link_libraries(test_sdk_types ${PROJECT_NAME})
+    ament_target_dependencies(test_sdk_types zhishu_robot_interfaces)
   endif()
 endif()
 

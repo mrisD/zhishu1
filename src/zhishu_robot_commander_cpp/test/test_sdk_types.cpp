@@ -2,6 +2,8 @@
 #include "zhishu_robot_commander_cpp/result.hpp"
 #include "zhishu_robot_commander_cpp/version.hpp"
 
+#include <zhishu_robot_interfaces/msg/commander_status.hpp>
+
 #include <gtest/gtest.h>
 
 namespace zhishu_robot_commander_cpp
@@ -48,11 +50,26 @@ TEST(MotionStatusTest, TerminalStatesAreExplicit)
   EXPECT_TRUE(isTerminal(MotionStatus::kCancelled));
 }
 
+TEST(CommanderStatusContractTest, ErrorCodesMatchRosMessageConstants)
+{
+  using Status = zhishu_robot_interfaces::msg::CommanderStatus;
+  EXPECT_EQ(static_cast<int>(ErrorCode::kSuccess), Status::SUCCESS);
+  EXPECT_EQ(static_cast<int>(ErrorCode::kInvalidArgument), Status::INVALID_ARGUMENT);
+  EXPECT_EQ(static_cast<int>(ErrorCode::kTargetRejected), Status::TARGET_REJECTED);
+  EXPECT_EQ(static_cast<int>(ErrorCode::kPlanningFailed), Status::PLANNING_FAILED);
+  EXPECT_EQ(static_cast<int>(ErrorCode::kExecutionFailed), Status::EXECUTION_FAILED);
+  EXPECT_EQ(static_cast<int>(ErrorCode::kBusy), Status::BUSY);
+  EXPECT_EQ(static_cast<int>(ErrorCode::kCancelled), Status::CANCELLED);
+  EXPECT_EQ(static_cast<int>(ErrorCode::kTimeout), Status::TIMEOUT);
+  EXPECT_EQ(static_cast<int>(ErrorCode::kNotReady), Status::NOT_READY);
+  EXPECT_EQ(static_cast<int>(ErrorCode::kInternalError), Status::INTERNAL_ERROR);
+}
+
 TEST(VersionTest, HeaderMatchesPackageMinorRelease)
 {
-  EXPECT_STREQ(kSdkVersion, "0.2.0");
+  EXPECT_STREQ(kSdkVersion, "0.3.0");
   EXPECT_EQ(kSdkVersionMajor, 0);
-  EXPECT_EQ(kSdkVersionMinor, 2);
+  EXPECT_EQ(kSdkVersionMinor, 3);
   EXPECT_EQ(kSdkVersionPatch, 0);
 }
 

@@ -1,0 +1,37 @@
+diff --git a/src/zhishu_robot_commander_cpp/config/joint_ethercat_loop.yaml b/src/zhishu_robot_commander_cpp/config/joint_ethercat_loop.yaml
+index b1a0a94..8e5c35e 100644
+--- a/src/zhishu_robot_commander_cpp/config/joint_ethercat_loop.yaml
++++ b/src/zhishu_robot_commander_cpp/config/joint_ethercat_loop.yaml
+@@ -1,8 +1,11 @@
+ /**:
+   ros__parameters:
+-    # Safe default pose matching both_arms_pose1 in zhishu_robot.srdf.
+-    # Values are degrees and are converted to radians by sdk_joint_ethercat_loop.
++    # Joint-loop test pose. Values are degrees and are converted to radians.
++    # Left arm follows the RViz joint values; right arm uses a mirrored pose.
++    # Order:
++    #   shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch,
++    #   wrist_yaw, wrist_pitch, wrist_roll
+     left_target_joints:
+-      [0.0, 0.0, 0.0, 40.107045659, 0.0, 0.0, 0.0]
++      [-15.0, -13.0, -24.0, 20.0, 32.0, -27.0, 19.0]
+     right_target_joints:
+-      [0.0, 0.0, 0.0, 40.107045659, 0.0, 0.0, 0.0]
++      [15.0, 13.0, 24.0, 20.0, -32.0, 27.0, 19.0]
+diff --git a/src/zhishu_robot_commander_cpp/src/sdk_joint_loop.cpp b/src/zhishu_robot_commander_cpp/src/sdk_joint_loop.cpp
+index 18888f7..8e98be3 100644
+--- a/src/zhishu_robot_commander_cpp/src/sdk_joint_loop.cpp
++++ b/src/zhishu_robot_commander_cpp/src/sdk_joint_loop.cpp
+@@ -325,10 +325,10 @@ int main(int argc, char ** argv)
+   const std::vector<double> all_zero(14, 0.0);
+   const auto left_pose_degrees = getOrDeclareParameter<std::vector<double>>(
+     node, "left_target_joints",
+-    {0.0, 0.0, 0.0, 40.107045659, 0.0, 0.0, 0.0});
++    {-15.0, -13.0, -24.0, 20.0, 32.0, -27.0, 19.0});
+   const auto right_pose_degrees = getOrDeclareParameter<std::vector<double>>(
+     node, "right_target_joints",
+-    {0.0, 0.0, 0.0, 40.107045659, 0.0, 0.0, 0.0});
++    {15.0, 13.0, 24.0, 20.0, -32.0, 27.0, 19.0});
+   std::vector<double> both_pose = degreesToRadians(left_pose_degrees);
+   const auto right_pose_radians = degreesToRadians(right_pose_degrees);
+   both_pose.insert(both_pose.end(), right_pose_radians.begin(), right_pose_radians.end());

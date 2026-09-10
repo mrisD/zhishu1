@@ -2,6 +2,15 @@
 Changelog for package zhishu_robot_commander_cpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.3.0 (2026-09-10)
+------------------
+* Add true ``left_gripper_tcp`` / ``right_gripper_tcp`` pose APIs with RobotModel-based rigid transform conversion to the arm IK tips.
+* Add structured ``zhishu_robot_interfaces/msg/CommanderStatus`` results on ``~/status_structured`` while preserving the existing String ``~/status`` topic.
+* Add TCP pose topics for single-arm, dual-arm, and Cartesian commands.
+* Add a customer-facing Python Commander SDK.
+* Add named-pose and joint/EtherCAT loop stability test executables with timing/failure summaries and safe cancellation.
+* Include TCP poses in ``RobotState`` snapshots.
+
 0.2.0 (2026-08-30)
 ------------------
 * Add structured SDK results and stable error codes.
