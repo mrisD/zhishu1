@@ -50,6 +50,10 @@ private:
     double counts_to_radians(int32_t counts, const ethercat_driver::MotorConfig & motor, size_t joint_index);
     int32_t radians_to_counts(double radians, const ethercat_driver::MotorConfig & motor, size_t joint_index) const;
     bool set_position_state(size_t joint_index, double value);
+    bool set_velocity_state(size_t joint_index, double value);
+    bool set_effort_state(size_t joint_index, double value);
+    bool set_velocity_raw_state(size_t joint_index, double value);
+    bool set_torque_raw_state(size_t joint_index, double value);
     bool set_position_command(size_t joint_index, double value);
     bool refresh_position_command(size_t joint_index);
  
@@ -62,8 +66,16 @@ private:
     // Jazzy owns the exported handles and the real-time loop accesses them through
     // the non-blocking handle API.
     std::vector<double> position_cache_;
+    std::vector<double> velocity_cache_;
+    std::vector<double> effort_cache_;
+    std::vector<double> velocity_raw_cache_;
+    std::vector<double> torque_raw_cache_;
     std::vector<double> command_cache_;
     std::vector<hardware_interface::StateInterface::SharedPtr> position_state_handles_;
+    std::vector<hardware_interface::StateInterface::SharedPtr> velocity_state_handles_;
+    std::vector<hardware_interface::StateInterface::SharedPtr> effort_state_handles_;
+    std::vector<hardware_interface::StateInterface::SharedPtr> velocity_raw_state_handles_;
+    std::vector<hardware_interface::StateInterface::SharedPtr> torque_raw_state_handles_;
     std::vector<hardware_interface::CommandInterface::SharedPtr> position_command_handles_;
     
     // joint_to_motor_index_[joint_index] == driver_config_.motors[motor_index].
@@ -71,6 +83,12 @@ private:
     std::vector<int> joint_to_motor_index_;
     std::vector<double> joint_sign_;
     std::vector<double> joint_offset_rad_;
+    std::vector<double> joint_reduction_ratio_;
+    std::vector<double> joint_rated_torque_nm_;
+    std::vector<double> joint_velocity_scale_rad_s_per_raw_;
+    std::vector<double> joint_effort_scale_nm_per_raw_;
+    double velocity_raw_rpm_per_count_ = 0.1;
+    double torque_raw_full_scale_ = 10000.0;
 
     // A battery-less absolute encoder can restart on a different, but equivalent,
     // 2*pi branch. The learned turn offset must be applied in both conversion
@@ -104,6 +122,7 @@ private:
     rclcpp::Node::SharedPtr recovery_node_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_fault_service_;
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr enable_service_;
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr pdo_record_service_;
 
 
 }; // class EsMotorHardwareInterface 

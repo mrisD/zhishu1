@@ -1,14 +1,18 @@
 #include "zhishu_robot_hardware/ethercat_driver.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <cinttypes>
 #include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <ctime>
 #include <cstring>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -35,6 +39,9 @@ constexpr uint16_t kPdoControlWord = 0x6040;
 constexpr uint16_t kPdoTargetPosition = 0x607A;
 constexpr uint16_t kPdoStatusWord = 0x6041;
 constexpr uint16_t kPdoActualPosition = 0x6064;
+constexpr uint16_t kPdoActualVelocity = 0x606C;
+constexpr uint16_t kPdoActualTorque = 0x6077;
+constexpr size_t kMaxPdoDiagnosticMotors = 16;
 
 struct PdoOffsets
 {
@@ -42,6 +49,43 @@ struct PdoOffsets
   unsigned int target_position = 0;
   unsigned int status_word = 0;
   unsigned int actual_position = 0;
+  unsigned int actual_velocity = 0;
+  unsigned int actual_torque = 0;
+};
+
+struct PdoDiagnosticMotorSample
+{
+  int32_t target_position = 0;
+  int32_t actual_position = 0;
+  int32_t position_error = 0;
+  int32_t target_delta = 0;
+  int32_t actual_delta = 0;
+  int32_t actual_velocity = 0;
+  int16_t actual_torque = 0;
+  uint16_t control_word = 0;
+  uint16_t status_word = 0;
+  uint16_t error_code = 0;
+  bool error_code_valid = false;
+  uint64_t goal_update_sequence = 0;
+  uint32_t goal_sequence_delta = 0;
+};
+
+struct PdoDiagnosticRecord
+{
+  int64_t monotonic_ns = 0;
+  int64_t scheduled_cycle_start_ns = 0;
+  int64_t cycle_period_ns = 0;
+  int64_t period_jitter_ns = 0;
+  int64_t start_lateness_ns = 0;
+  int64_t wake_lateness_ns = 0;
+  uint64_t execution_ns = 0;
+  uint64_t deadline_miss_total = 0;
+  uint64_t dropped_cycles_total = 0;
+  uint64_t cycle = 0;
+  uint32_t domain_wc = 0;
+  uint8_t domain_wc_state = 0;
+  uint8_t motor_count = 0;
+  std::array<PdoDiagnosticMotorSample, kMaxPdoDiagnosticMotors> motors{};
 };
 
 enum class Cia402State
@@ -144,12 +188,18 @@ struct MotorContext
   std::atomic<bool> slave_operational{false};
 
   std::atomic<int32_t> actual_counts{0};
+  std::atomic<int32_t> actual_velocity_raw{0};
+  std::atomic<int16_t> actual_torque_raw{0};
   std::atomic<int32_t> command_counts{0};
   std::atomic<uint16_t> statusword{0};
   std::atomic<uint16_t> error_code{0};
   std::atomic<bool> error_code_valid{false};
   std::atomic<int> cia402_state{static_cast<int>(Cia402State::Unknown)};
   std::atomic<int64_t> goal_counts{0};
+  // High 32 bits: update sequence; low 32 bits: signed target counts.
+  // Publishing both in one atomic prevents the EtherCAT thread from pairing a
+  // new target with an old sequence (or vice versa).
+  std::atomic<uint64_t> goal_command_snapshot{0};
   std::atomic<int> slave_al_state{0};
 
   double cmd_position = 0.0;
@@ -159,6 +209,13 @@ struct MotorContext
   bool hold_latched_after_enable = false;
   bool error_code_request_pending = false;
   uint64_t next_error_code_cycle = 0;
+
+  // Updated only by the EtherCAT cyclic thread and used to annotate exact
+  // consecutive-cycle command/feedback changes in the diagnostic CSV.
+  bool previous_pdo_sample_valid = false;
+  int32_t previous_pdo_target = 0;
+  int32_t previous_pdo_actual = 0;
+  uint32_t previous_pdo_goal_sequence = 0;
 
   uint8_t last_slave_al_state = 0xFF;
   bool last_slave_online = false;
@@ -274,6 +331,11 @@ public:
 
   void shutdown()
   {
+    {
+      std::lock_guard<std::mutex> diagnostics_lock(pdo_diagnostics_mutex_);
+      std::string ignored_message;
+      stopPdoRecordingNoLock(ignored_message);
+    }
     std::lock_guard<std::mutex> lock(lifecycle_mutex_);
     running_.store(false);
     if (worker_.joinable()) {
@@ -408,7 +470,215 @@ public:
     return states;
   }
 
+  bool startPdoRecording(std::string & message)
+  {
+    std::lock_guard<std::mutex> lock(pdo_diagnostics_mutex_);
+    if (!running_.load() || domain_pd_ == nullptr) {
+      message = "EtherCAT is not running; PDO recording is unavailable";
+      return false;
+    }
+    if (pdo_recording_enabled_.load()) {
+      message = "PDO recording is already active: " + pdo_diagnostics_path_;
+      return false;
+    }
+    // A bounded automatic capture can finish without a service callback. Reap
+    // its writer before allowing a later manual capture to replace the thread.
+    if (pdo_diagnostics_writer_.joinable()) {
+      pdo_diagnostics_writer_.join();
+    }
+    if (pdo_diagnostics_file_ != nullptr) {
+      std::fflush(pdo_diagnostics_file_);
+      std::fclose(pdo_diagnostics_file_);
+      pdo_diagnostics_file_ = nullptr;
+    }
+    if (motors_.size() > kMaxPdoDiagnosticMotors) {
+      message = "too many motors for PDO diagnostic recorder";
+      return false;
+    }
+
+    const size_t capacity = std::max<size_t>(
+      config_.pdo_diagnostics_buffer_cycles, 1024U);
+    try {
+      pdo_diagnostics_ring_.assign(capacity, PdoDiagnosticRecord{});
+
+      std::filesystem::path output_directory;
+      if (const char * ros_log_dir = std::getenv("ROS_LOG_DIR")) {
+        output_directory = ros_log_dir;
+        if (output_directory.filename() == "native") {
+          output_directory = output_directory.parent_path();
+        }
+      } else {
+        output_directory = std::filesystem::current_path();
+      }
+      std::filesystem::create_directories(output_directory);
+
+      std::time_t now = std::time(nullptr);
+      std::tm local_time{};
+      localtime_r(&now, &local_time);
+      char timestamp[32]{};
+      std::strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &local_time);
+      const unsigned int master_index = config_.motors.front().address.master_index;
+      output_directory /=
+        "pdo_master" + std::to_string(master_index) + "_" + timestamp + ".csv";
+      pdo_diagnostics_path_ = output_directory.string();
+    } catch (const std::exception & error) {
+      message = std::string("failed to prepare PDO recording: ") + error.what();
+      return false;
+    }
+
+    pdo_diagnostics_file_ = std::fopen(pdo_diagnostics_path_.c_str(), "w");
+    if (pdo_diagnostics_file_ == nullptr) {
+      message = "failed to open PDO CSV '" + pdo_diagnostics_path_ + "': " +
+        std::strerror(errno);
+      return false;
+    }
+
+    std::fprintf(
+      pdo_diagnostics_file_,
+      "# Exact EtherCAT cyclic PDO capture using GH1 TxPDO 0x1A01.\n"
+      "# With enable_velocity_torque_feedback=true, 0x1A01 is remapped to the ESI-defined "
+      "0x6041/0x6064/0x606C/0x6077 entries (12-byte SM3).\n"
+      "# Values from 0x606C and 0x6077 are recorded raw; no undocumented physical-unit "
+      "scaling is applied.\n"
+      "monotonic_ns,scheduled_cycle_start_ns,cycle_period_ns,period_jitter_ns,"
+      "start_lateness_ns,wake_lateness_ns,execution_ns,deadline_miss_total,"
+      "dropped_cycles_total,cycle,master_index,domain_wc,domain_wc_state,motor_name,"
+      "slave_position,target_position_607a,actual_position_6064,position_error_counts,"
+      "target_delta_counts,actual_delta_counts,actual_velocity_606c_raw,"
+      "actual_torque_6077_raw,control_word_6040,status_word_6041,error_code_valid,"
+      "error_code_603f,goal_update_sequence,goal_sequence_delta\n");
+    std::fflush(pdo_diagnostics_file_);
+
+    pdo_diagnostics_write_sequence_.store(0);
+    pdo_diagnostics_read_sequence_.store(0);
+    pdo_diagnostics_dropped_cycles_.store(0);
+    pdo_diagnostics_producer_active_.store(0);
+    pdo_recording_cycle_limit_.store(0, std::memory_order_relaxed);
+    try {
+      pdo_recording_enabled_.store(true, std::memory_order_release);
+      pdo_diagnostics_writer_ = std::thread([this]() { pdoDiagnosticsWriterLoop(); });
+    } catch (const std::exception & error) {
+      pdo_recording_enabled_.store(false, std::memory_order_release);
+      std::fclose(pdo_diagnostics_file_);
+      pdo_diagnostics_file_ = nullptr;
+      message = std::string("failed to start PDO CSV writer: ") + error.what();
+      return false;
+    }
+
+    message = "PDO recording started: " + pdo_diagnostics_path_;
+    return true;
+  }
+
+  bool stopPdoRecording(std::string & message)
+  {
+    std::lock_guard<std::mutex> lock(pdo_diagnostics_mutex_);
+    return stopPdoRecordingNoLock(message);
+  }
+
+  bool isPdoRecording() const
+  {
+    return pdo_recording_enabled_.load(std::memory_order_acquire);
+  }
+
 private:
+  bool stopPdoRecordingNoLock(std::string & message)
+  {
+    const bool was_recording = pdo_recording_enabled_.exchange(
+      false, std::memory_order_acq_rel);
+    if (!was_recording && !pdo_diagnostics_writer_.joinable()) {
+      message = "PDO recording is not active";
+      return false;
+    }
+
+    while (pdo_diagnostics_producer_active_.load(std::memory_order_acquire) != 0U) {
+      std::this_thread::yield();
+    }
+    if (pdo_diagnostics_writer_.joinable()) {
+      pdo_diagnostics_writer_.join();
+    }
+    if (pdo_diagnostics_file_ != nullptr) {
+      std::fflush(pdo_diagnostics_file_);
+      std::fclose(pdo_diagnostics_file_);
+      pdo_diagnostics_file_ = nullptr;
+    }
+
+    const uint64_t written_cycles = pdo_diagnostics_read_sequence_.load();
+    const uint64_t dropped_cycles = pdo_diagnostics_dropped_cycles_.load();
+    message = "PDO recording stopped: " + pdo_diagnostics_path_ +
+      " cycles=" + std::to_string(written_cycles) +
+      " dropped=" + std::to_string(dropped_cycles);
+    return true;
+  }
+
+  void pdoDiagnosticsWriterLoop()
+  {
+    const unsigned int master_index = config_.motors.front().address.master_index;
+    int64_t last_flush_ns = monotonicNs();
+
+    while (pdo_recording_enabled_.load(std::memory_order_acquire) ||
+      pdo_diagnostics_read_sequence_.load(std::memory_order_relaxed) <
+      pdo_diagnostics_write_sequence_.load(std::memory_order_acquire))
+    {
+      uint64_t read_sequence =
+        pdo_diagnostics_read_sequence_.load(std::memory_order_relaxed);
+      const uint64_t write_sequence =
+        pdo_diagnostics_write_sequence_.load(std::memory_order_acquire);
+      if (read_sequence == write_sequence) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        continue;
+      }
+
+      while (read_sequence < write_sequence) {
+        const auto & record =
+          pdo_diagnostics_ring_[read_sequence % pdo_diagnostics_ring_.size()];
+        for (size_t i = 0; i < record.motor_count; ++i) {
+          const auto & sample = record.motors[i];
+          const auto & motor = motors_[i]->config;
+          std::fprintf(
+            pdo_diagnostics_file_,
+            "%lld,%lld,%lld,%lld,%lld,%lld,%llu,%llu,%llu,%llu,%u,%u,%u,%s,%u,"
+            "%d,%d,%d,%d,%d,%d,%d,0x%04X,0x%04X,%u,0x%04X,%llu,%u\n",
+            static_cast<long long>(record.monotonic_ns),
+            static_cast<long long>(record.scheduled_cycle_start_ns),
+            static_cast<long long>(record.cycle_period_ns),
+            static_cast<long long>(record.period_jitter_ns),
+            static_cast<long long>(record.start_lateness_ns),
+            static_cast<long long>(record.wake_lateness_ns),
+            static_cast<unsigned long long>(record.execution_ns),
+            static_cast<unsigned long long>(record.deadline_miss_total),
+            static_cast<unsigned long long>(record.dropped_cycles_total),
+            static_cast<unsigned long long>(record.cycle), master_index,
+            record.domain_wc, static_cast<unsigned int>(record.domain_wc_state),
+            motor.name.c_str(), motor.address.slave_position,
+            static_cast<int>(sample.target_position),
+            static_cast<int>(sample.actual_position),
+            static_cast<int>(sample.position_error),
+            static_cast<int>(sample.target_delta),
+            static_cast<int>(sample.actual_delta),
+            static_cast<int>(sample.actual_velocity),
+            static_cast<int>(sample.actual_torque),
+            static_cast<unsigned int>(sample.control_word),
+            static_cast<unsigned int>(sample.status_word),
+            sample.error_code_valid ? 1U : 0U,
+            static_cast<unsigned int>(sample.error_code),
+            static_cast<unsigned long long>(sample.goal_update_sequence),
+            sample.goal_sequence_delta);
+        }
+        ++read_sequence;
+        pdo_diagnostics_read_sequence_.store(read_sequence, std::memory_order_release);
+      }
+
+      const int64_t now_ns = monotonicNs();
+      if (now_ns - last_flush_ns >= 1000000000LL) {
+        std::fflush(pdo_diagnostics_file_);
+        last_flush_ns = now_ns;
+      }
+    }
+    if (pdo_diagnostics_file_ != nullptr) {
+      std::fflush(pdo_diagnostics_file_);
+    }
+  }
+
   bool prepareConfigNoLock(const DriverConfig & config)
   {
     if (!validateConfig(config)) {
@@ -505,8 +775,12 @@ private:
     state.domain_wc = domain_wc_.load();
     state.domain_wc_state = domain_wc_state_.load();
     state.actual_counts = motor.actual_counts.load();
+    state.actual_velocity_raw = motor.actual_velocity_raw.load();
+    state.actual_torque_raw = motor.actual_torque_raw.load();
     state.command_counts = motor.command_counts.load();
     state.goal_counts = motor.goal_counts.load();
+    state.goal_update_sequence =
+      static_cast<uint32_t>(motor.goal_command_snapshot.load() >> 32U);
   }
 
   void setupRealtime()
@@ -661,13 +935,18 @@ private:
     }
 
     std::vector<ec_pdo_entry_reg_t> domain_regs;
-    domain_regs.reserve(motors_.size() * 4U + 1U);
+    const size_t entries_per_motor = config_.enable_velocity_torque_feedback ? 6U : 4U;
+    domain_regs.reserve(motors_.size() * entries_per_motor + 1U);
     for (auto & motor : motors_) {
       const auto & addr = motor->config.address;
       domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoControlWord, 0x00, &motor->offsets.control_word, nullptr});
       domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoTargetPosition, 0x00, &motor->offsets.target_position, nullptr});
       domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoStatusWord, 0x00, &motor->offsets.status_word, nullptr});
       domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoActualPosition, 0x00, &motor->offsets.actual_position, nullptr});
+      if (config_.enable_velocity_torque_feedback) {
+        domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoActualVelocity, 0x00, &motor->offsets.actual_velocity, nullptr});
+        domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoActualTorque, 0x00, &motor->offsets.actual_torque, nullptr});
+      }
     }
     domain_regs.push_back({});
 
@@ -686,7 +965,14 @@ private:
     }
 
     pdo_configured_ = true;
-    std::fprintf(stderr, "ethercat_driver: configure_pdo OK, RxPDO=0x1601 TxPDO=0x1A01\n");
+    if (config_.enable_velocity_torque_feedback) {
+      std::fprintf(
+        stderr,
+        "ethercat_driver: configure_pdo OK, RxPDO=0x1601 "
+        "TxPDO=0x1A01 remapped=[0x6041,0x6064,0x606C,0x6077]\n");
+    } else {
+      std::fprintf(stderr, "ethercat_driver: configure_pdo OK, RxPDO=0x1601 TxPDO=0x1A01\n");
+    }
     return true;
   }
 
@@ -818,26 +1104,54 @@ private:
       return true;
     }
 
-    static ec_pdo_entry_info_t pdo_entries[] = {
+    // Do not select the ESI's 0x1A00 PDO directly: the tested GH1 firmware
+    // rejected that 13-byte SM3 layout with AL 0x0017. The ESI marks 0x1A01
+    // as remappable (Fixed=0), so keep the known-good PDO index and optionally
+    // extend it to 12 bytes with the ESI-defined feedback objects:
+    //   0x6041:00 UINT  Status word
+    //   0x6064:00 DINT  Position actual value
+    //   0x606C:00 DINT  Velocity actual value
+    //   0x6077:00 INT   Torque actual value
+    static ec_pdo_entry_info_t base_pdo_entries[] = {
       {kPdoControlWord, 0x00, 16},
       {kPdoTargetPosition, 0x00, 32},
       {kPdoStatusWord, 0x00, 16},
       {kPdoActualPosition, 0x00, 32},
     };
-
-    static ec_pdo_info_t pdos[] = {
-      {0x1601, 2, pdo_entries + 0},
-      {0x1A01, 2, pdo_entries + 2},
+    static ec_pdo_info_t base_pdos[] = {
+      {0x1601, 2, base_pdo_entries + 0},
+      {0x1A01, 2, base_pdo_entries + 2},
     };
-
-    static ec_sync_info_t syncs[] = {
+    static ec_sync_info_t base_syncs[] = {
       {0, EC_DIR_OUTPUT, 0, nullptr, EC_WD_DISABLE},
       {1, EC_DIR_INPUT, 0, nullptr, EC_WD_DISABLE},
-      {2, EC_DIR_OUTPUT, 1, pdos + 0, EC_WD_ENABLE},
-      {3, EC_DIR_INPUT, 1, pdos + 1, EC_WD_DISABLE},
+      {2, EC_DIR_OUTPUT, 1, base_pdos + 0, EC_WD_ENABLE},
+      {3, EC_DIR_INPUT, 1, base_pdos + 1, EC_WD_DISABLE},
       {0xFF, static_cast<ec_direction_t>(0), 0, nullptr, static_cast<ec_watchdog_mode_t>(0)}
     };
 
+    static ec_pdo_entry_info_t extended_pdo_entries[] = {
+      {kPdoControlWord, 0x00, 16},
+      {kPdoTargetPosition, 0x00, 32},
+      {kPdoStatusWord, 0x00, 16},
+      {kPdoActualPosition, 0x00, 32},
+      {kPdoActualVelocity, 0x00, 32},
+      {kPdoActualTorque, 0x00, 16},
+    };
+    static ec_pdo_info_t extended_pdos[] = {
+      {0x1601, 2, extended_pdo_entries + 0},
+      {0x1A01, 4, extended_pdo_entries + 2},
+    };
+    static ec_sync_info_t extended_syncs[] = {
+      {0, EC_DIR_OUTPUT, 0, nullptr, EC_WD_DISABLE},
+      {1, EC_DIR_INPUT, 0, nullptr, EC_WD_DISABLE},
+      {2, EC_DIR_OUTPUT, 1, extended_pdos + 0, EC_WD_ENABLE},
+      {3, EC_DIR_INPUT, 1, extended_pdos + 1, EC_WD_DISABLE},
+      {0xFF, static_cast<ec_direction_t>(0), 0, nullptr, static_cast<ec_watchdog_mode_t>(0)}
+    };
+
+    ec_sync_info_t * syncs = config_.enable_velocity_torque_feedback ?
+      extended_syncs : base_syncs;
     const int ret = ecrt_slave_config_pdos(motor.sc, EC_END, syncs);
     if (ret != 0) {
       std::fprintf(stderr, "ethercat_driver: ecrt_slave_config_pdos failed for %s: %d\n", motor.config.name.c_str(), ret);
@@ -975,6 +1289,19 @@ private:
   {
     const int64_t clamped = std::clamp<int64_t>(target, INT32_MIN, INT32_MAX);
     motor.goal_counts.store(clamped);
+    uint64_t previous = motor.goal_command_snapshot.load(std::memory_order_relaxed);
+    while (true) {
+      const uint32_t next_sequence =
+        static_cast<uint32_t>(previous >> 32U) + 1U;
+      const uint64_t next =
+        (static_cast<uint64_t>(next_sequence) << 32U) |
+        static_cast<uint32_t>(static_cast<int32_t>(clamped));
+      if (motor.goal_command_snapshot.compare_exchange_weak(
+          previous, next, std::memory_order_release, std::memory_order_relaxed))
+      {
+        break;
+      }
+    }
     motor.have_goal.store(true);
     motor.target_reached.store(false);
   }
@@ -986,6 +1313,21 @@ private:
       running_.store(false);
       return;
     }
+    if (config_.pdo_diagnostics_auto_start) {
+      std::string message;
+      if (startPdoRecording(message)) {
+        pdo_recording_cycle_limit_.store(
+          config_.pdo_diagnostics_max_cycles, std::memory_order_relaxed);
+        if (config_.pdo_diagnostics_max_cycles > 0U) {
+          message += " max_cycles=" + std::to_string(config_.pdo_diagnostics_max_cycles);
+        }
+        std::fprintf(stderr, "ethercat_driver: %s\n", message.c_str());
+      } else {
+        std::fprintf(
+          stderr, "ethercat_driver: automatic PDO recording failed: %s\n",
+          message.c_str());
+      }
+    }
     // Enter FIFO scheduling only after all allocation and EtherCAT setup work is done.
     setupRealtime();
     ethercat_ok_.store(true);
@@ -994,15 +1336,28 @@ private:
     clock_gettime(CLOCK_MONOTONIC, &wake_time);
     const double dt = static_cast<double>(config_.cycle_ns) * 1e-9;
     uint64_t cycle_count = 0;
+    uint64_t absolute_cycle_count = 0;
     uint64_t deadline_miss_count = 0;
+    uint64_t total_deadline_miss_count = 0;
     uint64_t late_sample_count = 0;
     uint64_t late_total_ns = 0;
     uint64_t max_late_ns = 0;
     uint64_t max_execution_ns = 0;
     int64_t stats_start_ns = monotonicNs();
+    int64_t previous_cycle_start_ns = 0;
+    int64_t wake_lateness_for_cycle_ns = 0;
 
     while (running_.load()) {
       addNs(wake_time, config_.cycle_ns);
+      const int64_t cycle_start_ns = monotonicNs();
+      const int64_t scheduled_cycle_start_ns =
+        static_cast<int64_t>(timespecToNs(wake_time)) - config_.cycle_ns;
+      const int64_t cycle_period_ns = previous_cycle_start_ns == 0 ?
+        config_.cycle_ns : cycle_start_ns - previous_cycle_start_ns;
+      const int64_t period_jitter_ns = previous_cycle_start_ns == 0 ?
+        0 : cycle_period_ns - config_.cycle_ns;
+      const int64_t start_lateness_ns = cycle_start_ns - scheduled_cycle_start_ns;
+      previous_cycle_start_ns = cycle_start_ns;
 
       if (config_.enable_dc) {
         timespec app_time{};
@@ -1021,13 +1376,57 @@ private:
       domain_wc_state_.store(static_cast<int>(cyclic_domain_state.wc_state));
       ethercat_ok_.store(cyclic_domain_state.wc_state == EC_WC_COMPLETE);
 
-      for (auto & motor : motors_) {
+      PdoDiagnosticRecord * pdo_record = nullptr;
+      uint64_t pdo_write_sequence = 0;
+      if (pdo_recording_enabled_.load(std::memory_order_acquire)) {
+        pdo_diagnostics_producer_active_.fetch_add(1, std::memory_order_acq_rel);
+        if (pdo_recording_enabled_.load(std::memory_order_acquire)) {
+          pdo_write_sequence =
+            pdo_diagnostics_write_sequence_.load(std::memory_order_relaxed);
+          const uint64_t pdo_read_sequence =
+            pdo_diagnostics_read_sequence_.load(std::memory_order_acquire);
+          if (!pdo_diagnostics_ring_.empty() &&
+            pdo_write_sequence - pdo_read_sequence < pdo_diagnostics_ring_.size())
+          {
+            pdo_record =
+              &pdo_diagnostics_ring_[pdo_write_sequence % pdo_diagnostics_ring_.size()];
+            pdo_record->monotonic_ns = cycle_start_ns;
+            pdo_record->scheduled_cycle_start_ns = scheduled_cycle_start_ns;
+            pdo_record->cycle_period_ns = cycle_period_ns;
+            pdo_record->period_jitter_ns = period_jitter_ns;
+            pdo_record->start_lateness_ns = start_lateness_ns;
+            pdo_record->wake_lateness_ns = wake_lateness_for_cycle_ns;
+            pdo_record->deadline_miss_total = total_deadline_miss_count;
+            pdo_record->dropped_cycles_total =
+              pdo_diagnostics_dropped_cycles_.load(std::memory_order_relaxed);
+            pdo_record->cycle = absolute_cycle_count;
+            pdo_record->domain_wc = cyclic_domain_state.working_counter;
+            pdo_record->domain_wc_state =
+              static_cast<uint8_t>(cyclic_domain_state.wc_state);
+            pdo_record->motor_count = static_cast<uint8_t>(motors_.size());
+          } else {
+            pdo_diagnostics_dropped_cycles_.fetch_add(1, std::memory_order_relaxed);
+          }
+        }
+        if (pdo_record == nullptr) {
+          pdo_diagnostics_producer_active_.fetch_sub(1, std::memory_order_release);
+        }
+      }
+
+      for (size_t motor_index = 0; motor_index < motors_.size(); ++motor_index) {
+        auto & motor = motors_[motor_index];
         const uint16_t sw = EC_READ_U16(domain_pd_ + motor->offsets.status_word);
         const int32_t actual = EC_READ_S32(domain_pd_ + motor->offsets.actual_position);
+        const int32_t actual_velocity = config_.enable_velocity_torque_feedback ?
+          EC_READ_S32(domain_pd_ + motor->offsets.actual_velocity) : 0;
+        const int16_t actual_torque = config_.enable_velocity_torque_feedback ?
+          EC_READ_S16(domain_pd_ + motor->offsets.actual_torque) : 0;
         const Cia402State state = decodeStatusWord(sw);
         const bool op_enabled = (state == Cia402State::OperationEnabled);
 
         motor->actual_counts.store(actual);
+        motor->actual_velocity_raw.store(actual_velocity);
+        motor->actual_torque_raw.store(actual_torque);
         motor->statusword.store(sw);
         motor->cia402_state.store(static_cast<int>(state));
         motor->operation_enabled.store(op_enabled);
@@ -1063,6 +1462,8 @@ private:
           motor->first_cycle = false;
         }
 
+        uint32_t goal_update_sequence_used = static_cast<uint32_t>(
+          motor->goal_command_snapshot.load(std::memory_order_acquire) >> 32U);
         const bool direct_csp_command =
           config_.csp_direct_position_commands &&
           motor->config.mode_of_operation == 8 &&
@@ -1073,7 +1474,12 @@ private:
           // The JointTrajectoryController already interpolates the MoveIt trajectory
           // at the ros2_control rate. Re-profiling each moving target creates a
           // deadband at target_tolerance_counts and causes visible stop-start motion.
-          const int64_t goal = motor->goal_counts.load();
+          const uint64_t goal_snapshot =
+            motor->goal_command_snapshot.load(std::memory_order_acquire);
+          const int32_t goal = static_cast<int32_t>(
+            static_cast<uint32_t>(goal_snapshot));
+          goal_update_sequence_used =
+            static_cast<uint32_t>(goal_snapshot >> 32U);
           motor->cmd_position = static_cast<double>(goal);
           motor->profile_velocity = 0.0;
           motor->target_reached.store(
@@ -1086,8 +1492,43 @@ private:
         const int32_t command_position = clampToInt32(motor->cmd_position);
         motor->command_counts.store(command_position);
 
+        const uint16_t control_word = controlwordFor(*motor, sw);
         EC_WRITE_S32(domain_pd_ + motor->offsets.target_position, command_position);
-        EC_WRITE_U16(domain_pd_ + motor->offsets.control_word, controlwordFor(*motor, sw));
+        EC_WRITE_U16(domain_pd_ + motor->offsets.control_word, control_word);
+
+        if (pdo_record != nullptr) {
+          auto & sample = pdo_record->motors[motor_index];
+          sample.target_position = command_position;
+          sample.actual_position = actual;
+          sample.position_error = clampToInt32(
+            static_cast<double>(command_position) - static_cast<double>(actual));
+          if (motor->previous_pdo_sample_valid) {
+            sample.target_delta = clampToInt32(
+              static_cast<double>(command_position) -
+              static_cast<double>(motor->previous_pdo_target));
+            sample.actual_delta = clampToInt32(
+              static_cast<double>(actual) - static_cast<double>(motor->previous_pdo_actual));
+            sample.goal_sequence_delta =
+              goal_update_sequence_used - motor->previous_pdo_goal_sequence;
+          } else {
+            sample.target_delta = 0;
+            sample.actual_delta = 0;
+            sample.goal_sequence_delta = 0;
+          }
+          sample.actual_velocity = actual_velocity;
+          sample.actual_torque = actual_torque;
+          sample.control_word = control_word;
+          sample.status_word = sw;
+          sample.error_code = motor->error_code.load(std::memory_order_relaxed);
+          sample.error_code_valid =
+            motor->error_code_valid.load(std::memory_order_relaxed);
+          sample.goal_update_sequence = goal_update_sequence_used;
+        }
+
+        motor->previous_pdo_target = command_position;
+        motor->previous_pdo_actual = actual;
+        motor->previous_pdo_goal_sequence = goal_update_sequence_used;
+        motor->previous_pdo_sample_valid = true;
       }
 
       if (config_.enable_dc) {
@@ -1106,6 +1547,19 @@ private:
         std::max<int64_t>(0, execution_end_ns - (scheduled_wake_ns - config_.cycle_ns)));
       max_execution_ns = std::max(max_execution_ns, execution_ns);
 
+      if (pdo_record != nullptr) {
+        pdo_record->execution_ns = execution_ns;
+        const uint64_t completed_records = pdo_write_sequence + 1U;
+        pdo_diagnostics_write_sequence_.store(completed_records, std::memory_order_release);
+        const uint64_t cycle_limit =
+          pdo_recording_cycle_limit_.load(std::memory_order_relaxed);
+        if (cycle_limit > 0U && completed_records >= cycle_limit)
+        {
+          pdo_recording_enabled_.store(false, std::memory_order_release);
+        }
+        pdo_diagnostics_producer_active_.fetch_sub(1, std::memory_order_release);
+      }
+
       int sleep_ret = 0;
       do {
         sleep_ret = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &wake_time, nullptr);
@@ -1116,6 +1570,7 @@ private:
 
       const int64_t actual_wake_ns = monotonicNs();
       const int64_t lateness_ns = actual_wake_ns - scheduled_wake_ns;
+      wake_lateness_for_cycle_ns = lateness_ns;
       if (lateness_ns > 0) {
         const uint64_t positive_lateness_ns = static_cast<uint64_t>(lateness_ns);
         ++late_sample_count;
@@ -1123,11 +1578,13 @@ private:
         max_late_ns = std::max(max_late_ns, positive_lateness_ns);
         if (lateness_ns >= config_.cycle_ns) {
           ++deadline_miss_count;
+          ++total_deadline_miss_count;
           // Do not run a burst of back-to-back catch-up cycles after a large stall.
           clock_gettime(CLOCK_MONOTONIC, &wake_time);
         }
       }
       ++cycle_count;
+      ++absolute_cycle_count;
 
       if (actual_wake_ns - stats_start_ns >= 60000000000LL) {
         const double elapsed_s = static_cast<double>(actual_wake_ns - stats_start_ns) * 1e-9;
@@ -1246,6 +1703,18 @@ private:
   std::thread worker_;
   mutable std::mutex lifecycle_mutex_;
 
+  std::atomic<bool> pdo_recording_enabled_{false};
+  std::atomic<unsigned int> pdo_diagnostics_producer_active_{0};
+  std::atomic<uint64_t> pdo_diagnostics_write_sequence_{0};
+  std::atomic<uint64_t> pdo_diagnostics_read_sequence_{0};
+  std::atomic<uint64_t> pdo_diagnostics_dropped_cycles_{0};
+  std::atomic<uint64_t> pdo_recording_cycle_limit_{0};
+  std::vector<PdoDiagnosticRecord> pdo_diagnostics_ring_;
+  std::thread pdo_diagnostics_writer_;
+  std::mutex pdo_diagnostics_mutex_;
+  std::FILE * pdo_diagnostics_file_ = nullptr;
+  std::string pdo_diagnostics_path_;
+
   int64_t last_state_log_ns_ = 0;
   uint16_t last_master_slaves_ = 0xFFFF;
   uint8_t last_master_al_states_ = 0xFF;
@@ -1363,6 +1832,21 @@ bool EthercatDriver::getMotorState(const MotorAddress & address, MotorState & st
 std::vector<MotorState> EthercatDriver::getAllMotorStates() const
 {
   return impl_->getAllMotorStates();
+}
+
+bool EthercatDriver::startPdoRecording(std::string & message)
+{
+  return impl_->startPdoRecording(message);
+}
+
+bool EthercatDriver::stopPdoRecording(std::string & message)
+{
+  return impl_->stopPdoRecording(message);
+}
+
+bool EthercatDriver::isPdoRecording() const
+{
+  return impl_->isPdoRecording();
 }
 
 }  // namespace ethercat_driver

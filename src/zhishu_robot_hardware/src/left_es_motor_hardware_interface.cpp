@@ -23,6 +23,8 @@ namespace
 constexpr double kTwoPi = 6.283185307179586476925286766559;
 constexpr uint32_t kDefaultVendorId = 0x00206688;
 constexpr uint32_t kDefaultProductCode = 0x26483052;
+constexpr char kVelocityRawInterface[] = "velocity_raw";
+constexpr char kTorqueRawInterface[] = "torque_raw";
 
 const rclcpp::Logger & logger()
 {
@@ -185,12 +187,26 @@ hardware_interface::CallbackReturn LeftEsMotorHardwareInterface::
   driver_ = std::make_shared<ethercat_driver::EthercatDriver>();
 
   position_cache_.assign(info_.joints.size(), 0.0);
+  velocity_cache_.assign(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  effort_cache_.assign(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  velocity_raw_cache_.assign(info_.joints.size(), 0.0);
+  torque_raw_cache_.assign(info_.joints.size(), 0.0);
   command_cache_.assign(info_.joints.size(), 0.0);
   position_state_handles_.assign(info_.joints.size(), nullptr);
+  velocity_state_handles_.assign(info_.joints.size(), nullptr);
+  effort_state_handles_.assign(info_.joints.size(), nullptr);
+  velocity_raw_state_handles_.assign(info_.joints.size(), nullptr);
+  torque_raw_state_handles_.assign(info_.joints.size(), nullptr);
   position_command_handles_.assign(info_.joints.size(), nullptr);
   joint_to_motor_index_.assign(info_.joints.size(), kNoMotor);
   joint_sign_.assign(info_.joints.size(), 1.0);
   joint_offset_rad_.assign(info_.joints.size(), 0.0);
+  joint_reduction_ratio_.assign(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_rated_torque_nm_.assign(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_velocity_scale_rad_s_per_raw_.assign(
+    info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  joint_effort_scale_nm_per_raw_.assign(
+    info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   joint_position_wraparound_.assign(info_.joints.size(), false);
   joint_position_wrap_reference_rad_.assign(
     info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
@@ -225,8 +241,21 @@ hardware_interface::CallbackReturn LeftEsMotorHardwareInterface::
         response->success = set_motors_enabled_manually(request->data, response->message);
       });
 
+    pdo_record_service_ = recovery_node_->create_service<std_srvs::srv::SetBool>(
+      "/left_arm/record_pdo",
+      [this](
+        const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+        std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+      {
+        response->success = request->data ?
+          driver_->startPdoRecording(response->message) :
+          driver_->stopPdoRecording(response->message);
+      });
+
     RCLCPP_INFO(
-      logger(), "Manual recovery services ready: /left_arm/reset_fault and /left_arm/enable");
+      logger(),
+      "Hardware services ready: /left_arm/reset_fault, /left_arm/enable, "
+      "/left_arm/record_pdo");
   } else {
     RCLCPP_ERROR(logger(), "Controller manager executor is unavailable; cannot create recovery services.");
     return hardware_interface::CallbackReturn::ERROR;
@@ -263,6 +292,50 @@ bool LeftEsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
     driver_config_.csp_direct_position_commands = parse_bool(
       get_string_param(info_.hardware_parameters, "csp_direct_position_commands", "false"),
       "csp_direct_position_commands");
+    driver_config_.enable_velocity_torque_feedback = parse_bool(
+      get_string_param(info_.hardware_parameters, "enable_velocity_torque_feedback", "false"),
+      "enable_velocity_torque_feedback");
+    velocity_raw_rpm_per_count_ = parse_double(
+      get_string_param(info_.hardware_parameters, "velocity_raw_rpm_per_count", "0.1"),
+      "velocity_raw_rpm_per_count");
+    torque_raw_full_scale_ = parse_double(
+      get_string_param(info_.hardware_parameters, "torque_raw_full_scale", "10000.0"),
+      "torque_raw_full_scale");
+    if (!std::isfinite(velocity_raw_rpm_per_count_) || velocity_raw_rpm_per_count_ <= 0.0 ||
+      !std::isfinite(torque_raw_full_scale_) || torque_raw_full_scale_ <= 0.0)
+    {
+      RCLCPP_ERROR(
+        logger(),
+        "Feedback unit scales must be finite and positive: velocity_raw_rpm_per_count=%.9f "
+        "torque_raw_full_scale=%.3f.",
+        velocity_raw_rpm_per_count_, torque_raw_full_scale_);
+      return false;
+    }
+    driver_config_.pdo_diagnostics_buffer_cycles = static_cast<size_t>(parse_u64(
+      get_string_param(
+        info_.hardware_parameters, "pdo_diagnostics_buffer_cycles", "16384"),
+      "pdo_diagnostics_buffer_cycles"));
+    driver_config_.pdo_diagnostics_auto_start = parse_bool(
+      get_string_param(info_.hardware_parameters, "pdo_diagnostics_auto_start", "false"),
+      "pdo_diagnostics_auto_start");
+    driver_config_.pdo_diagnostics_max_cycles = parse_u64(
+      get_string_param(info_.hardware_parameters, "pdo_diagnostics_max_cycles", "0"),
+      "pdo_diagnostics_max_cycles");
+    if (driver_config_.pdo_diagnostics_buffer_cycles < 1024U ||
+      driver_config_.pdo_diagnostics_buffer_cycles > 1048576U)
+    {
+      RCLCPP_ERROR(
+        logger(), "pdo_diagnostics_buffer_cycles must be in [1024, 1048576], got %zu.",
+        driver_config_.pdo_diagnostics_buffer_cycles);
+      return false;
+    }
+    if (driver_config_.pdo_diagnostics_auto_start &&
+      driver_config_.pdo_diagnostics_max_cycles == 0U)
+    {
+      RCLCPP_WARN(
+        logger(),
+        "Automatic PDO recording has no cycle limit and can consume disk space continuously.");
+    }
     enable_motors_on_activate_ = parse_bool(
       get_string_param(info_.hardware_parameters, "enable_motors_on_activate", "true"),
       "enable_motors_on_activate");
@@ -338,6 +411,36 @@ bool LeftEsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
         get_local_or_global_param(joint.parameters, info_.hardware_parameters, "joint_sign", "1.0"), joint.name + ".joint_sign");
       joint_offset_rad_[joint_index] = parse_double(
         get_local_or_global_param(joint.parameters, info_.hardware_parameters, "position_offset_rad", "0.0"), joint.name + ".position_offset_rad");
+      joint_reduction_ratio_[joint_index] = parse_double(
+        get_local_or_global_param(
+          joint.parameters, info_.hardware_parameters, "reduction_ratio", "nan"),
+        joint.name + ".reduction_ratio");
+      joint_rated_torque_nm_[joint_index] = parse_double(
+        get_local_or_global_param(
+          joint.parameters, info_.hardware_parameters, "rated_torque_nm", "nan"),
+        joint.name + ".rated_torque_nm");
+
+      if (driver_config_.enable_velocity_torque_feedback &&
+        (!std::isfinite(joint_reduction_ratio_[joint_index]) ||
+        joint_reduction_ratio_[joint_index] <= 0.0 ||
+        !std::isfinite(joint_rated_torque_nm_[joint_index]) ||
+        joint_rated_torque_nm_[joint_index] <= 0.0))
+      {
+        RCLCPP_ERROR(
+          logger(),
+          "Joint '%s' requires finite positive reduction_ratio and rated_torque_nm "
+          "when velocity/torque feedback is enabled (got %.6f, %.6f).",
+          joint.name.c_str(), joint_reduction_ratio_[joint_index],
+          joint_rated_torque_nm_[joint_index]);
+        return false;
+      }
+
+      joint_velocity_scale_rad_s_per_raw_[joint_index] =
+        joint_sign_[joint_index] * velocity_raw_rpm_per_count_ * kTwoPi /
+        (60.0 * joint_reduction_ratio_[joint_index]);
+      joint_effort_scale_nm_per_raw_[joint_index] =
+        joint_sign_[joint_index] * joint_rated_torque_nm_[joint_index] /
+        torque_raw_full_scale_;
       joint_position_wraparound_[joint_index] = parse_bool(
         get_local_or_global_param(
           joint.parameters, info_.hardware_parameters, "position_wraparound", "false"),
@@ -372,9 +475,14 @@ bool LeftEsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
       RCLCPP_INFO(
         logger(),
         "EtherCAT joint mapping: joint=%s motor=%s slave_position=%u counts_per_rev=%.1f "
-        "sign=%.1f offset_rad=%.6f wraparound=%d wrap_reference_rad=%.6f",
+        "sign=%.1f offset_rad=%.6f reduction_ratio=%.3f rated_torque_nm=%.3f "
+        "velocity_scale=%.12f_rad_s_per_raw effort_scale=%.9f_Nm_per_raw "
+        "wraparound=%d wrap_reference_rad=%.6f",
         joint.name.c_str(), motor_config.name.c_str(), motor_config.address.slave_position,
         motor_config.counts_per_rev, joint_sign_[joint_index], joint_offset_rad_[joint_index],
+        joint_reduction_ratio_[joint_index], joint_rated_torque_nm_[joint_index],
+        joint_velocity_scale_rad_s_per_raw_[joint_index],
+        joint_effort_scale_nm_per_raw_[joint_index],
         static_cast<int>(joint_position_wraparound_[joint_index]),
         joint_position_wrap_reference_rad_[joint_index]);
 
@@ -730,6 +838,20 @@ std::vector<hardware_interface::StateInterface::ConstSharedPtr> LeftEsMotorHardw
         if (const auto initial_value = position_state_handles_[i]->get_optional<double>()) {
           position_cache_[i] = *initial_value;
         }
+      } else if (interface.name == hardware_interface::HW_IF_VELOCITY) {
+        const std::string interface_name =
+          info_.joints[i].name + "/" + hardware_interface::HW_IF_VELOCITY;
+        velocity_state_handles_[i] = get_state_interface_handle(interface_name);
+      } else if (interface.name == hardware_interface::HW_IF_EFFORT) {
+        const std::string interface_name =
+          info_.joints[i].name + "/" + hardware_interface::HW_IF_EFFORT;
+        effort_state_handles_[i] = get_state_interface_handle(interface_name);
+      } else if (interface.name == kVelocityRawInterface) {
+        const std::string interface_name = info_.joints[i].name + "/" + kVelocityRawInterface;
+        velocity_raw_state_handles_[i] = get_state_interface_handle(interface_name);
+      } else if (interface.name == kTorqueRawInterface) {
+        const std::string interface_name = info_.joints[i].name + "/" + kTorqueRawInterface;
+        torque_raw_state_handles_[i] = get_state_interface_handle(interface_name);
       }
     }
   }
@@ -760,6 +882,34 @@ bool LeftEsMotorHardwareInterface::set_position_state(size_t joint_index, double
 {
   position_cache_[joint_index] = value;
   const auto & handle = position_state_handles_[joint_index];
+  return handle ? handle->set_value(value, false) : false;
+}
+
+bool LeftEsMotorHardwareInterface::set_velocity_state(size_t joint_index, double value)
+{
+  velocity_cache_[joint_index] = value;
+  const auto & handle = velocity_state_handles_[joint_index];
+  return handle ? handle->set_value(value, false) : false;
+}
+
+bool LeftEsMotorHardwareInterface::set_effort_state(size_t joint_index, double value)
+{
+  effort_cache_[joint_index] = value;
+  const auto & handle = effort_state_handles_[joint_index];
+  return handle ? handle->set_value(value, false) : false;
+}
+
+bool LeftEsMotorHardwareInterface::set_velocity_raw_state(size_t joint_index, double value)
+{
+  velocity_raw_cache_[joint_index] = value;
+  const auto & handle = velocity_raw_state_handles_[joint_index];
+  return handle ? handle->set_value(value, false) : false;
+}
+
+bool LeftEsMotorHardwareInterface::set_torque_raw_state(size_t joint_index, double value)
+{
+  torque_raw_cache_[joint_index] = value;
+  const auto & handle = torque_raw_state_handles_[joint_index];
   return handle ? handle->set_value(value, false) : false;
 }
 
@@ -1112,6 +1262,20 @@ hardware_interface::return_type LeftEsMotorHardwareInterface::
     if (state.status_word != 0) {
       set_position_state(
         joint_index, counts_to_radians(state.actual_counts, motor, joint_index));
+
+      if (driver_config_.enable_velocity_torque_feedback) {
+        const double velocity_raw = static_cast<double>(state.actual_velocity_raw);
+        const double torque_raw = static_cast<double>(state.actual_torque_raw);
+        set_velocity_raw_state(joint_index, velocity_raw);
+        set_torque_raw_state(joint_index, torque_raw);
+        // GH1 manual: 0x606C is 0.1 motor RPM/count and 0x6077 is
+        // 1/10000 rated current/count. The module data sheets provide the
+        // 101:1 reduction and rated output torque used for ROS SI units.
+        set_velocity_state(
+          joint_index, velocity_raw * joint_velocity_scale_rad_s_per_raw_[joint_index]);
+        set_effort_state(
+          joint_index, torque_raw * joint_effort_scale_nm_per_raw_[joint_index]);
+      }
     }
 
     if (state.fault || state.fault_reaction_active || state.quick_stop_active) {

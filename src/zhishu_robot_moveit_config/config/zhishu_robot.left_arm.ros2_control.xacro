@@ -32,6 +32,13 @@
                 <!-- In CSP mode the 1 kHz ros2_control target is already limited;
                      forward it directly instead of applying a second software profile. -->
                 <param name="csp_direct_position_commands">true</param>
+                <!-- On-demand 1 kHz PDO capture uses a lock-free ring and a
+                     non-realtime CSV writer. 16384 cycles tolerate a 16 s disk stall. -->
+                <param name="pdo_diagnostics_buffer_cycles">16384</param>
+                <!-- Capture a bounded 20 s startup window even if the ROS service
+                     executor is unavailable. This avoids unbounded disk growth. -->
+                <param name="pdo_diagnostics_auto_start">true</param>
+                <param name="pdo_diagnostics_max_cycles">20000</param>
                 <param name="enable_motors_on_activate">${enable_motors_on_activate}</param>
                 <param name="master_index">0</param>
                 <param name="alias">0</param>
@@ -39,6 +46,13 @@
                 <param name="product_code">0x26483052</param>
                 <param name="configure_sdo">true</param>
                 <param name="configure_pdos">true</param>
+                <!-- Keep TxPDO index 0x1A01, but remap it to include the ESI
+                     feedback objects 0x606C (velocity) and 0x6077 (torque). -->
+                <param name="enable_velocity_torque_feedback">true</param>
+                <!-- GH1 manual units: 0x606C = 0.1 motor RPM/count;
+                     0x6077 = 1/10000 rated current/count. -->
+                <param name="velocity_raw_rpm_per_count">0.1</param>
+                <param name="torque_raw_full_scale">10000.0</param>
                 <param name="mode_of_operation">8</param>
                 <param name="auto_enable">false</param>
                 <param name="counts_per_rev">131072.0</param>
@@ -62,28 +76,49 @@
                 <param name="position_wrap_reference_rad">-1.073365</param>
                 <param name="motor_name">left_arm_motor_0</param>
                 <param name="slave_position">0</param>
+                <param name="motor_model">GH32A1-101-DBE-R</param>
+                <param name="reduction_ratio">101.0</param>
+                <param name="rated_torque_nm">178.0</param>
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['left_shoulder_pitch_joint']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+                <state_interface name="velocity_raw"/>
+                <state_interface name="torque_raw"/>
             </joint>
             <joint name="left_shoulder_roll_joint">
                 <param name="use_ethercat">true</param>
                 <param name="motor_name">left_arm_motor_1</param>
                 <param name="slave_position">1</param>
+                <param name="motor_model">GH32A1-101-DBE-R</param>
+                <param name="reduction_ratio">101.0</param>
+                <param name="rated_torque_nm">178.0</param>
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['left_shoulder_roll_joint']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+                <state_interface name="velocity_raw"/>
+                <state_interface name="torque_raw"/>
             </joint>
             <joint name="left_shoulder_yaw_joint">
                 <param name="use_ethercat">true</param>
                 <param name="motor_name">left_arm_motor_2</param>
                 <param name="slave_position">2</param>
+                <param name="motor_model">GH20A1-101-D0E-R</param>
+                <param name="reduction_ratio">101.0</param>
+                <param name="rated_torque_nm">52.0</param>
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['left_shoulder_yaw_joint']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+                <state_interface name="velocity_raw"/>
+                <state_interface name="torque_raw"/>
             </joint>
             <joint name="left_elbow_pitch_joint">
                 <param name="use_ethercat">true</param>
@@ -91,37 +126,65 @@
                 <param name="snap_lower_limit_rad">0.0</param>
                 <param name="motor_name">left_arm_motor_3</param>
                 <param name="slave_position">3</param>
+                <param name="motor_model">GH17A1-101-D0E-R</param>
+                <param name="reduction_ratio">101.0</param>
+                <param name="rated_torque_nm">31.0</param>
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['left_elbow_pitch_joint']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+                <state_interface name="velocity_raw"/>
+                <state_interface name="torque_raw"/>
             </joint>
             <joint name="left_wrist_yaw_joint">
                 <param name="use_ethercat">true</param>
                 <param name="motor_name">left_arm_motor_4</param>
                 <param name="slave_position">4</param>
+                <param name="motor_model">GH14A1-101-D0E-R</param>
+                <param name="reduction_ratio">101.0</param>
+                <param name="rated_torque_nm">10.0</param>
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['left_wrist_yaw_joint']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+                <state_interface name="velocity_raw"/>
+                <state_interface name="torque_raw"/>
             </joint>
             <joint name="left_wrist_pitch_joint">
                 <param name="use_ethercat">true</param>
                 <param name="motor_name">left_arm_motor_5</param>
                 <param name="slave_position">5</param>
+                <param name="motor_model">GH14A1-101-D0E-R</param>
+                <param name="reduction_ratio">101.0</param>
+                <param name="rated_torque_nm">10.0</param>
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['left_wrist_pitch_joint']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+                <state_interface name="velocity_raw"/>
+                <state_interface name="torque_raw"/>
             </joint>
             <joint name="left_wrist_roll_joint">
                 <param name="use_ethercat">true</param>
                 <param name="motor_name">left_arm_motor_6</param>
                 <param name="slave_position">6</param>
+                <param name="motor_model">GH11A1-101-D0E-R</param>
+                <param name="reduction_ratio">101.0</param>
+                <param name="rated_torque_nm">4.8</param>
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['left_wrist_roll_joint']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+                <state_interface name="velocity_raw"/>
+                <state_interface name="torque_raw"/>
             </joint>
 
             <joint name="left_gripper_left_finger_joint">

@@ -13,6 +13,14 @@ find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(std_srvs REQUIRED)
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(
+    test_pdo_diagnostics
+    test/test_pdo_diagnostics.py
+  )
+endif()
+
 # IgH EtherCAT master user-space development files
 set(ECRT_INCLUDE_DIR "/usr/local/etherlab/include" CACHE PATH "Path containing ecrt.h")
 set(ECRT_LIBRARY "/usr/local/etherlab/lib/libethercat.so" CACHE FILEPATH "Path to libethercat.so or libethercat.a")
@@ -117,6 +125,13 @@ install(
 install(
   DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS
+    scripts/record_pdo_diagnostics.py
+    scripts/analyze_pdo_diagnostics.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

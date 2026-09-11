@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -63,6 +64,23 @@ struct DriverConfig
   // for non-CSP deployments and rollback.
   bool csp_direct_position_commands = false;
 
+  // Keep the firmware-accepted TxPDO index 0x1A01, but remap it to include
+  // the ESI-defined 0x606C velocity and 0x6077 torque feedback entries.
+  // This avoids selecting the 13-byte 0x1A00 map that was rejected by the
+  // tested GH1 firmware with AL 0x0017.
+  bool enable_velocity_torque_feedback = false;
+
+  // Number of complete EtherCAT cycles retained while the non-realtime CSV
+  // writer catches up. Recording is started and stopped explicitly through
+  // EthercatDriver; the cyclic thread never performs file I/O.
+  size_t pdo_diagnostics_buffer_cycles = 16384;
+
+  // Optionally start a bounded PDO capture as soon as EtherCAT initialization
+  // succeeds. This is also a fallback when the controller-manager service
+  // executor is unavailable. Zero max cycles means no automatic stop.
+  bool pdo_diagnostics_auto_start = false;
+  uint64_t pdo_diagnostics_max_cycles = 0;
+
   std::vector<MotorConfig> motors;
 };
 
@@ -86,8 +104,14 @@ struct MotorState
   int domain_wc_state = 0;
 
   int32_t actual_counts = 0;
+  // Raw CiA-402 values from the ESI-defined feedback objects. Unit conversion
+  // belongs in the ros2_control adapter because the ESI does not define the
+  // physical scaling for these objects.
+  int32_t actual_velocity_raw = 0;  // 0x606C:00, DINT
+  int16_t actual_torque_raw = 0;    // 0x6077:00, INT
   int32_t command_counts = 0;
   int64_t goal_counts = 0;
+  uint64_t goal_update_sequence = 0;
 };
 
 class EthercatDriver
@@ -130,6 +154,13 @@ public:
 
   bool getMotorState(const MotorAddress & address, MotorState & state) const;
   std::vector<MotorState> getAllMotorStates() const;
+
+  // Capture the exact cyclic PDO process image without doing any file I/O in
+  // the realtime EtherCAT thread. The returned message contains the CSV path
+  // on start and sample/drop statistics on stop.
+  bool startPdoRecording(std::string & message);
+  bool stopPdoRecording(std::string & message);
+  bool isPdoRecording() const;
 
 private:
   class Impl;
