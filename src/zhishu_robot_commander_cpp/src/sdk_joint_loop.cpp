@@ -59,7 +59,7 @@ zhishu_robot_commander_cpp::Commander::Options commanderOptions(
   options.velocity_scaling = getOrDeclareParameter<double>(
     node, "commander.velocity_scaling", 0.30);
   options.acceleration_scaling = getOrDeclareParameter<double>(
-    node, "commander.acceleration_scaling", 0.30);
+    node, "commander.acceleration_scaling", 1.0);
   options.planning_time = getOrDeclareParameter<double>(
     node, "commander.planning_time", 5.0);
   options.planning_attempts = static_cast<int>(getOrDeclareParameter<std::int64_t>(
@@ -328,7 +328,7 @@ int main(int argc, char ** argv)
     {-15.0, -13.0, -24.0, 20.0, 32.0, -27.0, 19.0});
   const auto right_pose_degrees = getOrDeclareParameter<std::vector<double>>(
     node, "right_target_joints",
-    {15.0, 13.0, 24.0, 20.0, -32.0, 27.0, 19.0});
+    {15.0, 13.0, 24.0, 20.0, -32.0, 0.0, 19.0});
   std::vector<double> both_pose = degreesToRadians(left_pose_degrees);
   const auto right_pose_radians = degreesToRadians(right_pose_degrees);
   both_pose.insert(both_pose.end(), right_pose_radians.begin(), right_pose_radians.end());
