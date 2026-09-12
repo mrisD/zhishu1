@@ -12,6 +12,7 @@
   <depend>rclcpp</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
   <depend>moveit_msgs</depend>
   <depend>zhishu_robot_interfaces</depend>
   <depend>moveit_ros_planning_interface</depend>

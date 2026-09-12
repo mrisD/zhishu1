@@ -58,6 +58,10 @@ struct PdoDiagnosticMotorSample
   int32_t target_position = 0;
   int32_t actual_position = 0;
   int32_t position_error = 0;
+  double sent_target_position_joint_rad = 0.0;
+  double feedback_actual_position_joint_rad = 0.0;
+  double position_error_joint_rad = 0.0;
+  double position_conversion_offset_rad = 0.0;
   int32_t target_delta = 0;
   int32_t actual_delta = 0;
   int32_t actual_velocity = 0;
@@ -169,7 +173,8 @@ int64_t monotonicNs()
 struct MotorContext
 {
   explicit MotorContext(const MotorConfig & cfg)
-  : config(cfg), command_enable(cfg.auto_enable)
+  : config(cfg), command_enable(cfg.auto_enable),
+    diagnostic_position_offset_rad(cfg.position_offset_rad)
   {
   }
 
@@ -196,6 +201,7 @@ struct MotorContext
   std::atomic<bool> error_code_valid{false};
   std::atomic<int> cia402_state{static_cast<int>(Cia402State::Unknown)};
   std::atomic<int64_t> goal_counts{0};
+  std::atomic<double> diagnostic_position_offset_rad{0.0};
   // High 32 bits: update sequence; low 32 bits: signed target counts.
   // Publishing both in one atomic prevents the EtherCAT thread from pairing a
   // new target with an old sequence (or vice versa).
@@ -364,6 +370,16 @@ public:
     return true;
   }
 
+  bool setDiagnosticPositionOffsetRad(const MotorAddress & address, double offset_rad)
+  {
+    auto motor = findMotor(address);
+    if (!motor || !std::isfinite(offset_rad)) {
+      return false;
+    }
+    motor->diagnostic_position_offset_rad.store(offset_rad, std::memory_order_release);
+    return true;
+  }
+
   bool setRelativeTargetCounts(const MotorAddress & address, int32_t delta_counts)
   {
     auto motor = findMotor(address);
@@ -512,11 +528,19 @@ public:
       }
       std::filesystem::create_directories(output_directory);
 
-      std::time_t now = std::time(nullptr);
+      const auto now = std::chrono::system_clock::now();
+      const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
       std::tm local_time{};
-      localtime_r(&now, &local_time);
-      char timestamp[32]{};
-      std::strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &local_time);
+      localtime_r(&now_time, &local_time);
+      char timestamp_seconds[32]{};
+      std::strftime(
+        timestamp_seconds, sizeof(timestamp_seconds), "%Y%m%d_%H%M%S", &local_time);
+      const auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
+        now.time_since_epoch()).count() % 1000000LL;
+      char timestamp[48]{};
+      std::snprintf(
+        timestamp, sizeof(timestamp), "%s_%06lld", timestamp_seconds,
+        static_cast<long long>(microseconds));
       const unsigned int master_index = config_.motors.front().address.master_index;
       output_directory /=
         "pdo_master" + std::to_string(master_index) + "_" + timestamp + ".csv";
@@ -539,13 +563,16 @@ public:
       "# With enable_velocity_torque_feedback=true, 0x1A01 is remapped to the ESI-defined "
       "0x6041/0x6064/0x606C/0x6077 entries (12-byte SM3).\n"
       "# Values from 0x606C and 0x6077 are recorded raw; no undocumented physical-unit "
-      "scaling is applied.\n"
+      "scaling is applied. Joint SI columns use the explicit ros2_control configuration.\n"
       "monotonic_ns,scheduled_cycle_start_ns,cycle_period_ns,period_jitter_ns,"
       "start_lateness_ns,wake_lateness_ns,execution_ns,deadline_miss_total,"
       "dropped_cycles_total,cycle,master_index,domain_wc,domain_wc_state,motor_name,"
       "slave_position,target_position_607a,actual_position_6064,position_error_counts,"
+      "sent_target_position_joint_rad,feedback_actual_position_joint_rad,"
+      "position_error_joint_rad,position_conversion_offset_rad,"
       "target_delta_counts,actual_delta_counts,actual_velocity_606c_raw,"
-      "actual_torque_6077_raw,control_word_6040,status_word_6041,error_code_valid,"
+      "actual_torque_6077_raw,joint_velocity_rad_s,joint_effort_nm,"
+      "control_word_6040,status_word_6041,error_code_valid,"
       "error_code_603f,goal_update_sequence,goal_sequence_delta\n");
     std::fflush(pdo_diagnostics_file_);
 
@@ -637,7 +664,8 @@ private:
           std::fprintf(
             pdo_diagnostics_file_,
             "%lld,%lld,%lld,%lld,%lld,%lld,%llu,%llu,%llu,%llu,%u,%u,%u,%s,%u,"
-            "%d,%d,%d,%d,%d,%d,%d,0x%04X,0x%04X,%u,0x%04X,%llu,%u\n",
+            "%d,%d,%d,%.12g,%.12g,%.12g,%.12g,%d,%d,%d,%d,%.12g,%.12g,"
+            "0x%04X,0x%04X,%u,0x%04X,%llu,%u\n",
             static_cast<long long>(record.monotonic_ns),
             static_cast<long long>(record.scheduled_cycle_start_ns),
             static_cast<long long>(record.cycle_period_ns),
@@ -653,10 +681,18 @@ private:
             static_cast<int>(sample.target_position),
             static_cast<int>(sample.actual_position),
             static_cast<int>(sample.position_error),
+            sample.sent_target_position_joint_rad,
+            sample.feedback_actual_position_joint_rad,
+            sample.position_error_joint_rad,
+            sample.position_conversion_offset_rad,
             static_cast<int>(sample.target_delta),
             static_cast<int>(sample.actual_delta),
             static_cast<int>(sample.actual_velocity),
             static_cast<int>(sample.actual_torque),
+            static_cast<double>(sample.actual_velocity) *
+            motor.velocity_scale_rad_s_per_raw,
+            static_cast<double>(sample.actual_torque) *
+            motor.effort_scale_nm_per_raw,
             static_cast<unsigned int>(sample.control_word),
             static_cast<unsigned int>(sample.status_word),
             sample.error_code_valid ? 1U : 0U,
@@ -1502,6 +1538,16 @@ private:
           sample.actual_position = actual;
           sample.position_error = clampToInt32(
             static_cast<double>(command_position) - static_cast<double>(actual));
+          const double position_scale = motor->config.position_scale_rad_per_count;
+          const double position_offset =
+            motor->diagnostic_position_offset_rad.load(std::memory_order_acquire);
+          sample.sent_target_position_joint_rad =
+            static_cast<double>(command_position) * position_scale + position_offset;
+          sample.feedback_actual_position_joint_rad =
+            static_cast<double>(actual) * position_scale + position_offset;
+          sample.position_error_joint_rad =
+            static_cast<double>(sample.position_error) * position_scale;
+          sample.position_conversion_offset_rad = position_offset;
           if (motor->previous_pdo_sample_valid) {
             sample.target_delta = clampToInt32(
               static_cast<double>(command_position) -
@@ -1778,6 +1824,12 @@ bool EthercatDriver::isEthercatOk() const
 bool EthercatDriver::setAbsoluteTargetCounts(const MotorAddress & address, int32_t counts)
 {
   return impl_->setAbsoluteTargetCounts(address, counts);
+}
+
+bool EthercatDriver::setDiagnosticPositionOffsetRad(
+  const MotorAddress & address, double offset_rad)
+{
+  return impl_->setDiagnosticPositionOffsetRad(address, offset_rad);
 }
 
 bool EthercatDriver::setRelativeTargetCounts(const MotorAddress & address, int32_t delta_counts)

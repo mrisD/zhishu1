@@ -9,7 +9,7 @@ import rclpy
 from std_srvs.srv import SetBool
 
 
-def call_both(node, clients, enabled, timeout):
+def call_services(node, clients, enabled, timeout):
     request = SetBool.Request()
     request.data = enabled
     futures = [client.call_async(request) for client in clients]
@@ -70,10 +70,25 @@ def main():
             if not client.wait_for_service(timeout_sec=remaining):
                 raise TimeoutError(f"service is unavailable: {name}")
 
-        start_responses = call_both(node, clients, True, args.service_timeout)
+        start_responses = call_services(node, clients, True, args.service_timeout)
         for name, response in zip(service_names, start_responses):
             print(f"{name}: {response.message}")
         if not all(response.success for response in start_responses):
+            started_clients = [
+                client
+                for client, response in zip(clients, start_responses)
+                if response.success
+            ]
+            if started_clients:
+                try:
+                    call_services(
+                        node, started_clients, False, args.service_timeout
+                    )
+                except Exception as error:
+                    print(
+                        f"failed to roll back partial PDO start: {error}",
+                        file=sys.stderr,
+                    )
             raise RuntimeError("one or more PDO recorders failed to start")
         started = True
 
@@ -84,7 +99,7 @@ def main():
     finally:
         if started:
             try:
-                stop_responses = call_both(
+                stop_responses = call_services(
                     node, clients, False, args.service_timeout
                 )
                 for name, response in zip(service_names, stop_responses):

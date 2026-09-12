@@ -1,4 +1,5 @@
 #include "zhishu_robot_commander_cpp/sdk.hpp"
+#include "stability_pdo_recording.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -9,6 +10,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 
@@ -308,10 +310,19 @@ int main(int argc, char ** argv)
     "both_arms_home",
   };
   TestStatistics statistics;
+  std::unique_ptr<zhishu_robot_commander_cpp::StabilityPdoRecording> pdo_recording;
 
   try {
     const auto loop_count = getOrDeclareParameter<std::int64_t>(node, "loop_count", 10);
     const auto interval_sec = getOrDeclareParameter<double>(node, "interval_sec", 1.5);
+    const auto record_pdo = getOrDeclareParameter<bool>(
+      node, "record_pdo_diagnostics", true);
+    const auto use_fake_hardware = getOrDeclareParameter<bool>(
+      node, "use_fake_hardware", false);
+    const auto pdo_record_cycles = getOrDeclareParameter<std::int64_t>(
+      node, "pdo_record_cycles", 1);
+    const auto pdo_service_timeout_sec = getOrDeclareParameter<double>(
+      node, "pdo_service_timeout_sec", 10.0);
     const auto options = commanderOptions(node);
 
     if (loop_count < 0) {
@@ -323,6 +334,16 @@ int main(int argc, char ** argv)
     } else if (interval_sec < 0.0) {
       RCLCPP_ERROR(
         node->get_logger(), "interval_sec must be >= 0.0, got %.3f", interval_sec);
+      statistics.stop_reason = "invalid_parameter";
+      exit_code = 2;
+    } else if (record_pdo && !use_fake_hardware &&
+      (pdo_record_cycles <= 0 || pdo_service_timeout_sec <= 0.0))
+    {
+      RCLCPP_ERROR(
+        node->get_logger(),
+        "pdo_record_cycles and pdo_service_timeout_sec must be positive when PDO "
+        "recording is enabled; got %ld and %.3f",
+        static_cast<long>(pdo_record_cycles), pdo_service_timeout_sec);
       statistics.stop_reason = "invalid_parameter";
       exit_code = 2;
     } else {
@@ -337,6 +358,19 @@ int main(int argc, char ** argv)
         statistics.stop_reason = "robot_not_ready";
         exit_code = 1;
       } else {
+        if (record_pdo && !use_fake_hardware) {
+          const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::duration<double>(pdo_service_timeout_sec));
+          pdo_recording =
+            std::make_unique<zhishu_robot_commander_cpp::StabilityPdoRecording>(
+            node, timeout);
+          if (!pdo_recording->start()) {
+            statistics.stop_reason = "pdo_recording_start_failure";
+            throw std::runtime_error(
+                    "both PDO recorders must start before the real-hardware stability test");
+          }
+        }
+
         statistics.test_start = SteadyClock::now();
         RCLCPP_INFO(
           node->get_logger(),
@@ -428,6 +462,16 @@ int main(int argc, char ** argv)
             elapsedSeconds(statistics.test_start),
             static_cast<unsigned long>(statistics.successful_motions),
             static_cast<unsigned long>(statistics.failed_motions));
+
+          if (pdo_recording && pdo_recording->active() &&
+            statistics.completed_cycles >= static_cast<std::uint64_t>(pdo_record_cycles))
+          {
+            if (!pdo_recording->stop()) {
+              statistics.stop_reason = "pdo_recording_stop_failure";
+              exit_code = 1;
+              break;
+            }
+          }
           ++cycle;
         }
 
@@ -448,11 +492,14 @@ int main(int argc, char ** argv)
       }
     }
   } catch (const std::exception & exception) {
-    statistics.stop_reason = "exception";
+    if (statistics.stop_reason == "completed") {
+      statistics.stop_reason = "exception";
+    }
     RCLCPP_FATAL(node->get_logger(), "named-pose stability test failed: %s", exception.what());
     exit_code = 1;
   }
 
+  pdo_recording.reset();
   executor.cancel();
   if (spinner.joinable()) {
     spinner.join();

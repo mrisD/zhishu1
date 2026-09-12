@@ -7,8 +7,11 @@ from collections import defaultdict
 
 
 class MotorStats:
-    def __init__(self):
+    def __init__(self, moving_velocity_threshold_raw=10):
+        self.moving_velocity_threshold_raw = moving_velocity_threshold_raw
         self.rows = 0
+        self.stable_rows = 0
+        self.moving_rows = 0
         self.first_ns = None
         self.last_ns = None
         self.target_min = None
@@ -24,6 +27,7 @@ class MotorStats:
         self.pdo_multi_update_cycles = 0
         self.skipped_goal_updates = 0
         self.errors = []
+        self.position_errors_rad = []
         self.target_steps = []
         self.period_jitter_ns = []
         self.wake_lateness_ns = []
@@ -35,6 +39,10 @@ class MotorStats:
         self.seen_wc_complete = False
         self.velocity_abs_max_raw = 0
         self.torque_abs_max_raw = 0
+        self.moving_velocity_abs_max_raw = 0
+        self.moving_torque_abs_max_raw = 0
+        self.moving_velocity_abs_max_rad_s = None
+        self.moving_effort_abs_max_nm = None
         self.status_words = set()
         self.control_words = set()
         self.error_codes = set()
@@ -44,6 +52,23 @@ class MotorStats:
         target = int(row["target_position_607a"])
         actual = int(row["actual_position_6064"])
         goal_sequence = int(row["goal_update_sequence"])
+        actual_velocity = int(row.get("actual_velocity_606c_raw", 0))
+        actual_torque = int(row.get("actual_torque_6077_raw", 0))
+        joint_velocity = row.get("joint_velocity_rad_s")
+        joint_effort = row.get("joint_effort_nm")
+        position_error_rad = row.get("position_error_joint_rad")
+        joint_velocity = (
+            float(joint_velocity) if joint_velocity not in (None, "") else None
+        )
+        joint_effort = float(joint_effort) if joint_effort not in (None, "") else None
+        if position_error_rad not in (None, ""):
+            self.position_errors_rad.append(abs(float(position_error_rad)))
+        target_delta = int(
+            row.get(
+                "target_delta_counts",
+                0 if self.last_target is None else target - self.last_target,
+            )
+        )
 
         self.period_jitter_ns.append(abs(int(row.get("period_jitter_ns", 0))))
         self.wake_lateness_ns.append(max(0, int(row.get("wake_lateness_ns", 0))))
@@ -63,13 +88,41 @@ class MotorStats:
                 self.wc_regression_cycles += 1
         self.velocity_abs_max_raw = max(
             self.velocity_abs_max_raw,
-            abs(int(row.get("actual_velocity_606c_raw", 0))),
+            abs(actual_velocity),
         )
         self.torque_abs_max_raw = max(
             self.torque_abs_max_raw,
-            abs(int(row.get("actual_torque_6077_raw", 0))),
+            abs(actual_torque),
         )
-        self.status_words.add(int(row.get("status_word_6041", "0"), 0))
+        status_word_text = row.get("status_word_6041")
+        status_word = int(status_word_text, 0) if status_word_text is not None else None
+        if status_word is not None:
+            self.status_words.add(status_word)
+        operation_enabled = status_word is None or (status_word & 0x006F) == 0x0027
+        if wc_complete and operation_enabled:
+            self.stable_rows += 1
+            moving = (
+                target_delta != 0
+                or abs(actual_velocity) >= self.moving_velocity_threshold_raw
+            )
+            if moving:
+                self.moving_rows += 1
+                self.moving_velocity_abs_max_raw = max(
+                    self.moving_velocity_abs_max_raw, abs(actual_velocity)
+                )
+                self.moving_torque_abs_max_raw = max(
+                    self.moving_torque_abs_max_raw, abs(actual_torque)
+                )
+                if joint_velocity is not None:
+                    self.moving_velocity_abs_max_rad_s = max(
+                        self.moving_velocity_abs_max_rad_s or 0.0,
+                        abs(joint_velocity),
+                    )
+                if joint_effort is not None:
+                    self.moving_effort_abs_max_nm = max(
+                        self.moving_effort_abs_max_nm or 0.0,
+                        abs(joint_effort),
+                    )
         if "control_word_6040" in row:
             self.control_words.add(int(row["control_word_6040"], 0))
         if int(row.get("error_code_valid", 0)):
@@ -131,6 +184,8 @@ class MotorStats:
             )
         elif target_span <= 2 and actual_span >= 5:
             verdict = "目标基本静止但实际位置波动：优先检查驱动器伺服参数/机械系统"
+        elif self.stable_rows > 0 and self.moving_rows < 10:
+            verdict = "未捕获明确运动阶段：请将 PDO 记录与 MOVE_START 同步"
         elif target_change_ratio > 0.01:
             verdict = "目标本身持续变化：需结合轨迹阶段检查 ros2_control/驱动下发"
         else:
@@ -167,9 +222,19 @@ def main():
         description="Summarize exact EtherCAT PDO diagnostic CSV files."
     )
     parser.add_argument("csv", nargs="+", help="one or more pdo_master*.csv files")
+    parser.add_argument(
+        "--moving-velocity-threshold-raw",
+        type=int,
+        default=10,
+        help="absolute 0x606C raw threshold used to classify motion (default: 10)",
+    )
     args = parser.parse_args()
+    if args.moving_velocity_threshold_raw < 0:
+        parser.error("--moving-velocity-threshold-raw must be non-negative")
 
-    stats = defaultdict(MotorStats)
+    stats = defaultdict(
+        lambda: MotorStats(args.moving_velocity_threshold_raw)
+    )
     for path in args.csv:
         for row in rows_from_file(path):
             key = (int(row["master_index"]), row["motor_name"])
@@ -179,8 +244,12 @@ def main():
         "master motor samples seconds target_span actual_span target_change% "
         "actual_change% repeat% multi_update_cycles skipped_updates "
         "target_step_p95 target_step_max error_p95 error_max "
+        "position_error_p95_rad position_error_max_rad "
         "jitter_p99_us wake_late_p99_us execution_p99_us deadline_misses "
-        "dropped wc_startup_incomplete wc_regressions velocity_abs_max_raw torque_abs_max_raw "
+        "dropped wc_startup_incomplete wc_regressions stable_samples moving_samples moving% "
+        "velocity_abs_max_raw torque_abs_max_raw moving_velocity_abs_max_raw "
+        "moving_torque_abs_max_raw moving_velocity_abs_max_rad_s "
+        "moving_effort_abs_max_nm "
         "status_words control_words error_codes verdict"
     )
     for (master, motor), values in sorted(stats.items()):
@@ -202,18 +271,45 @@ def main():
             execution_p99_us,
             verdict,
         ) = values.summary()
+        moving_velocity_si = (
+            "-"
+            if values.moving_velocity_abs_max_rad_s is None
+            else f"{values.moving_velocity_abs_max_rad_s:.6f}"
+        )
+        moving_effort_si = (
+            "-"
+            if values.moving_effort_abs_max_nm is None
+            else f"{values.moving_effort_abs_max_nm:.6f}"
+        )
+        position_error_p95_rad = (
+            "-"
+            if not values.position_errors_rad
+            else f"{values.percentile(values.position_errors_rad, 0.95):.9f}"
+        )
+        position_error_max_rad = (
+            "-"
+            if not values.position_errors_rad
+            else f"{max(values.position_errors_rad):.9f}"
+        )
         print(
             f"{master} {motor} {values.rows} {elapsed:.3f} "
             f"{target_span} {actual_span} "
             f"{target_change_ratio * 100:.2f} {actual_change_ratio * 100:.2f} "
             f"{repeat_ratio * 100:.2f} {multi_update_cycles} "
             f"{skipped_goal_updates} {target_step_p95} {target_step_max} "
-            f"{error_p95} {error_max} {jitter_p99_us:.3f} "
+            f"{error_p95} {error_max} "
+            f"{position_error_p95_rad} {position_error_max_rad} "
+            f"{jitter_p99_us:.3f} "
             f"{wake_late_p99_us:.3f} {execution_p99_us:.3f} "
             f"{values.deadline_miss_total} {values.dropped_cycles_total} "
             f"{values.wc_incomplete_cycles} {values.wc_regression_cycles} "
+            f"{values.stable_rows} {values.moving_rows} "
+            f"{values.moving_rows / max(1, values.stable_rows) * 100:.2f} "
             f"{values.velocity_abs_max_raw} "
             f"{values.torque_abs_max_raw} "
+            f"{values.moving_velocity_abs_max_raw} "
+            f"{values.moving_torque_abs_max_raw} "
+            f"{moving_velocity_si} {moving_effort_si} "
             f"{','.join(f'0x{x:04X}' for x in sorted(values.status_words)) or '-'} "
             f"{','.join(f'0x{x:04X}' for x in sorted(values.control_words)) or '-'} "
             f"{','.join(f'0x{x:04X}' for x in sorted(values.error_codes)) or '-'} "

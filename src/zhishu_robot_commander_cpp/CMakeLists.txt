@@ -12,6 +12,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(zhishu_robot_interfaces REQUIRED)
 find_package(Threads REQUIRED)
@@ -56,11 +57,13 @@ ament_target_dependencies(sdk_example rclcpp)
 
 add_executable(sdk_named_pose_loop src/sdk_named_pose_loop.cpp)
 target_link_libraries(sdk_named_pose_loop ${PROJECT_NAME})
-ament_target_dependencies(sdk_named_pose_loop rclcpp)
+ament_target_dependencies(sdk_named_pose_loop rclcpp std_srvs)
+target_sources(sdk_named_pose_loop PRIVATE src/stability_pdo_recording.cpp)
 
 add_executable(sdk_joint_ethercat_loop src/sdk_joint_loop.cpp)
 target_link_libraries(sdk_joint_ethercat_loop ${PROJECT_NAME})
-ament_target_dependencies(sdk_joint_ethercat_loop rclcpp)
+ament_target_dependencies(sdk_joint_ethercat_loop rclcpp std_srvs)
+target_sources(sdk_joint_ethercat_loop PRIVATE src/stability_pdo_recording.cpp)
 
 install(
   DIRECTORY include/
@@ -91,6 +94,16 @@ if(BUILD_TESTING)
   if(TARGET test_sdk_types)
     target_link_libraries(test_sdk_types ${PROJECT_NAME})
     ament_target_dependencies(test_sdk_types zhishu_robot_interfaces)
+  endif()
+
+  ament_add_gtest(
+    test_stability_pdo_recording
+    test/test_stability_pdo_recording.cpp
+    src/stability_pdo_recording.cpp
+  )
+  if(TARGET test_stability_pdo_recording)
+    target_include_directories(test_stability_pdo_recording PRIVATE src)
+    ament_target_dependencies(test_stability_pdo_recording rclcpp std_srvs)
   endif()
 endif()
 

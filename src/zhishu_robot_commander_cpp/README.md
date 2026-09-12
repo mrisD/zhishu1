@@ -302,6 +302,36 @@ ros2 launch zhishu_robot_commander_cpp sdk_joint_ethercat_loop.launch.py \
 任一动作失败立即停止。Ctrl+C 会请求取消当前 MoveIt 动作后退出。真机运行前必须先核对
 目标关节角、碰撞环境和急停/STO 状态。
 
+真机模式默认会在第一轮运动开始前同步重启左右臂 PDO 记录，在第一轮完整结束后停止，
+因此生成的 `pdo_master0_*.csv` 和 `pdo_master1_*.csv` 会覆盖真实运动，而不是只包含
+EtherCAT 启动阶段。可用 `pdo_record_cycles` 增加记录轮数，或显式关闭记录：
+
+```bash
+ros2 launch zhishu_robot_commander_cpp sdk_joint_ethercat_loop.launch.py \
+  loop_count:=10 pdo_record_cycles:=2
+
+ros2 launch zhishu_robot_commander_cpp sdk_joint_ethercat_loop.launch.py \
+  loop_count:=10 record_pdo_diagnostics:=false
+```
+
+当任一臂记录服务无法启动时，真机稳定性程序不会发送运动目标；若只有一侧启动成功，
+程序会自动回滚，避免左右 CSV 对应不同的运动时间窗。仿真模式会自动跳过 PDO 服务。
+记录完成后可运行：
+
+```bash
+ros2 run zhishu_robot_hardware analyze_pdo_diagnostics.py \
+  /path/to/pdo_master0_*.csv /path/to/pdo_master1_*.csv
+```
+
+分析结果中的 `stable_samples` 只统计 WC 完整且驱动器处于 Operation Enabled 的样本，
+`moving_samples` 则进一步要求目标位置变化或实际速度超过噪声阈值。新生成的 CSV 同时
+保留驱动器原始值，并提供按当前关节配置换算的 `joint_velocity_rad_s` 和
+`joint_effort_nm`。位置数据同时包含本周期写入驱动器的
+`sent_target_position_joint_rad`、同周期接收的
+`feedback_actual_position_joint_rad` 和 `position_error_joint_rad`；环绕关节使用与
+ros2_control 相同的连续位置分支，并在 `position_conversion_offset_rad` 中记录每个
+样本实际使用的分支偏移。
+
 ### Python SDK
 
 新增 `zhishu_robot_commander_py`。Python 端只作为 ROS 2 client，不重复加载 MoveIt；

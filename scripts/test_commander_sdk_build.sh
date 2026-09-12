@@ -10,13 +10,17 @@ if [[ ! -f /opt/ros/jazzy/setup.bash ]]; then
 fi
 
 cd "${WORKSPACE_DIR}"
+set +u
 source /opt/ros/jazzy/setup.bash
+set -u
 
 colcon build \
   --symlink-install \
   --packages-up-to zhishu_robot_commander_cpp
 
+set +u
 source install/setup.bash
+set -u
 colcon test \
   --packages-select zhishu_robot_commander_cpp \
   --event-handlers console_direct+

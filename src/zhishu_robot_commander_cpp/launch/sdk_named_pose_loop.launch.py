@@ -16,6 +16,9 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     use_fake_hardware = LaunchConfiguration("use_fake_hardware")
     enable_motors_on_activate = LaunchConfiguration("enable_motors_on_activate")
+    record_pdo_diagnostics = LaunchConfiguration("record_pdo_diagnostics")
+    pdo_record_cycles = LaunchConfiguration("pdo_record_cycles")
+    pdo_service_timeout_sec = LaunchConfiguration("pdo_service_timeout_sec")
 
     package_share = get_package_share_directory("zhishu_robot_commander_cpp")
     commander_yaml = os.path.join(package_share, "config", "commander.yaml")
@@ -53,6 +56,10 @@ def generate_launch_description():
                 "loop_count": loop_count,
                 "interval_sec": interval_sec,
                 "use_sim_time": use_sim_time,
+                "use_fake_hardware": use_fake_hardware,
+                "record_pdo_diagnostics": record_pdo_diagnostics,
+                "pdo_record_cycles": pdo_record_cycles,
+                "pdo_service_timeout_sec": pdo_service_timeout_sec,
             },
         ],
     )
@@ -74,6 +81,21 @@ def generate_launch_description():
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("use_fake_hardware", default_value="false"),
             DeclareLaunchArgument("enable_motors_on_activate", default_value="true"),
+            DeclareLaunchArgument(
+                "record_pdo_diagnostics",
+                default_value="true",
+                description="Record synchronized PDO data during real-hardware motion",
+            ),
+            DeclareLaunchArgument(
+                "pdo_record_cycles",
+                default_value="1",
+                description="Number of complete motion cycles included in the PDO recording",
+            ),
+            DeclareLaunchArgument(
+                "pdo_service_timeout_sec",
+                default_value="10.0",
+                description="Timeout for synchronized left/right PDO service calls",
+            ),
             loop_node,
         ]
     )

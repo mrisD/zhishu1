@@ -441,6 +441,14 @@ bool EsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
       joint_effort_scale_nm_per_raw_[joint_index] =
         joint_sign_[joint_index] * joint_rated_torque_nm_[joint_index] /
         torque_raw_full_scale_;
+      driver_config_.motors[motor_index].velocity_scale_rad_s_per_raw =
+        joint_velocity_scale_rad_s_per_raw_[joint_index];
+      driver_config_.motors[motor_index].effort_scale_nm_per_raw =
+        joint_effort_scale_nm_per_raw_[joint_index];
+      driver_config_.motors[motor_index].position_scale_rad_per_count =
+        joint_sign_[joint_index] * kTwoPi / motor_config.counts_per_rev;
+      driver_config_.motors[motor_index].position_offset_rad =
+        joint_offset_rad_[joint_index];
       joint_position_wraparound_[joint_index] = parse_bool(
         get_local_or_global_param(
           joint.parameters, info_.hardware_parameters, "position_wraparound", "false"),
@@ -967,6 +975,13 @@ double EsMotorHardwareInterface::counts_to_radians(
     if (offset_changed) {
       const bool was_initialized = joint_turn_offset_initialized_[joint_index];
       joint_turn_offset_rad_[joint_index] = learned_turn_offset;
+      if (!driver_->setDiagnosticPositionOffsetRad(
+          motor.address, joint_offset_rad_[joint_index] + learned_turn_offset))
+      {
+        RCLCPP_WARN(
+          logger(), "Failed to update PDO diagnostic position branch for joint '%s'.",
+          info_.joints[joint_index].name.c_str());
+      }
       RCLCPP_INFO(
         logger(),
         "%s position branch for joint '%s': raw=%.6f rad reference=%.6f rad "

@@ -90,3 +90,54 @@ def test_detects_working_counter_regression_after_complete():
     assert stats.wc_incomplete_cycles == 2
     assert stats.wc_regression_cycles == 1
     assert "WC 回退" in stats.summary()[-1]
+
+
+def test_counts_only_stable_operation_enabled_motion_samples():
+    stats = MODULE.MotorStats(moving_velocity_threshold_raw=10)
+    stats.add(
+        row(
+            0,
+            0,
+            1,
+            domain_wc_state=1,
+            status_word_6041="0x0027",
+            target_delta_counts=100,
+            actual_velocity_606c_raw=100,
+            actual_torque_6077_raw=200,
+        )
+    )
+    stats.add(
+        row(
+            10,
+            8,
+            2,
+            domain_wc_state=2,
+            status_word_6041="0x0027",
+            target_delta_counts=10,
+            actual_velocity_606c_raw=80,
+            actual_torque_6077_raw=-300,
+            joint_velocity_rad_s=0.8,
+            joint_effort_nm=-5.34,
+            position_error_joint_rad=0.002,
+        )
+    )
+    stats.add(
+        row(
+            10,
+            10,
+            2,
+            domain_wc_state=2,
+            status_word_6041="0x0040",
+            target_delta_counts=0,
+            actual_velocity_606c_raw=90,
+            actual_torque_6077_raw=400,
+        )
+    )
+
+    assert stats.stable_rows == 1
+    assert stats.moving_rows == 1
+    assert stats.moving_velocity_abs_max_raw == 80
+    assert stats.moving_torque_abs_max_raw == 300
+    assert stats.moving_velocity_abs_max_rad_s == 0.8
+    assert stats.moving_effort_abs_max_nm == 5.34
+    assert stats.position_errors_rad == [0.002]

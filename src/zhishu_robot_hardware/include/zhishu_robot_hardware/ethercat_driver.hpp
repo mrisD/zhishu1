@@ -42,6 +42,14 @@ struct MotorConfig
   double max_accel_counts_s2 = 20000.0;
   int64_t target_tolerance_counts = 20;
   double counts_per_rev = 131072.0;
+
+  // Configured joint-side conversions are retained alongside the raw PDO
+  // values so diagnostic CSV files are directly usable while preserving the
+  // original drive counts as the source of truth.
+  double velocity_scale_rad_s_per_raw = 0.0;
+  double effort_scale_nm_per_raw = 0.0;
+  double position_scale_rad_per_count = 0.0;
+  double position_offset_rad = 0.0;
 };
 
 struct DriverConfig
@@ -141,6 +149,9 @@ public:
   bool isEthercatOk() const;
 
   bool setAbsoluteTargetCounts(const MotorAddress & address, int32_t counts);
+  // Keep diagnostic joint-position conversion on the same learned 2*pi branch
+  // as ros2_control. This does not alter commands sent to the drive.
+  bool setDiagnosticPositionOffsetRad(const MotorAddress & address, double offset_rad);
   bool setRelativeTargetCounts(const MotorAddress & address, int32_t delta_counts);
   bool setTargetDegrees(const MotorAddress & address, double degrees);
   bool setRelativeDegrees(const MotorAddress & address, double delta_degrees);
