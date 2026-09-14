@@ -8,19 +8,27 @@
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>eigen3_cmake_module</build_depend>
 
   <depend>rclcpp</depend>
+  <depend>cv_bridge</depend>
+  <depend>eigen</depend>
+  <depend>libopencv-dev</depend>
+  <depend>moveit_calibration_plugins</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2_eigen</depend>
+  <depend>tf2_ros</depend>
+  <depend>visualization_msgs</depend>
   <depend>zhishu_robot_commander_cpp</depend>
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>moveit_calibration_gui</exec_depend>
-  <exec_depend>moveit_calibration_plugins</exec_depend>
   <exec_depend>moveit_configs_utils</exec_depend>
   <exec_depend>moveit_ros_visualization</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
   <exec_depend>rclpy</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>cv_bridge</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>zhishu_robot_gazebo</exec_depend>
   <exec_depend>zhishu_robot_moveit_config</exec_depend>

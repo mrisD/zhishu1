@@ -263,7 +263,11 @@ void ContextTabWidget::loadWidget(const rviz_common::Config& config)
     if (config.mapGetString(frame.first.c_str(), &frame_name))
     {
       frame.second->clear();
-      if (!frame_name.isEmpty() && frame.second->hasFrame(frame_name.toStdString()))
+      // During RViz startup TF discovery may lag behind config loading. Keep a
+      // configured frame visible even when it is not in the combo box cache
+      // yet; otherwise a valid saved Context silently becomes empty and an
+      // automatic solve cannot publish its result.
+      if (!frame_name.isEmpty())
         frame.second->addItem(frame_name);
     }
   }

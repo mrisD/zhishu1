@@ -38,6 +38,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/utils/moveit_error_code.hpp>
+#include <QMetaObject>
 
 
 namespace moveit_rviz_plugin
@@ -144,7 +145,9 @@ ControlTabWidget::ControlTabWidget(rclcpp::Node::SharedPtr node, HandEyeCalibrat
   sample_tree_view_->setHeaderHidden(true);
   sample_tree_view_->setIndentation(10);
   sample_layout->addWidget(sample_tree_view_);
-  reprojection_error_label_ = new QLabel("Reprojection error: N/A");
+  reprojection_error_label_ = new QLabel("Calibration result: N/A\nReprojection error: N/A");
+  reprojection_error_label_->setWordWrap(true);
+  reprojection_error_label_->setTextInteractionFlags(Qt::TextSelectableByMouse);
   sample_layout->addWidget(reprojection_error_label_);
 
   // Settings area
@@ -257,6 +260,17 @@ ControlTabWidget::ControlTabWidget(rclcpp::Node::SharedPtr node, HandEyeCalibrat
   // Set initial status
   calibration_display_->setStatus(rviz_common::properties::StatusProperty::Ok, "Calibration",
                                   "Collect 5 samples to start calibration.");
+
+  // Automatic calibration runs outside RViz.  It publishes a small YAML
+  // request after writing a native MoveIt sample file.  Marshal the callback
+  // onto Qt's GUI thread before touching widgets or the in-process sample
+  // vectors.
+  auto_load_samples_subscription_ = node_->create_subscription<std_msgs::msg::String>(
+      "/handeye_calibration/auto_load_samples", rclcpp::QoS(1).transient_local().reliable(),
+      [this](std_msgs::msg::String::ConstSharedPtr message) {
+        const std::string request = message->data;
+        QMetaObject::invokeMethod(this, [this, request]() { handleAutoLoadRequest(request); }, Qt::QueuedConnection);
+      });
 }
 
 void ControlTabWidget::loadWidget(const rviz_common::Config& config)
@@ -443,6 +457,7 @@ bool ControlTabWidget::solveCameraRobotPose()
     if (res)
     {
       camera_robot_pose_ = solver_->getCameraRobotPose();
+      camera_robot_pose_.matrix().row(3) << 0.0, 0.0, 0.0, 1.0;
 
       // Update camera pose guess in context tab
       Eigen::Vector3d t = camera_robot_pose_.translation();
@@ -452,8 +467,14 @@ bool ControlTabWidget::solveCameraRobotPose()
       // Calculate reprojection error
       const auto& reproj_err = solver_->getReprojectionError(effector_wrt_world_, object_wrt_sensor_,
                                                              camera_robot_pose_, sensor_mount_type_);
+      const Eigen::Quaterniond quaternion(camera_robot_pose_.rotation());
       std::ostringstream reproj_err_text;
-      reproj_err_text << "Reprojection error:\n" << reproj_err.first << " m, " << reproj_err.second << " rad";
+      reproj_err_text << "Calibration result (" << frame_names_[from_frame_tag_] << " -> "
+                      << frame_names_["sensor"] << "):\n"
+                      << "translation xyz: [" << t.x() << ", " << t.y() << ", " << t.z() << "] m\n"
+                      << "quaternion xyzw: [" << quaternion.x() << ", " << quaternion.y() << ", "
+                      << quaternion.z() << ", " << quaternion.w() << "]\n"
+                      << "Reprojection error: " << reproj_err.first << " m, " << reproj_err.second << " rad";
       RCLCPP_WARN(node_->get_logger(), "%s", reproj_err_text.str().c_str());
       reprojection_error_label_->setText(QString(reproj_err_text.str().c_str()));
 
@@ -634,7 +655,7 @@ void ControlTabWidget::takeSampleBtnClicked([[maybe_unused]] bool clicked)
 
 void ControlTabWidget::deleteLatestSampleBtnClicked([[maybe_unused]] bool clicked)
 {
-  if (joint_states_.empty())
+  if (effector_wrt_world_.empty() || object_wrt_sensor_.empty())
   {
     QMessageBox::warning(this, tr("Empty Pose samples"), tr("Cannot delete last sample, list is already empty."));
     return;
@@ -645,9 +666,10 @@ void ControlTabWidget::deleteLatestSampleBtnClicked([[maybe_unused]] bool clicke
   object_wrt_sensor_.pop_back();
 
   // Delete latest recorded joint state, update progress bar
-  joint_states_.pop_back();
-  tree_view_model_->takeRow(joint_states_.size());
-  auto_progress_->setMax(joint_states_.size());
+  if (!joint_states_.empty())
+    joint_states_.pop_back();
+  tree_view_model_->takeRow(effector_wrt_world_.size());
+  auto_progress_->setMax(effector_wrt_world_.size());
 }
 
 void ControlTabWidget::clearSamplesBtnClicked([[maybe_unused]] bool clicked)
@@ -661,6 +683,7 @@ void ControlTabWidget::clearSamplesBtnClicked([[maybe_unused]] bool clicked)
   joint_states_.clear();
   auto_progress_->setMax(0);
   auto_progress_->setValue(0);
+  reprojection_error_label_->setText("Calibration result: N/A\nReprojection error: N/A");
 }
 
 void ControlTabWidget::saveCameraPoseBtnClicked([[maybe_unused]] bool clicked)
@@ -862,37 +885,104 @@ void ControlTabWidget::loadSamplesBtnClicked([[maybe_unused]] bool clicked)
   if (file_name.isEmpty())
     return;
 
-  effector_wrt_world_.clear();
-  object_wrt_sensor_.clear();
+  loadSamplesFromFile(file_name.toStdString(), true);
+}
 
-  // transformations are serialised as 4x4 row-major matrices
-  typedef Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Matrix4d_rm;
-
-  YAML::Node yaml_states = YAML::LoadFile(file_name.toStdString());
+bool ControlTabWidget::loadSamplesFromFile(const std::string& file_name, bool show_dialog)
+{
   try
   {
-    for (std::size_t i = 0; i < yaml_states.size(); i++)
+    const YAML::Node yaml_states = YAML::LoadFile(file_name);
+    if (!yaml_states.IsSequence())
+      throw std::runtime_error("the top-level YAML value must be a sequence");
+
+    // Transformations are serialized as 4x4 row-major matrices.  Validate
+    // everything before replacing the samples already visible in RViz.
+    typedef Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Matrix4d_rm;
+    std::vector<Eigen::Isometry3d> effectors;
+    std::vector<Eigen::Isometry3d> objects;
+    effectors.reserve(yaml_states.size());
+    objects.reserve(yaml_states.size());
+    for (std::size_t i = 0; i < yaml_states.size(); ++i)
     {
-      effector_wrt_world_.emplace_back(
-          Eigen::Map<const Matrix4d_rm>(yaml_states[i]["effector_wrt_world"].as<std::vector<double>>().data()));
-
-      object_wrt_sensor_.emplace_back(
-          Eigen::Map<const Matrix4d_rm>(yaml_states[i]["object_wrt_sensor"].as<std::vector<double>>().data()));
-
-      // add to GUI
-      ControlTabWidget::addPoseSampleToTreeView(tf2::eigenToTransform(object_wrt_sensor_.back()),
-                                                tf2::eigenToTransform(effector_wrt_world_.back()),
-                                                effector_wrt_world_.size());
+      const auto effector_values = yaml_states[i]["effector_wrt_world"].as<std::vector<double>>();
+      const auto object_values = yaml_states[i]["object_wrt_sensor"].as<std::vector<double>>();
+      if (effector_values.size() != 16 || object_values.size() != 16)
+        throw std::runtime_error("sample " + std::to_string(i + 1) + " must contain two 16-value matrices");
+      effectors.emplace_back(Eigen::Map<const Matrix4d_rm>(effector_values.data()));
+      objects.emplace_back(Eigen::Map<const Matrix4d_rm>(object_values.data()));
     }
 
+    effector_wrt_world_ = std::move(effectors);
+    object_wrt_sensor_ = std::move(objects);
+    joint_states_.clear();
+    joint_names_.clear();
+    tree_view_model_->clear();
+    reprojection_error_label_->setText("Calibration result: pending solve\nReprojection error: N/A");
+    for (std::size_t i = 0; i < effector_wrt_world_.size(); ++i)
+    {
+      addPoseSampleToTreeView(tf2::eigenToTransform(object_wrt_sensor_[i]),
+                              tf2::eigenToTransform(effector_wrt_world_[i]), i + 1);
+    }
     auto_progress_->setMax(yaml_states.size());
     auto_progress_->setValue(yaml_states.size());
+    calibration_display_->setStatus(
+        rviz_common::properties::StatusProperty::Ok, "Calibration",
+        QString::fromStdString("Loaded " + std::to_string(yaml_states.size()) + " pose samples."));
+    RCLCPP_INFO(node_->get_logger(), "Loaded %zu hand-eye pose samples from %s", yaml_states.size(),
+                file_name.c_str());
+    return true;
   }
-  catch (const YAML::Exception& e)
+  catch (const std::exception& e)
   {
-    QMessageBox::critical(this, "YAML Exception",
-                          QString::fromStdString("YAML exception: " + std::string(e.what()) +
-                                                 "\nCheck that the sample file has the correct format."));
+    const std::string message = "Could not load hand-eye samples from " + file_name + ": " + e.what();
+    calibration_display_->setStatus(rviz_common::properties::StatusProperty::Error, "Calibration",
+                                    QString::fromStdString(message));
+    RCLCPP_ERROR(node_->get_logger(), "%s", message.c_str());
+    if (show_dialog)
+      QMessageBox::critical(this, "Sample load failed", QString::fromStdString(message));
+    return false;
+  }
+}
+
+void ControlTabWidget::handleAutoLoadRequest(const std::string& request_yaml)
+{
+  if (request_yaml == last_auto_load_request_)
+    return;
+  last_auto_load_request_ = request_yaml;
+
+  try
+  {
+    const YAML::Node request = YAML::Load(request_yaml);
+    const std::string sample_file = request["sample_file"].as<std::string>();
+    const std::string solver_name = request["solver"].as<std::string>("");
+    const bool auto_solve = request["auto_solve"].as<bool>(true);
+    if (!loadSamplesFromFile(sample_file, false))
+      return;
+
+    if (auto* tabs = qobject_cast<QTabWidget*>(parentWidget()))
+      tabs->setCurrentWidget(this);
+
+    if (!solver_name.empty())
+    {
+      for (int i = 0; i < calibration_solver_->count(); ++i)
+      {
+        if (parseSolverName(calibration_solver_->itemText(i).toStdString(), '/') == solver_name)
+        {
+          calibration_solver_->setCurrentIndex(i);
+          break;
+        }
+      }
+    }
+    if (auto_solve && !solveCameraRobotPose())
+      RCLCPP_ERROR(node_->get_logger(), "Automatic RViz solve failed after loading %s", sample_file.c_str());
+  }
+  catch (const std::exception& e)
+  {
+    const std::string message = "Invalid automatic sample-load request: " + std::string(e.what());
+    calibration_display_->setStatus(rviz_common::properties::StatusProperty::Error, "Calibration",
+                                    QString::fromStdString(message));
+    RCLCPP_ERROR(node_->get_logger(), "%s", message.c_str());
   }
 }
 

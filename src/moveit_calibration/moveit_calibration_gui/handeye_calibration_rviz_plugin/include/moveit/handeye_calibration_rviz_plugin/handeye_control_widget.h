@@ -41,6 +41,7 @@
 #include <QLabel>
 #include <QString>
 #include <QTreeView>
+#include <QTabWidget>
 #include <QComboBox>
 #include <QGroupBox>
 #include <QTextStream>
@@ -64,6 +65,7 @@
 #include <moveit/handeye_calibration_solver/handeye_solver_base.h>
 #include <moveit/planning_scene_rviz_plugin/background_processing.hpp>
 #include <moveit/handeye_calibration_rviz_plugin/handeye_calibration_display.h>
+#include <std_msgs/msg/string.hpp>
 
 #ifndef Q_MOC_RUN
 #include <rclcpp/rclcpp.hpp>
@@ -203,6 +205,9 @@ private Q_SLOTS:
   void executeFinished();
 
 private:
+  bool loadSamplesFromFile(const std::string& file_name, bool show_dialog);
+  void handleAutoLoadRequest(const std::string& request_yaml);
+
   HandEyeCalibrationDisplay* calibration_display_;
 
   // **************************************************************
@@ -268,6 +273,8 @@ private:
   planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor_;
   moveit::planning_interface::MoveGroupInterfacePtr move_group_;
   moveit::planning_interface::MoveGroupInterface::PlanPtr current_plan_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr auto_load_samples_subscription_;
+  std::string last_auto_load_request_;
 
   // **************************************************************
   // Launch script exporters

@@ -38,9 +38,55 @@ Visualization Manager:
       Planning Request:
         Planning Group: left_arm
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: HandEye Sample Poses
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /handeye_calibration/sample_markers
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: HandEye Detection Image
+      Normalize Range: true
+      Queue Size: 2
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /handeye_calibration/annotated_image
+      Transport Hint: raw
+      Value: true
     - Class: moveit_rviz_plugin/HandEyeCalibration
+      ArUco dictionary: DICT_5X5_250
       Enabled: true
       Name: HandEyeCalibration
+      Rx: 0.0
+      Ry: 0.0
+      Rz: 0.0
+      Tx: 0.0
+      Ty: 0.0
+      Tz: 0.0
+      base: base_link
+      eef: left_gripper_tcp
+      group: left_arm
+      image_topic: /camera_head/color/image_raw
+      marker border (bits): 1
+      marker separation (px): 50
+      marker size (px): 200
+      markers, X: 3
+      markers, Y: 4
+      measured marker size (m): 0.06
+      measured separation (m): 0.015
+      object: handeye_target
+      sensor: head_camera_optical_frame
+      sensor_mount_type: 0
+      solver: Horaud1995
+      target_type: HandEyeTarget/Aruco
       Value: true
   Enabled: true
   Global Options:

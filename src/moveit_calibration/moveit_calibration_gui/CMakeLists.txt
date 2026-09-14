@@ -27,6 +27,7 @@ find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rviz_common REQUIRED)
 find_package(rviz_visual_tools REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
 
 set(THIS_PACKAGE_INCLUDE_DEPENDS
@@ -42,6 +43,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp
   rviz_common
   rviz_visual_tools
+  std_msgs
   tf2_eigen
 )
 

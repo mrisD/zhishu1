@@ -10,10 +10,11 @@ from launch.actions import (
     AppendEnvironmentVariable,
     DeclareLaunchArgument,
     ExecuteProcess,
+    GroupAction,
     IncludeLaunchDescription,
     TimerAction,
 )
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -32,27 +33,41 @@ def generate_launch_description():
         "GZ_SIM_RESOURCE_PATH", os.path.dirname(package_share)
     )
 
-    simulation = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                gazebo_share,
-                "launch",
-                "zhishu_robot.gazebo_moveit.launch.py",
+    simulation = GroupAction(
+        scoped=True,
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(
+                        gazebo_share,
+                        "launch",
+                        "zhishu_robot.gazebo_moveit.launch.py",
+                    )
+                ),
+                launch_arguments={
+                    # Keep the simulation server independent from the desktop renderer.
+                    # The combined OGRE2/software-rendering path is unstable on some
+                    # Mesa/EGL systems, so a GUI-only OGRE client is started below.
+                    "headless": "true",
+                    "use_rviz": "false",
+                    "world_file": "handeye_empty.sdf",
+                    "use_camera": "false",
+                    "use_head_camera": "true",
+                    "hide_head_pitch_visual": hide_head_pitch_visual,
+                    "handeye_target_enabled": "true",
+                    "software_rendering": "true",
+                    "initial_positions_file": os.path.join(
+                        package_share, "config", "initial_positions.yaml"
+                    ),
+                }.items(),
             )
-        ),
-        launch_arguments={
-            "headless": headless,
-            "use_rviz": "false",
-            "world_file": "handeye_empty.sdf",
-            "use_camera": "false",
-            "use_head_camera": "true",
-            "hide_head_pitch_visual": hide_head_pitch_visual,
-            "handeye_target_enabled": "true",
-            "software_rendering": "true",
-            "initial_positions_file": os.path.join(
-                package_share, "config", "initial_positions.yaml"
-            ),
-        }.items(),
+        ],
+    )
+
+    gazebo_gui = ExecuteProcess(
+        cmd=["gz", "sim", "-g", "-v", "3", "--render-engine-gui", "ogre"],
+        output="screen",
+        condition=UnlessCondition(headless),
     )
 
     moveit_config = (
@@ -105,6 +120,24 @@ def generate_launch_description():
         output="screen",
     )
 
+    camera_info_relay = ExecuteProcess(
+        cmd=[
+            sys.executable,
+            os.path.join(
+                package_share,
+                "..",
+                "..",
+                "lib",
+                "zhishu_robot_handeye_calibration",
+                "camera_info_relay.py",
+            ),
+            "--ros-args",
+            "-p",
+            "use_sim_time:=true",
+        ],
+        output="screen",
+    )
+
     return LaunchDescription(
         [
             DeclareLaunchArgument("headless", default_value="false"),
@@ -116,6 +149,7 @@ def generate_launch_description():
             ),
             calibration_resources,
             simulation,
-            TimerAction(period=7.0, actions=[head_guard, rviz]),
+            TimerAction(period=2.0, actions=[gazebo_gui]),
+            TimerAction(period=7.0, actions=[head_guard, camera_info_relay, rviz]),
         ]
     )

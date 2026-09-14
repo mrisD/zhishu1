@@ -12,6 +12,17 @@
       <origin xyz="0 0 0" rpy="-${pi / 2} 0 -${pi / 2}"/>
     </joint>
 
+    <!-- Keep a coincident, read-only simulation truth frame.  The MoveIt
+         HandEye RViz panel intentionally publishes its current camera-pose
+         guess on head_camera_optical_frame, so that public calibration frame
+         cannot also be used as an independent ground-truth reference. -->
+    <link name="head_camera_optical_truth"/>
+    <joint name="head_camera_optical_truth_joint" type="fixed">
+      <parent link="head_camera_link"/>
+      <child link="head_camera_optical_truth"/>
+      <origin xyz="0 0 0" rpy="-${pi / 2} 0 -${pi / 2}"/>
+    </joint>
+
     <xacro:if value="${enabled}">
       <gazebo reference="head_camera_link">
         <sensor name="head_handeye_camera" type="camera">
