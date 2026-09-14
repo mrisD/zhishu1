@@ -6,6 +6,7 @@
 /log-jazzy/
 /zhishu_robot_logs/
 *.zip
+*.patch
 *.STL
 __pycache__/
 *.py[cod]

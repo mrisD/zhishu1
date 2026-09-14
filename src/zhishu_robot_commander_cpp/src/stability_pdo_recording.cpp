@@ -74,8 +74,8 @@ bool StabilityPdoRecording::start()
     return true;
   }
 
-  // Stop a still-running bounded startup capture first. A recorder that already
-  // finished reports inactive; that is expected and does not block the restart.
+  // Stop a still-running bounded startup capture first. The driver resumes the
+  // same per-master CSV, so startup and motion samples remain in one file.
   const auto cleanup_results = callBoth(false);
   if (!std::all_of(
       cleanup_results.begin(), cleanup_results.end(),

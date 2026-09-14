@@ -514,66 +514,82 @@ public:
 
     const size_t capacity = std::max<size_t>(
       config_.pdo_diagnostics_buffer_cycles, 1024U);
+    bool write_csv_header = false;
     try {
       pdo_diagnostics_ring_.assign(capacity, PdoDiagnosticRecord{});
 
-      std::filesystem::path output_directory;
-      if (const char * ros_log_dir = std::getenv("ROS_LOG_DIR")) {
-        output_directory = ros_log_dir;
-        if (output_directory.filename() == "native") {
-          output_directory = output_directory.parent_path();
+      if (pdo_diagnostics_path_.empty()) {
+        std::filesystem::path output_directory;
+        if (const char * ros_log_dir = std::getenv("ROS_LOG_DIR")) {
+          output_directory = ros_log_dir;
+          if (output_directory.filename() == "native") {
+            output_directory = output_directory.parent_path();
+          }
+        } else {
+          output_directory = std::filesystem::current_path();
         }
-      } else {
-        output_directory = std::filesystem::current_path();
-      }
-      std::filesystem::create_directories(output_directory);
+        std::filesystem::create_directories(output_directory);
 
-      const auto now = std::chrono::system_clock::now();
-      const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-      std::tm local_time{};
-      localtime_r(&now_time, &local_time);
-      char timestamp_seconds[32]{};
-      std::strftime(
-        timestamp_seconds, sizeof(timestamp_seconds), "%Y%m%d_%H%M%S", &local_time);
-      const auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
-        now.time_since_epoch()).count() % 1000000LL;
-      char timestamp[48]{};
-      std::snprintf(
-        timestamp, sizeof(timestamp), "%s_%06lld", timestamp_seconds,
-        static_cast<long long>(microseconds));
-      const unsigned int master_index = config_.motors.front().address.master_index;
-      output_directory /=
-        "pdo_master" + std::to_string(master_index) + "_" + timestamp + ".csv";
-      pdo_diagnostics_path_ = output_directory.string();
+        const auto now = std::chrono::system_clock::now();
+        const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        std::tm local_time{};
+        localtime_r(&now_time, &local_time);
+        char timestamp_seconds[32]{};
+        std::strftime(
+          timestamp_seconds, sizeof(timestamp_seconds), "%Y%m%d_%H%M%S", &local_time);
+        const auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
+          now.time_since_epoch()).count() % 1000000LL;
+        char timestamp[48]{};
+        std::snprintf(
+          timestamp, sizeof(timestamp), "%s_%06lld", timestamp_seconds,
+          static_cast<long long>(microseconds));
+        const unsigned int master_index = config_.motors.front().address.master_index;
+        output_directory /=
+          "pdo_master" + std::to_string(master_index) + "_" + timestamp + ".csv";
+        pdo_diagnostics_path_ = output_directory.string();
+      }
+
+      const std::filesystem::path output_path(pdo_diagnostics_path_);
+      write_csv_header =
+        !std::filesystem::exists(output_path) || std::filesystem::file_size(output_path) == 0U;
     } catch (const std::exception & error) {
       message = std::string("failed to prepare PDO recording: ") + error.what();
       return false;
     }
 
-    pdo_diagnostics_file_ = std::fopen(pdo_diagnostics_path_.c_str(), "w");
+    // Keep one file per EtherCAT master for the lifetime of this driver. A later
+    // service start resumes the same file instead of creating another CSV.
+    pdo_diagnostics_file_ = std::fopen(
+      pdo_diagnostics_path_.c_str(), write_csv_header ? "w" : "a");
     if (pdo_diagnostics_file_ == nullptr) {
       message = "failed to open PDO CSV '" + pdo_diagnostics_path_ + "': " +
         std::strerror(errno);
       return false;
     }
 
-    std::fprintf(
-      pdo_diagnostics_file_,
-      "# Exact EtherCAT cyclic PDO capture using GH1 TxPDO 0x1A01.\n"
-      "# With enable_velocity_torque_feedback=true, 0x1A01 is remapped to the ESI-defined "
-      "0x6041/0x6064/0x606C/0x6077 entries (12-byte SM3).\n"
-      "# Values from 0x606C and 0x6077 are recorded raw; no undocumented physical-unit "
-      "scaling is applied. Joint SI columns use the explicit ros2_control configuration.\n"
-      "monotonic_ns,scheduled_cycle_start_ns,cycle_period_ns,period_jitter_ns,"
-      "start_lateness_ns,wake_lateness_ns,execution_ns,deadline_miss_total,"
-      "dropped_cycles_total,cycle,master_index,domain_wc,domain_wc_state,motor_name,"
-      "slave_position,target_position_607a,actual_position_6064,position_error_counts,"
-      "sent_target_position_joint_rad,feedback_actual_position_joint_rad,"
-      "position_error_joint_rad,position_conversion_offset_rad,"
-      "target_delta_counts,actual_delta_counts,actual_velocity_606c_raw,"
-      "actual_torque_6077_raw,joint_velocity_rad_s,joint_effort_nm,"
-      "control_word_6040,status_word_6041,error_code_valid,"
-      "error_code_603f,goal_update_sequence,goal_sequence_delta\n");
+    if (write_csv_header) {
+      std::fprintf(
+        pdo_diagnostics_file_,
+        "# Exact EtherCAT cyclic PDO capture using GH1 TxPDO 0x1A01.\n"
+        "# With enable_velocity_torque_feedback=true, 0x1A01 is remapped to the ESI-defined "
+        "0x6041/0x6064/0x606C/0x6077 entries (12-byte SM3).\n"
+        "# Values from 0x606C and 0x6077 are recorded raw; no undocumented physical-unit "
+        "scaling is applied. Joint SI columns use the explicit ros2_control configuration.\n"
+        "monotonic_ns,scheduled_cycle_start_ns,cycle_period_ns,period_jitter_ns,"
+        "start_lateness_ns,wake_lateness_ns,execution_ns,deadline_miss_total,"
+        "dropped_cycles_total,cycle,master_index,domain_wc,domain_wc_state,motor_name,"
+        "slave_position,target_position_607a,actual_position_6064,position_error_counts,"
+        "sent_target_position_joint_rad,feedback_actual_position_joint_rad,"
+        "position_error_joint_rad,position_conversion_offset_rad,"
+        "target_delta_counts,actual_delta_counts,actual_velocity_606c_raw,"
+        "actual_torque_6077_raw,joint_velocity_rad_s,joint_effort_nm,"
+        "control_word_6040,status_word_6041,error_code_valid,"
+        "error_code_603f,goal_update_sequence,goal_sequence_delta\n");
+    } else {
+      std::fprintf(
+        pdo_diagnostics_file_,
+        "# PDO recording resumed in the same driver session.\n");
+    }
     std::fflush(pdo_diagnostics_file_);
 
     pdo_diagnostics_write_sequence_.store(0);

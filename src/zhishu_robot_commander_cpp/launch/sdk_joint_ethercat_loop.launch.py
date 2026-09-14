@@ -13,6 +13,8 @@ from moveit_configs_utils import MoveItConfigsBuilder
 def generate_launch_description():
     loop_count = LaunchConfiguration("loop_count")
     interval_sec = LaunchConfiguration("interval_sec")
+    velocity_scaling = LaunchConfiguration("velocity_scaling")
+    acceleration_scaling = LaunchConfiguration("acceleration_scaling")
     use_sim_time = LaunchConfiguration("use_sim_time")
     use_fake_hardware = LaunchConfiguration("use_fake_hardware")
     enable_motors_on_activate = LaunchConfiguration("enable_motors_on_activate")
@@ -58,6 +60,8 @@ def generate_launch_description():
             {
                 "loop_count": loop_count,
                 "interval_sec": interval_sec,
+                "commander.velocity_scaling": velocity_scaling,
+                "commander.acceleration_scaling": acceleration_scaling,
                 "use_sim_time": use_sim_time,
                 "use_fake_hardware": use_fake_hardware,
                 "record_pdo_diagnostics": record_pdo_diagnostics,
@@ -79,6 +83,16 @@ def generate_launch_description():
                 default_value="1.5",
                 description="Pause in seconds between joint motions",
             ),
+            DeclareLaunchArgument(
+                "velocity_scaling",
+                default_value="0.30",
+                description="MoveIt maximum velocity scaling used by the joint loop",
+            ),
+            DeclareLaunchArgument(
+                "acceleration_scaling",
+                default_value="0.10",
+                description="MoveIt maximum acceleration scaling used by the joint loop",
+            ),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("use_fake_hardware", default_value="false"),
             DeclareLaunchArgument("enable_motors_on_activate", default_value="true"),
@@ -89,7 +103,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "pdo_record_cycles",
-                default_value="1",
+                default_value="5",
                 description="Number of complete motion cycles included in the PDO recording",
             ),
             DeclareLaunchArgument(

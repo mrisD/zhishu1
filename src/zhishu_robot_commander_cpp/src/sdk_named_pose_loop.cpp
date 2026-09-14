@@ -320,7 +320,7 @@ int main(int argc, char ** argv)
     const auto use_fake_hardware = getOrDeclareParameter<bool>(
       node, "use_fake_hardware", false);
     const auto pdo_record_cycles = getOrDeclareParameter<std::int64_t>(
-      node, "pdo_record_cycles", 1);
+      node, "pdo_record_cycles", 5);
     const auto pdo_service_timeout_sec = getOrDeclareParameter<double>(
       node, "pdo_service_timeout_sec", 10.0);
     const auto options = commanderOptions(node);

@@ -61,7 +61,7 @@ zhishu_robot_commander_cpp::Commander::Options commanderOptions(
   options.velocity_scaling = getOrDeclareParameter<double>(
     node, "commander.velocity_scaling", 0.30);
   options.acceleration_scaling = getOrDeclareParameter<double>(
-    node, "commander.acceleration_scaling", 1.0);
+    node, "commander.acceleration_scaling", 0.10);
   options.planning_time = getOrDeclareParameter<double>(
     node, "commander.planning_time", 5.0);
   options.planning_attempts = static_cast<int>(getOrDeclareParameter<std::int64_t>(
@@ -351,7 +351,7 @@ int main(int argc, char ** argv)
     const auto use_fake_hardware = getOrDeclareParameter<bool>(
       node, "use_fake_hardware", false);
     const auto pdo_record_cycles = getOrDeclareParameter<std::int64_t>(
-      node, "pdo_record_cycles", 1);
+      node, "pdo_record_cycles", 5);
     const auto pdo_service_timeout_sec = getOrDeclareParameter<double>(
       node, "pdo_service_timeout_sec", 10.0);
     const auto options = commanderOptions(node);

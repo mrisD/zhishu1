@@ -88,7 +88,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "pdo_record_cycles",
-                default_value="1",
+                default_value="5",
                 description="Number of complete motion cycles included in the PDO recording",
             ),
             DeclareLaunchArgument(
