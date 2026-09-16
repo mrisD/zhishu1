@@ -18,6 +18,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     use_fake_hardware = LaunchConfiguration("use_fake_hardware")
     enable_motors_on_activate = LaunchConfiguration("enable_motors_on_activate")
+    pdo_diagnostics_auto_start = LaunchConfiguration("pdo_diagnostics_auto_start")
     record_pdo_diagnostics = LaunchConfiguration("record_pdo_diagnostics")
     pdo_record_cycles = LaunchConfiguration("pdo_record_cycles")
     pdo_service_timeout_sec = LaunchConfiguration("pdo_service_timeout_sec")
@@ -37,6 +38,7 @@ def generate_launch_description():
                 "use_gazebo": "false",
                 "use_fake_hardware": use_fake_hardware,
                 "enable_motors_on_activate": enable_motors_on_activate,
+                "pdo_diagnostics_auto_start": pdo_diagnostics_auto_start,
             },
         )
         .robot_description_semantic(file_path="config/zhishu_robot.srdf")
@@ -97,13 +99,18 @@ def generate_launch_description():
             DeclareLaunchArgument("use_fake_hardware", default_value="false"),
             DeclareLaunchArgument("enable_motors_on_activate", default_value="true"),
             DeclareLaunchArgument(
+                "pdo_diagnostics_auto_start",
+                default_value="false",
+                description="Disable the separate 20 s startup capture for strict cycle-only CSVs",
+            ),
+            DeclareLaunchArgument(
                 "record_pdo_diagnostics",
                 default_value="true",
                 description="Record synchronized PDO data during real-hardware motion",
             ),
             DeclareLaunchArgument(
                 "pdo_record_cycles",
-                default_value="5",
+                default_value="2",
                 description="Number of complete motion cycles included in the PDO recording",
             ),
             DeclareLaunchArgument(

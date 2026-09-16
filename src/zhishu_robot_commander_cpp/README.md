@@ -302,9 +302,10 @@ ros2 launch zhishu_robot_commander_cpp sdk_joint_ethercat_loop.launch.py \
 任一动作失败立即停止。Ctrl+C 会请求取消当前 MoveIt 动作后退出。真机运行前必须先核对
 目标关节角、碰撞环境和急停/STO 状态。
 
-真机模式默认会在第一轮运动开始前同步重启左右臂 PDO 记录，在第一轮完整结束后停止，
-因此生成的 `pdo_master0_*.csv` 和 `pdo_master1_*.csv` 会覆盖真实运动，而不是只包含
-EtherCAT 启动阶段。可用 `pdo_record_cycles` 增加记录轮数，或显式关闭记录：
+真机模式先在不记录 PDO 的情况下将双臂移动到全零位并等待 `interval_sec`，随后同步开启
+左右臂 PDO 记录。正式循环的每一轮只包含“全零位 → 配置目标 → 全零位”，默认在第二轮
+完整结束后停止，因此 CSV 严格覆盖两个完整往返，不包含启动时当前位置回零的半周期。
+可用 `pdo_record_cycles` 增加记录轮数，或显式关闭记录：
 
 ```bash
 ros2 launch zhishu_robot_commander_cpp sdk_joint_ethercat_loop.launch.py \

@@ -107,7 +107,7 @@ struct TestStatistics
   std::uint64_t attempted_motions{0};
   std::uint64_t successful_motions{0};
   std::uint64_t failed_motions{0};
-  std::array<TargetStatistics, 3> target_stats{};
+  std::array<TargetStatistics, 2> target_stats{};
   std::string stop_reason{"completed"};
   std::string failed_target{};
   std::int64_t failed_cycle{0};
@@ -256,7 +256,7 @@ MotionAttempt executeMotion(
 void printTestSummary(
   const rclcpp::Node::SharedPtr & node,
   const TestStatistics & statistics,
-  const std::array<MotionTarget, 3> & targets,
+  const std::array<MotionTarget, 2> & targets,
   std::int64_t loop_count,
   double interval_sec,
   double velocity_scaling,
@@ -323,7 +323,7 @@ int main(int argc, char ** argv)
   int exit_code = 0;
   constexpr std::int64_t default_loop_count = 0;
   constexpr const char * sequence_description =
-    "all_zero->configured_joint_pose->all_zero";
+    "prepare_all_zero(unrecorded)->[configured_joint_pose->all_zero_return]";
   const std::vector<double> all_zero(14, 0.0);
   const auto left_pose_degrees = getOrDeclareParameter<std::vector<double>>(
     node, "left_target_joints",
@@ -334,8 +334,8 @@ int main(int argc, char ** argv)
   std::vector<double> both_pose = degreesToRadians(left_pose_degrees);
   const auto right_pose_radians = degreesToRadians(right_pose_degrees);
   both_pose.insert(both_pose.end(), right_pose_radians.begin(), right_pose_radians.end());
-  const std::array<MotionTarget, 3> targets{{
-    {"all_zero_start", all_zero},
+  const MotionTarget preparation_target{"prepare_all_zero", all_zero};
+  const std::array<MotionTarget, 2> targets{{
     {"configured_joint_pose", both_pose},
     {"all_zero_return", all_zero},
   }};
@@ -351,7 +351,7 @@ int main(int argc, char ** argv)
     const auto use_fake_hardware = getOrDeclareParameter<bool>(
       node, "use_fake_hardware", false);
     const auto pdo_record_cycles = getOrDeclareParameter<std::int64_t>(
-      node, "pdo_record_cycles", 5);
+      node, "pdo_record_cycles", 2);
     const auto pdo_service_timeout_sec = getOrDeclareParameter<double>(
       node, "pdo_service_timeout_sec", 10.0);
     const auto options = commanderOptions(node);
@@ -396,21 +396,54 @@ int main(int argc, char ** argv)
         statistics.stop_reason = "robot_not_ready";
         exit_code = 1;
       } else {
-        if (record_pdo && !use_fake_hardware) {
-          const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::duration<double>(pdo_service_timeout_sec));
-          pdo_recording =
-            std::make_unique<zhishu_robot_commander_cpp::StabilityPdoRecording>(
-            node, timeout);
-          if (!pdo_recording->start()) {
-            statistics.stop_reason = "pdo_recording_start_failure";
-            throw std::runtime_error(
-                    "both PDO recorders must start before the real-hardware stability test");
+        RCLCPP_INFO(
+          node->get_logger(),
+          "[STABILITY][PREP_START] moving both arms to all-zero before PDO recording");
+        const auto preparation = executeMotion(
+          node, robot, preparation_target, 0, 1);
+        bool preparation_ok = false;
+        if (preparation.interrupted) {
+          statistics.stop_reason = "user_shutdown";
+          exit_code = 0;
+        } else if (!preparation.result) {
+          statistics.failed_motions = 1;
+          statistics.failed_target = preparation_target.name;
+          statistics.failed_cycle = 0;
+          statistics.failed_result = preparation.result;
+          statistics.stop_reason = "initial_position_failure";
+          robot.cancelActiveMotion();
+          exit_code = 1;
+          RCLCPP_ERROR(
+            node->get_logger(),
+            "[STABILITY][PREP_FAIL] all-zero preparation failed; PDO recording will not start");
+        } else {
+          RCLCPP_INFO(
+            node->get_logger(),
+            "[STABILITY][PREP_OK] both arms are at all-zero; settling for %.3f s before "
+            "PDO recording",
+            interval_sec);
+          preparation_ok = interruptibleSleep(interval_sec);
+          if (!preparation_ok) {
+            statistics.stop_reason = "user_shutdown";
           }
         }
 
-        statistics.test_start = SteadyClock::now();
-        RCLCPP_INFO(
+        if (preparation_ok) {
+          if (record_pdo && !use_fake_hardware) {
+            const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::duration<double>(pdo_service_timeout_sec));
+            pdo_recording =
+              std::make_unique<zhishu_robot_commander_cpp::StabilityPdoRecording>(
+            node, timeout);
+            if (!pdo_recording->start()) {
+              statistics.stop_reason = "pdo_recording_start_failure";
+              throw std::runtime_error(
+                    "both PDO recorders must start before the real-hardware stability test");
+            }
+          }
+
+          statistics.test_start = SteadyClock::now();
+          RCLCPP_INFO(
           node->get_logger(),
           "[STABILITY][TEST_START] sequence=%s loop_count=%ld%s interval_sec=%.3f "
           "velocity_scaling=%.3f acceleration_scaling=%.3f",
@@ -418,82 +451,82 @@ int main(int argc, char ** argv)
           static_cast<long>(loop_count), loop_count == 0 ? " (infinite)" : "",
           interval_sec, options.velocity_scaling, options.acceleration_scaling);
 
-        std::int64_t cycle = 1;
-        while (!shutdownRequested() && (loop_count == 0 || cycle <= loop_count)) {
-          const auto cycle_start = SteadyClock::now();
-          if (loop_count == 0) {
-            RCLCPP_INFO(
+          std::int64_t cycle = 1;
+          while (!shutdownRequested() && (loop_count == 0 || cycle <= loop_count)) {
+            const auto cycle_start = SteadyClock::now();
+            if (loop_count == 0) {
+              RCLCPP_INFO(
               node->get_logger(), "[STABILITY][CYCLE_START] cycle=%ld/infinite",
               static_cast<long>(cycle));
-          } else {
-            RCLCPP_INFO(
+            } else {
+              RCLCPP_INFO(
               node->get_logger(), "[STABILITY][CYCLE_START] cycle=%ld/%ld",
               static_cast<long>(cycle), static_cast<long>(loop_count));
-          }
-
-          bool cycle_ok = true;
-          for (std::size_t target_index = 0; target_index < targets.size(); ++target_index) {
-            if (shutdownRequested()) {
-              cycle_ok = false;
-              statistics.stop_reason = "user_shutdown";
-              break;
             }
 
-            ++statistics.attempted_motions;
-            const auto attempt = executeMotion(
-              node, robot, targets[target_index], cycle, loop_count);
-
-            if (attempt.interrupted) {
-              cycle_ok = false;
-              statistics.stop_reason = "user_shutdown";
-              exit_code = 0;
-              break;
-            }
-
-            if (!attempt.result) {
-              cycle_ok = false;
-              if (!shutdownRequested()) {
-                ++statistics.failed_motions;
-                statistics.target_stats[target_index].addFailure();
-                statistics.stop_reason = "motion_failure";
-                statistics.failed_target = targets[target_index].name;
-                statistics.failed_cycle = cycle;
-                statistics.failed_result = attempt.result;
-                robot.cancelActiveMotion();
-                exit_code = 1;
-              } else {
-                statistics.stop_reason = "user_shutdown";
-                exit_code = 0;
-              }
-              break;
-            }
-
-            ++statistics.successful_motions;
-            statistics.target_stats[target_index].addSuccess(attempt.duration_sec);
-
-            const bool has_next_target_in_cycle = target_index + 1 < targets.size();
-            const bool has_next_cycle = loop_count == 0 || cycle < loop_count;
-            const bool has_next_action = has_next_target_in_cycle || has_next_cycle;
-            if (has_next_action && interval_sec > 0.0) {
-              RCLCPP_INFO(
-                node->get_logger(),
-                "[STABILITY][INTERVAL] waiting %.3f s before next motion", interval_sec);
-              if (!interruptibleSleep(interval_sec)) {
+            bool cycle_ok = true;
+            for (std::size_t target_index = 0; target_index < targets.size(); ++target_index) {
+              if (shutdownRequested()) {
                 cycle_ok = false;
                 statistics.stop_reason = "user_shutdown";
                 break;
               }
+
+              ++statistics.attempted_motions;
+              const auto attempt = executeMotion(
+              node, robot, targets[target_index], cycle, loop_count);
+
+              if (attempt.interrupted) {
+                cycle_ok = false;
+                statistics.stop_reason = "user_shutdown";
+                exit_code = 0;
+                break;
+              }
+
+              if (!attempt.result) {
+                cycle_ok = false;
+                if (!shutdownRequested()) {
+                  ++statistics.failed_motions;
+                  statistics.target_stats[target_index].addFailure();
+                  statistics.stop_reason = "motion_failure";
+                  statistics.failed_target = targets[target_index].name;
+                  statistics.failed_cycle = cycle;
+                  statistics.failed_result = attempt.result;
+                  robot.cancelActiveMotion();
+                  exit_code = 1;
+                } else {
+                  statistics.stop_reason = "user_shutdown";
+                  exit_code = 0;
+                }
+                break;
+              }
+
+              ++statistics.successful_motions;
+              statistics.target_stats[target_index].addSuccess(attempt.duration_sec);
+
+              const bool has_next_target_in_cycle = target_index + 1 < targets.size();
+              const bool has_next_cycle = loop_count == 0 || cycle < loop_count;
+              const bool has_next_action = has_next_target_in_cycle || has_next_cycle;
+              if (has_next_action && interval_sec > 0.0) {
+                RCLCPP_INFO(
+                node->get_logger(),
+                "[STABILITY][INTERVAL] waiting %.3f s before next motion", interval_sec);
+                if (!interruptibleSleep(interval_sec)) {
+                  cycle_ok = false;
+                  statistics.stop_reason = "user_shutdown";
+                  break;
+                }
+              }
             }
-          }
 
-          if (!cycle_ok) {
-            break;
-          }
+            if (!cycle_ok) {
+              break;
+            }
 
-          ++statistics.completed_cycles;
-          const double cycle_duration_sec =
-            std::chrono::duration<double>(SteadyClock::now() - cycle_start).count();
-          RCLCPP_INFO(
+            ++statistics.completed_cycles;
+            const double cycle_duration_sec =
+              std::chrono::duration<double>(SteadyClock::now() - cycle_start).count();
+            RCLCPP_INFO(
             node->get_logger(),
             "[STABILITY][CYCLE_OK] cycle=%ld duration=%.3f s total_runtime=%.1f s "
             "success=%lu failure=%lu",
@@ -502,32 +535,33 @@ int main(int argc, char ** argv)
             static_cast<unsigned long>(statistics.successful_motions),
             static_cast<unsigned long>(statistics.failed_motions));
 
-          if (pdo_recording && pdo_recording->active() &&
-            statistics.completed_cycles >= static_cast<std::uint64_t>(pdo_record_cycles))
-          {
-            if (!pdo_recording->stop()) {
-              statistics.stop_reason = "pdo_recording_stop_failure";
-              exit_code = 1;
-              break;
+            if (pdo_recording && pdo_recording->active() &&
+              statistics.completed_cycles >= static_cast<std::uint64_t>(pdo_record_cycles))
+            {
+              if (!pdo_recording->stop()) {
+                statistics.stop_reason = "pdo_recording_stop_failure";
+                exit_code = 1;
+                break;
+              }
             }
+            ++cycle;
           }
-          ++cycle;
-        }
 
-        if (shutdownRequested() && statistics.stop_reason == "completed") {
-          statistics.stop_reason = "user_shutdown";
-        }
-        if (statistics.stop_reason == "completed" && loop_count > 0 &&
-          statistics.completed_cycles == static_cast<std::uint64_t>(loop_count))
-        {
-          RCLCPP_INFO(
+          if (shutdownRequested() && statistics.stop_reason == "completed") {
+            statistics.stop_reason = "user_shutdown";
+          }
+          if (statistics.stop_reason == "completed" && loop_count > 0 &&
+            statistics.completed_cycles == static_cast<std::uint64_t>(loop_count))
+          {
+            RCLCPP_INFO(
             node->get_logger(), "[STABILITY][TEST_OK] all %ld cycles completed",
             static_cast<long>(loop_count));
-        }
+          }
 
-        printTestSummary(
+          printTestSummary(
           node, statistics, targets, loop_count, interval_sec,
           options.velocity_scaling, options.acceleration_scaling);
+        }
       }
     }
   } catch (const std::exception & exception) {
