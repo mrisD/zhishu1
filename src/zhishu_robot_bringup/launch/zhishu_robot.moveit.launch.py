@@ -66,6 +66,7 @@ def generate_launch_description():
     session_started_at = datetime.now().strftime("%H-%M-%S")
     use_fake_hardware = LaunchConfiguration("use_fake_hardware")
     enable_motors_on_activate = LaunchConfiguration("enable_motors_on_activate")
+    pdo_diagnostics_auto_start = LaunchConfiguration("pdo_diagnostics_auto_start")
     enable_log_recorder = LaunchConfiguration("enable_log_recorder")
     enable_kernel_ethercat_log = LaunchConfiguration("enable_kernel_ethercat_log")
     enable_commander = LaunchConfiguration("enable_commander")
@@ -99,6 +100,7 @@ def generate_launch_description():
                 "use_gazebo": "false",
                 "use_fake_hardware": use_fake_hardware,
                 "enable_motors_on_activate": enable_motors_on_activate,
+                "pdo_diagnostics_auto_start": pdo_diagnostics_auto_start,
             },
         )
         .robot_description_semantic(file_path="config/zhishu_robot.srdf")
@@ -316,6 +318,14 @@ def generate_launch_description():
             "enable_motors_on_activate",
             default_value="true",
             description="Enable CiA402 operation; false keeps EtherCAT communication-only mode",
+        ),
+        DeclareLaunchArgument(
+            "pdo_diagnostics_auto_start",
+            default_value="false",
+            description=(
+                "Capture a separate 20 s EtherCAT startup window; keep false for "
+                "service-triggered cycle-only CSVs"
+            ),
         ),
         DeclareLaunchArgument(
             "enable_commander",

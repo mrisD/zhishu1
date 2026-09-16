@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="zhishu_robot_left_arm_ros2_control" params="name initial_positions_file use_gazebo:=false use_fake_hardware:=true enable_motors_on_activate:=true">
+    <xacro:macro name="zhishu_robot_left_arm_ros2_control" params="name initial_positions_file use_gazebo:=false use_fake_hardware:=true enable_motors_on_activate:=true pdo_diagnostics_auto_start:=true">
         <xacro:property name="initial_positions" value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
 
         <ros2_control name="${name}" type="system">
@@ -35,9 +35,9 @@
                 <!-- On-demand 1 kHz PDO capture uses a lock-free ring and a
                      non-realtime CSV writer. 16384 cycles tolerate a 16 s disk stall. -->
                 <param name="pdo_diagnostics_buffer_cycles">16384</param>
-                <!-- Capture a bounded 20 s startup window even if the ROS service
-                     executor is unavailable. This avoids unbounded disk growth. -->
-                <param name="pdo_diagnostics_auto_start">true</param>
+                <!-- Optionally capture a bounded 20 s startup window even if the ROS
+                     service executor is unavailable. -->
+                <param name="pdo_diagnostics_auto_start">${pdo_diagnostics_auto_start}</param>
                 <param name="pdo_diagnostics_max_cycles">20000</param>
                 <param name="enable_motors_on_activate">${enable_motors_on_activate}</param>
                 <param name="master_index">0</param>

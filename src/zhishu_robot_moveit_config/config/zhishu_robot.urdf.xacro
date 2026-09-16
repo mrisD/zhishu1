@@ -4,6 +4,7 @@
     <xacro:arg name="use_gazebo" default="false" />
     <xacro:arg name="use_fake_hardware" default="true" />
     <xacro:arg name="enable_motors_on_activate" default="true" />
+    <xacro:arg name="pdo_diagnostics_auto_start" default="true" />
     <xacro:arg name="use_head_camera" default="false" />
     <xacro:arg name="hide_head_pitch_visual" default="false" />
     <xacro:arg name="handeye_target_enabled" default="false" />
@@ -21,12 +22,14 @@
             name="LeftArmSystem"
             initial_positions_file="$(arg initial_positions_file)"
             use_fake_hardware="$(arg use_fake_hardware)"
-            enable_motors_on_activate="$(arg enable_motors_on_activate)"/>
+            enable_motors_on_activate="$(arg enable_motors_on_activate)"
+            pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
         <xacro:zhishu_robot_right_arm_ros2_control
             name="RightArmSystem"
             initial_positions_file="$(arg initial_positions_file)"
             use_fake_hardware="$(arg use_fake_hardware)"
-            enable_motors_on_activate="$(arg enable_motors_on_activate)"/>
+            enable_motors_on_activate="$(arg enable_motors_on_activate)"
+            pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
     </xacro:unless>
 
     <xacro:if value="$(arg use_gazebo)">
