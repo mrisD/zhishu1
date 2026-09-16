@@ -41,6 +41,8 @@ constexpr uint16_t kPdoStatusWord = 0x6041;
 constexpr uint16_t kPdoActualPosition = 0x6064;
 constexpr uint16_t kPdoActualVelocity = 0x606C;
 constexpr uint16_t kPdoActualTorque = 0x6077;
+constexpr uint16_t kPdoActualCurrent = 0x6078;
+constexpr uint16_t kPdoFollowingErrorActual = 0x60F4;
 constexpr size_t kMaxPdoDiagnosticMotors = 16;
 
 struct PdoOffsets
@@ -51,6 +53,8 @@ struct PdoOffsets
   unsigned int actual_position = 0;
   unsigned int actual_velocity = 0;
   unsigned int actual_torque = 0;
+  unsigned int actual_current = 0;
+  unsigned int following_error_actual = 0;
 };
 
 struct PdoDiagnosticMotorSample
@@ -58,6 +62,7 @@ struct PdoDiagnosticMotorSample
   int32_t target_position = 0;
   int32_t actual_position = 0;
   int32_t position_error = 0;
+  int32_t following_error_actual = 0;
   double sent_target_position_joint_rad = 0.0;
   double feedback_actual_position_joint_rad = 0.0;
   double position_error_joint_rad = 0.0;
@@ -66,6 +71,7 @@ struct PdoDiagnosticMotorSample
   int32_t actual_delta = 0;
   int32_t actual_velocity = 0;
   int16_t actual_torque = 0;
+  int16_t actual_current = 0;
   uint16_t control_word = 0;
   uint16_t status_word = 0;
   uint16_t error_code = 0;
@@ -572,18 +578,24 @@ public:
         pdo_diagnostics_file_,
         "# Exact EtherCAT cyclic PDO capture using GH1 TxPDO 0x1A01.\n"
         "# With enable_velocity_torque_feedback=true, 0x1A01 is remapped to the ESI-defined "
-        "0x6041/0x6064/0x606C/0x6077 entries (12-byte SM3).\n"
-        "# Values from 0x606C and 0x6077 are recorded raw; no undocumented physical-unit "
-        "scaling is applied. Joint SI columns use the explicit ros2_control configuration.\n"
+        "0x6041/0x6064/0x606C/0x6077/0x6078/0x60F4 entries (18-byte SM3).\n"
+        "# Values from 0x606C, 0x6077, 0x6078, and 0x60F4 are recorded raw; joint SI columns "
+        "use the explicit ros2_control conversion parameters.\n"
+        "# GH1 firmware validation found that 0x6078 TxPDO may duplicate the preceding mapped "
+        "value and 0x60F4 may remain zero; use position_error_counts for following-error analysis.\n"
+        "# The 1 kHz recording path is PDO-only; mailbox SDO reads are reserved for low-rate "
+        "diagnostics.\n"
         "monotonic_ns,scheduled_cycle_start_ns,cycle_period_ns,period_jitter_ns,"
         "start_lateness_ns,wake_lateness_ns,execution_ns,deadline_miss_total,"
         "dropped_cycles_total,cycle,master_index,domain_wc,domain_wc_state,motor_name,"
-        "slave_position,target_position_607a,actual_position_6064,position_error_counts,"
+        "slave_position,rxpdo_target_position_607a_counts,txpdo_position_actual_6064_counts,"
+        "position_error_counts,txpdo_following_error_actual_60f4_counts,"
         "sent_target_position_joint_rad,feedback_actual_position_joint_rad,"
         "position_error_joint_rad,position_conversion_offset_rad,"
-        "target_delta_counts,actual_delta_counts,actual_velocity_606c_raw,"
-        "actual_torque_6077_raw,joint_velocity_rad_s,joint_effort_nm,"
-        "control_word_6040,status_word_6041,error_code_valid,"
+        "target_delta_counts,actual_delta_counts,txpdo_velocity_actual_606c_raw,"
+        "txpdo_torque_actual_6077_raw,txpdo_current_actual_6078_raw,"
+        "joint_velocity_rad_s,joint_effort_nm,rxpdo_control_word_6040,"
+        "txpdo_status_word_6041,error_code_valid,"
         "error_code_603f,goal_update_sequence,goal_sequence_delta\n");
     } else {
       std::fprintf(
@@ -680,7 +692,7 @@ private:
           std::fprintf(
             pdo_diagnostics_file_,
             "%lld,%lld,%lld,%lld,%lld,%lld,%llu,%llu,%llu,%llu,%u,%u,%u,%s,%u,"
-            "%d,%d,%d,%.12g,%.12g,%.12g,%.12g,%d,%d,%d,%d,%.12g,%.12g,"
+            "%d,%d,%d,%d,%.12g,%.12g,%.12g,%.12g,%d,%d,%d,%d,%d,%.12g,%.12g,"
             "0x%04X,0x%04X,%u,0x%04X,%llu,%u\n",
             static_cast<long long>(record.monotonic_ns),
             static_cast<long long>(record.scheduled_cycle_start_ns),
@@ -697,6 +709,7 @@ private:
             static_cast<int>(sample.target_position),
             static_cast<int>(sample.actual_position),
             static_cast<int>(sample.position_error),
+            static_cast<int>(sample.following_error_actual),
             sample.sent_target_position_joint_rad,
             sample.feedback_actual_position_joint_rad,
             sample.position_error_joint_rad,
@@ -705,6 +718,7 @@ private:
             static_cast<int>(sample.actual_delta),
             static_cast<int>(sample.actual_velocity),
             static_cast<int>(sample.actual_torque),
+            static_cast<int>(sample.actual_current),
             static_cast<double>(sample.actual_velocity) *
             motor.velocity_scale_rad_s_per_raw,
             static_cast<double>(sample.actual_torque) *
@@ -987,7 +1001,7 @@ private:
     }
 
     std::vector<ec_pdo_entry_reg_t> domain_regs;
-    const size_t entries_per_motor = config_.enable_velocity_torque_feedback ? 6U : 4U;
+    const size_t entries_per_motor = config_.enable_velocity_torque_feedback ? 8U : 4U;
     domain_regs.reserve(motors_.size() * entries_per_motor + 1U);
     for (auto & motor : motors_) {
       const auto & addr = motor->config.address;
@@ -998,6 +1012,8 @@ private:
       if (config_.enable_velocity_torque_feedback) {
         domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoActualVelocity, 0x00, &motor->offsets.actual_velocity, nullptr});
         domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoActualTorque, 0x00, &motor->offsets.actual_torque, nullptr});
+        domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoActualCurrent, 0x00, &motor->offsets.actual_current, nullptr});
+        domain_regs.push_back({addr.alias, addr.slave_position, addr.vendor_id, addr.product_code, kPdoFollowingErrorActual, 0x00, &motor->offsets.following_error_actual, nullptr});
       }
     }
     domain_regs.push_back({});
@@ -1021,7 +1037,7 @@ private:
       std::fprintf(
         stderr,
         "ethercat_driver: configure_pdo OK, RxPDO=0x1601 "
-        "TxPDO=0x1A01 remapped=[0x6041,0x6064,0x606C,0x6077]\n");
+        "TxPDO=0x1A01 remapped=[0x6041,0x6064,0x606C,0x6077,0x6078,0x60F4]\n");
     } else {
       std::fprintf(stderr, "ethercat_driver: configure_pdo OK, RxPDO=0x1601 TxPDO=0x1A01\n");
     }
@@ -1159,11 +1175,13 @@ private:
     // Do not select the ESI's 0x1A00 PDO directly: the tested GH1 firmware
     // rejected that 13-byte SM3 layout with AL 0x0017. The ESI marks 0x1A01
     // as remappable (Fixed=0), so keep the known-good PDO index and optionally
-    // extend it to 12 bytes with the ESI-defined feedback objects:
+    // extend it to 18 bytes with the ESI-defined feedback objects:
     //   0x6041:00 UINT  Status word
     //   0x6064:00 DINT  Position actual value
     //   0x606C:00 DINT  Velocity actual value
     //   0x6077:00 INT   Torque actual value
+    //   0x6078:00 INT   Current actual value
+    //   0x60F4:00 DINT  Following error actual value
     static ec_pdo_entry_info_t base_pdo_entries[] = {
       {kPdoControlWord, 0x00, 16},
       {kPdoTargetPosition, 0x00, 32},
@@ -1189,10 +1207,12 @@ private:
       {kPdoActualPosition, 0x00, 32},
       {kPdoActualVelocity, 0x00, 32},
       {kPdoActualTorque, 0x00, 16},
+      {kPdoActualCurrent, 0x00, 16},
+      {kPdoFollowingErrorActual, 0x00, 32},
     };
     static ec_pdo_info_t extended_pdos[] = {
       {0x1601, 2, extended_pdo_entries + 0},
-      {0x1A01, 4, extended_pdo_entries + 2},
+      {0x1A01, 6, extended_pdo_entries + 2},
     };
     static ec_sync_info_t extended_syncs[] = {
       {0, EC_DIR_OUTPUT, 0, nullptr, EC_WD_DISABLE},
@@ -1411,6 +1431,9 @@ private:
       const int64_t start_lateness_ns = cycle_start_ns - scheduled_cycle_start_ns;
       previous_cycle_start_ns = cycle_start_ns;
 
+      // Apply a prepared recording transition on the first EtherCAT cycle at
+      // or after the shared monotonic deadline. Both masters receive the same
+      // deadline, so service scheduling latency cannot shift the capture window.
       if (config_.enable_dc) {
         timespec app_time{};
         clock_gettime(CLOCK_MONOTONIC, &app_time);
@@ -1473,6 +1496,10 @@ private:
           EC_READ_S32(domain_pd_ + motor->offsets.actual_velocity) : 0;
         const int16_t actual_torque = config_.enable_velocity_torque_feedback ?
           EC_READ_S16(domain_pd_ + motor->offsets.actual_torque) : 0;
+        const int16_t actual_current = config_.enable_velocity_torque_feedback ?
+          EC_READ_S16(domain_pd_ + motor->offsets.actual_current) : 0;
+        const int32_t following_error_actual = config_.enable_velocity_torque_feedback ?
+          EC_READ_S32(domain_pd_ + motor->offsets.following_error_actual) : 0;
         const Cia402State state = decodeStatusWord(sw);
         const bool op_enabled = (state == Cia402State::OperationEnabled);
 
@@ -1579,6 +1606,8 @@ private:
           }
           sample.actual_velocity = actual_velocity;
           sample.actual_torque = actual_torque;
+          sample.actual_current = actual_current;
+          sample.following_error_actual = following_error_actual;
           sample.control_word = control_word;
           sample.status_word = sw;
           sample.error_code = motor->error_code.load(std::memory_order_relaxed);

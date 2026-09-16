@@ -6,6 +6,15 @@ import math
 from collections import defaultdict
 
 
+def get_compatible_field(row, current_name, *legacy_names, default=None):
+    """Return the first non-empty current or historical CSV field value."""
+    for name in (current_name, *legacy_names):
+        value = row.get(name)
+        if value not in (None, ""):
+            return value
+    return default
+
+
 class MotorStats:
     def __init__(self, moving_velocity_threshold_raw=10):
         self.moving_velocity_threshold_raw = moving_velocity_threshold_raw
@@ -49,11 +58,41 @@ class MotorStats:
 
     def add(self, row):
         timestamp_ns = int(row["monotonic_ns"])
-        target = int(row["target_position_607a"])
-        actual = int(row["actual_position_6064"])
+        target = int(
+            get_compatible_field(
+                row,
+                "rxpdo_target_position_607a_counts",
+                "target_position_607a_counts",
+                "target_position_607a",
+            )
+        )
+        actual = int(
+            get_compatible_field(
+                row,
+                "txpdo_position_actual_6064_counts",
+                "position_actual_6064_counts",
+                "actual_position_6064",
+            )
+        )
         goal_sequence = int(row["goal_update_sequence"])
-        actual_velocity = int(row.get("actual_velocity_606c_raw", 0))
-        actual_torque = int(row.get("actual_torque_6077_raw", 0))
+        actual_velocity = int(
+            get_compatible_field(
+                row,
+                "txpdo_velocity_actual_606c_raw",
+                "velocity_actual_606c_raw",
+                "actual_velocity_606c_raw",
+                default=0,
+            )
+        )
+        actual_torque = int(
+            get_compatible_field(
+                row,
+                "txpdo_torque_actual_6077_raw",
+                "torque_actual_6077_raw",
+                "actual_torque_6077_raw",
+                default=0,
+            )
+        )
         joint_velocity = row.get("joint_velocity_rad_s")
         joint_effort = row.get("joint_effort_nm")
         position_error_rad = row.get("position_error_joint_rad")
@@ -94,7 +133,9 @@ class MotorStats:
             self.torque_abs_max_raw,
             abs(actual_torque),
         )
-        status_word_text = row.get("status_word_6041")
+        status_word_text = get_compatible_field(
+            row, "txpdo_status_word_6041", "status_word_6041"
+        )
         status_word = int(status_word_text, 0) if status_word_text is not None else None
         if status_word is not None:
             self.status_words.add(status_word)
@@ -123,8 +164,11 @@ class MotorStats:
                         self.moving_effort_abs_max_nm or 0.0,
                         abs(joint_effort),
                     )
-        if "control_word_6040" in row:
-            self.control_words.add(int(row["control_word_6040"], 0))
+        control_word_text = get_compatible_field(
+            row, "rxpdo_control_word_6040", "control_word_6040"
+        )
+        if control_word_text is not None:
+            self.control_words.add(int(control_word_text, 0))
         if int(row.get("error_code_valid", 0)):
             error_code = int(row.get("error_code_603f", "0"), 0)
             if error_code:

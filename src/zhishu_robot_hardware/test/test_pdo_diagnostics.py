@@ -15,8 +15,8 @@ SPEC.loader.exec_module(MODULE)
 def row(target, actual, sequence, timestamp=0, **extra):
     result = {
         "monotonic_ns": str(timestamp),
-        "target_position_607a": str(target),
-        "actual_position_6064": str(actual),
+        "rxpdo_target_position_607a_counts": str(target),
+        "txpdo_position_actual_6064_counts": str(actual),
         "goal_update_sequence": str(sequence),
     }
     result.update({key: str(value) for key, value in extra.items()})
@@ -60,10 +60,10 @@ def test_collects_timing_pdo_and_drive_health_fields():
             deadline_miss_total=2,
             dropped_cycles_total=3,
             domain_wc_state=1,
-            actual_velocity_606c_raw=-45,
-            actual_torque_6077_raw=321,
-            status_word_6041="0x0027",
-            control_word_6040="0x000F",
+            txpdo_velocity_actual_606c_raw=-45,
+            txpdo_torque_actual_6077_raw=321,
+            txpdo_status_word_6041="0x0027",
+            rxpdo_control_word_6040="0x000F",
             error_code_valid=1,
             error_code_603f="0x1234",
         )
@@ -100,10 +100,10 @@ def test_counts_only_stable_operation_enabled_motion_samples():
             0,
             1,
             domain_wc_state=1,
-            status_word_6041="0x0027",
+            txpdo_status_word_6041="0x0027",
             target_delta_counts=100,
-            actual_velocity_606c_raw=100,
-            actual_torque_6077_raw=200,
+            txpdo_velocity_actual_606c_raw=100,
+            txpdo_torque_actual_6077_raw=200,
         )
     )
     stats.add(
@@ -112,10 +112,10 @@ def test_counts_only_stable_operation_enabled_motion_samples():
             8,
             2,
             domain_wc_state=2,
-            status_word_6041="0x0027",
+            txpdo_status_word_6041="0x0027",
             target_delta_counts=10,
-            actual_velocity_606c_raw=80,
-            actual_torque_6077_raw=-300,
+            txpdo_velocity_actual_606c_raw=80,
+            txpdo_torque_actual_6077_raw=-300,
             joint_velocity_rad_s=0.8,
             joint_effort_nm=-5.34,
             position_error_joint_rad=0.002,
@@ -127,10 +127,10 @@ def test_counts_only_stable_operation_enabled_motion_samples():
             10,
             2,
             domain_wc_state=2,
-            status_word_6041="0x0040",
+            txpdo_status_word_6041="0x0040",
             target_delta_counts=0,
-            actual_velocity_606c_raw=90,
-            actual_torque_6077_raw=400,
+            txpdo_velocity_actual_606c_raw=90,
+            txpdo_torque_actual_6077_raw=400,
         )
     )
 
@@ -141,3 +141,45 @@ def test_counts_only_stable_operation_enabled_motion_samples():
     assert stats.moving_velocity_abs_max_rad_s == 0.8
     assert stats.moving_effort_abs_max_nm == 5.34
     assert stats.position_errors_rad == [0.002]
+
+
+def test_accepts_legacy_pdo_field_names():
+    stats = MODULE.MotorStats()
+    stats.add(
+        {
+            "monotonic_ns": "0",
+            "target_position_607a": "100",
+            "actual_position_6064": "95",
+            "goal_update_sequence": "1",
+            "actual_velocity_606c_raw": "-45",
+            "actual_torque_6077_raw": "321",
+            "status_word_6041": "0x0027",
+            "control_word_6040": "0x000F",
+        }
+    )
+
+    assert stats.target_min == 100
+    assert stats.actual_min == 95
+    assert stats.velocity_abs_max_raw == 45
+    assert stats.torque_abs_max_raw == 321
+    assert stats.status_words == {0x0027}
+    assert stats.control_words == {0x000F}
+
+
+def test_accepts_intermediate_pdo_field_aliases():
+    stats = MODULE.MotorStats()
+    stats.add(
+        {
+            "monotonic_ns": "0",
+            "target_position_607a_counts": "200",
+            "position_actual_6064_counts": "190",
+            "goal_update_sequence": "1",
+            "velocity_actual_606c_raw": "12",
+            "torque_actual_6077_raw": "-34",
+        }
+    )
+
+    assert stats.target_min == 200
+    assert stats.actual_min == 190
+    assert stats.velocity_abs_max_raw == 12
+    assert stats.torque_abs_max_raw == 34

@@ -73,7 +73,9 @@ struct DriverConfig
   bool csp_direct_position_commands = false;
 
   // Keep the firmware-accepted TxPDO index 0x1A01, but remap it to include
-  // the ESI-defined 0x606C velocity and 0x6077 torque feedback entries.
+  // the ESI-defined 0x606C velocity, 0x6077 torque, 0x6078 current, and 0x60F4
+  // following-error feedback entries. The latter two are logged as raw values;
+  // validated GH1 firmware may duplicate 0x6078 or keep 0x60F4 at zero.
   // This avoids selecting the 13-byte 0x1A00 map that was rejected by the
   // tested GH1 firmware with AL 0x0017.
   bool enable_velocity_torque_feedback = false;
