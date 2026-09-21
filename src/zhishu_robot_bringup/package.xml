@@ -19,6 +19,8 @@
   <exec_depend>ros2controlcli</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>std_srvs</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>zhishu_robot_description</exec_depend>
   <exec_depend>zhishu_robot_logging</exec_depend>
   <exec_depend>zhishu_robot_commander_cpp</exec_depend>
   <exec_depend>zhishu_robot_moveit_config</exec_depend>

@@ -119,6 +119,13 @@ private:
     // The flag is checked by write() so ros2_control cannot resume motion between those steps.
     std::atomic<bool> manual_motion_enabled_{false};
     std::mutex recovery_mutex_;
+    // Service namespace is configurable so the generic EtherCAT plugin can be
+    // reused by independent hardware components (right arm, torso/head, ...).
+    // Defaults preserve the existing /right_arm/* API.
+    std::string service_namespace_{"right_arm"};
+    std::string reset_fault_service_name_{"/right_arm/reset_fault"};
+    std::string enable_service_name_{"/right_arm/enable"};
+    std::string pdo_record_service_name_{"/right_arm/record_pdo"};
     rclcpp::Node::SharedPtr recovery_node_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_fault_service_;
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr enable_service_;

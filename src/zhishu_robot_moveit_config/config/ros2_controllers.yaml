@@ -29,6 +29,12 @@ controller_manager:
     body_posture_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    # Real-hardware controller for the three GH1 axes on TorsoHeadSystem.
+    # Keep body_posture_controller for Gazebo/admittance flows that include the
+    # CAN lift axis. Do not activate both overlapping controllers at once.
+    torso_head_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
@@ -101,6 +107,24 @@ body_posture_controller:
       - position
     state_interfaces:
       - position
+
+
+torso_head_controller:
+  ros__parameters:
+    joints:
+      - waist_pitch_joint
+      - head_yaw_joint
+      - head_pitch_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+    # Initial real-hardware validation uses complete three-joint goals only.
+    allow_partial_joints_goal: false
+    interpolate_from_desired_state: false
+    set_last_command_interface_value_as_state_on_activation: false
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0
 
 
 right_gripper_controller:

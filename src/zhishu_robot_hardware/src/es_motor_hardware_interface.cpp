@@ -122,6 +122,26 @@ bool parse_bool(const std::string & text, const std::string & field_name)
   throw std::runtime_error(oss.str());
 }
 
+std::string normalize_service_namespace(std::string value)
+{
+  while (!value.empty() && value.front() == '/') {
+    value.erase(value.begin());
+  }
+  while (!value.empty() && value.back() == '/') {
+    value.pop_back();
+  }
+  if (value.empty()) {
+    throw std::runtime_error("hardware parameter 'service_namespace' must not be empty");
+  }
+  return value;
+}
+
+std::string make_node_name_from_namespace(std::string value)
+{
+  std::replace(value.begin(), value.end(), '/', '_');
+  return value + "_fault_recovery";
+}
+
 bool right_arm_default_slave_position(const std::string & joint_name, uint16_t & slave_position)
 {
   // 右臂 7 轴默认映射：从机械臂根部到腕部，EtherCAT 从站位置 0 -> 6。
@@ -219,12 +239,24 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
     return hardware_interface::CallbackReturn::ERROR;
   }
 
+  try {
+    service_namespace_ = normalize_service_namespace(
+      get_string_param(info_.hardware_parameters, "service_namespace", "right_arm"));
+  } catch (const std::exception & e) {
+    RCLCPP_ERROR(logger(), "Invalid recovery service namespace: %s", e.what());
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  reset_fault_service_name_ = "/" + service_namespace_ + "/reset_fault";
+  enable_service_name_ = "/" + service_namespace_ + "/enable";
+  pdo_record_service_name_ = "/" + service_namespace_ + "/record_pdo";
+
   if (auto executor = params.executor.lock()) {
-    recovery_node_ = std::make_shared<rclcpp::Node>("right_arm_fault_recovery");
+    recovery_node_ = std::make_shared<rclcpp::Node>(
+      make_node_name_from_namespace(service_namespace_));
     executor->add_node(recovery_node_->get_node_base_interface());
 
     reset_fault_service_ = recovery_node_->create_service<std_srvs::srv::Trigger>(
-      "/right_arm/reset_fault",
+      reset_fault_service_name_,
       [this](
         const std::shared_ptr<std_srvs::srv::Trigger::Request>,
         std::shared_ptr<std_srvs::srv::Trigger::Response> response)
@@ -233,7 +265,7 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
       });
 
     enable_service_ = recovery_node_->create_service<std_srvs::srv::SetBool>(
-      "/right_arm/enable",
+      enable_service_name_,
       [this](
         const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
         std::shared_ptr<std_srvs::srv::SetBool::Response> response)
@@ -242,7 +274,7 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
       });
 
     pdo_record_service_ = recovery_node_->create_service<std_srvs::srv::SetBool>(
-      "/right_arm/record_pdo",
+      pdo_record_service_name_,
       [this](
         const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
         std::shared_ptr<std_srvs::srv::SetBool::Response> response)
@@ -254,8 +286,9 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
 
     RCLCPP_INFO(
       logger(),
-      "Hardware services ready: /right_arm/reset_fault, /right_arm/enable, "
-      "/right_arm/record_pdo");
+      "Hardware services ready: %s, %s, %s",
+      reset_fault_service_name_.c_str(), enable_service_name_.c_str(),
+      pdo_record_service_name_.c_str());
   } else {
     RCLCPP_ERROR(logger(), "Controller manager executor is unavailable; cannot create recovery services.");
     return hardware_interface::CallbackReturn::ERROR;
@@ -508,7 +541,9 @@ bool EsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
     }
 
     if (driver_config_.motors.empty()) {
-      RCLCPP_ERROR(logger(), "No EtherCAT motors were configured. Add slave_position params or keep the right_arm joint names.");
+      RCLCPP_ERROR(
+        logger(),
+        "No EtherCAT motors were configured. Add slave_position/use_ethercat params for this hardware component.");
       return false;
     }
 
@@ -762,7 +797,7 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
       "Hardware fault recovery activation: all motors remain Operation Disabled; "
       "explicit operator enable is required." :
       "EtherCAT communication-only mode: all motors remain Operation Disabled; "
-      "commands cannot move the arm.");
+      "commands cannot move this hardware component.");
   }
 
   safety_stop_reported_.assign(driver_config_.motors.size(), false);
@@ -827,7 +862,7 @@ hardware_interface::CallbackReturn EsMotorHardwareInterface::
 
   RCLCPP_ERROR(
     logger(),
-    "Hardware entered error processing. Controllers using this arm are stopped; "
+    "Hardware entered error processing. Controllers using this hardware component are stopped; "
     "EtherCAT remains active for diagnostics and manual fault reset.");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -1105,7 +1140,8 @@ bool EsMotorHardwareInterface::reset_faults_manually(std::string & message)
     }
     if (clear) {
       message = "safety-state recovery completed for " + std::to_string(recovery_count) +
-        " motor(s); motors are still disabled, call /right_arm/enable with data=true";
+        " motor(s); motors are still disabled, call " + enable_service_name_ +
+        " with data=true";
       return true;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));

@@ -15,8 +15,13 @@ from launch.actions import (
     SetEnvironmentVariable,
 )
 from launch.event_handlers import OnProcessExit, OnProcessStart
-from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.conditions import IfCondition, UnlessCondition
+from launch.substitutions import (
+    AndSubstitution,
+    LaunchConfiguration,
+    NotSubstitution,
+    PathJoinSubstitution,
+)
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackagePrefix, FindPackageShare
@@ -65,7 +70,27 @@ def _configure_native_log_directory(context):
 def generate_launch_description():
     session_started_at = datetime.now().strftime("%H-%M-%S")
     use_fake_hardware = LaunchConfiguration("use_fake_hardware")
+    enable_left_arm_hardware = LaunchConfiguration("enable_left_arm_hardware")
+    enable_right_arm_hardware = LaunchConfiguration("enable_right_arm_hardware")
+    enable_torso_head_hardware = LaunchConfiguration("enable_torso_head_hardware")
+    both_arm_hardware_enabled = AndSubstitution(
+        enable_left_arm_hardware,
+        enable_right_arm_hardware,
+    )
+    torso_head_hardware_disabled = NotSubstitution(enable_torso_head_hardware)
+    arm_only_mode = AndSubstitution(
+        both_arm_hardware_enabled,
+        torso_head_hardware_disabled,
+    )
+    no_arm_hardware = NotSubstitution(both_arm_hardware_enabled)
+    no_trajectory_hardware = AndSubstitution(
+        no_arm_hardware,
+        torso_head_hardware_disabled,
+    )
     enable_motors_on_activate = LaunchConfiguration("enable_motors_on_activate")
+    torso_head_enable_motors_on_activate = LaunchConfiguration(
+        "torso_head_enable_motors_on_activate"
+    )
     pdo_diagnostics_auto_start = LaunchConfiguration("pdo_diagnostics_auto_start")
     enable_log_recorder = LaunchConfiguration("enable_log_recorder")
     enable_kernel_ethercat_log = LaunchConfiguration("enable_kernel_ethercat_log")
@@ -99,7 +124,13 @@ def generate_launch_description():
             mappings={
                 "use_gazebo": "false",
                 "use_fake_hardware": use_fake_hardware,
+                "enable_left_arm_hardware": enable_left_arm_hardware,
+                "enable_right_arm_hardware": enable_right_arm_hardware,
+                "enable_torso_head_hardware": enable_torso_head_hardware,
                 "enable_motors_on_activate": enable_motors_on_activate,
+                "torso_head_enable_motors_on_activate": (
+                    torso_head_enable_motors_on_activate
+                ),
                 "pdo_diagnostics_auto_start": pdo_diagnostics_auto_start,
             },
         )
@@ -165,6 +196,7 @@ def generate_launch_description():
         prefix=["taskset -c 6"],  #controller_manager 固定到 CPU6
         output="screen",
         parameters=[controllers_yaml, {"use_sim_time": False}],
+        remappings=[("~/robot_description", "/robot_description")],
         additional_env={"LC_NUMERIC": "C"},
     )
 
@@ -212,6 +244,18 @@ def generate_launch_description():
         executable="spawner",
         arguments=[
             "dual_arm_controller",
+            "--controller-manager", "/controller_manager",
+            "--param-file", controllers_yaml,
+            "--controller-manager-timeout", "120",
+        ],
+        output="screen",
+    )
+
+    torso_head_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "torso_head_controller",
             "--controller-manager", "/controller_manager",
             "--param-file", controllers_yaml,
             "--controller-manager-timeout", "120",
@@ -304,21 +348,63 @@ def generate_launch_description():
     # 启动顺序
     # ==============================
     return LaunchDescription([
+        # Hardware mode and components
         DeclareLaunchArgument(
             "use_fake_hardware",
-            default_value="false",
-            description="Use mock joints instead of the EtherCAT arms",
+            default_value="true",
+            description="Use mock joints instead of EtherCAT hardware",
         ),
         DeclareLaunchArgument(
-            "use_rviz",
-            default_value="false",
-            description="Start RViz2",
+            "enable_left_arm_hardware",
+            default_value="true",
+            description="Instantiate LeftArmSystem",
         ),
+        DeclareLaunchArgument(
+            "enable_right_arm_hardware",
+            default_value="true",
+            description="Instantiate RightArmSystem",
+        ),
+        DeclareLaunchArgument(
+            "enable_torso_head_hardware",
+            default_value="true",
+            description=(
+                "Enable TorsoHeadSystem. When combined with arm hardware, "
+                "EtherCAT master/slave ownership must be verified separately."
+            ),
+        ),
+
+        # Motor activation safety
         DeclareLaunchArgument(
             "enable_motors_on_activate",
             default_value="true",
-            description="Enable CiA402 operation; false keeps EtherCAT communication-only mode",
+            description=(
+                "Enable CiA402 operation for the arm hardware; false keeps "
+                "EtherCAT in communication-only mode"
+            ),
         ),
+        DeclareLaunchArgument(
+            "torso_head_enable_motors_on_activate",
+            default_value="false",
+            description=(
+                "Enable torso/head drives during hardware activation. Keep false "
+                "for initial feedback/direction checks and enable explicitly by "
+                "service."
+            ),
+        ),
+
+        # Control and visualization nodes
+        DeclareLaunchArgument(
+            "enable_commander",
+            default_value="false",
+            description="Start the Commander ROS bridge after move_group starts",
+        ),
+        DeclareLaunchArgument(
+            "use_rviz",
+            default_value="true",
+            description="Start RViz2",
+        ),
+
+        # EtherCAT/PDO diagnostics
         DeclareLaunchArgument(
             "pdo_diagnostics_auto_start",
             default_value="false",
@@ -327,11 +413,8 @@ def generate_launch_description():
                 "service-triggered cycle-only CSVs"
             ),
         ),
-        DeclareLaunchArgument(
-            "enable_commander",
-            default_value="false",
-            description="Start the Commander ROS bridge after move_group starts",
-        ),
+
+        # Logging
         DeclareLaunchArgument(
             "enable_log_recorder",
             default_value="true",
@@ -355,7 +438,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "log_session",
             default_value=session_started_at,
-            description="Per-launch directory name; defaults to bringup start time HH-MM-SS",
+            description=(
+                "Per-launch directory name; defaults to bringup start time "
+                "HH-MM-SS"
+            ),
         ),
         DeclareLaunchArgument(
             "log_max_file_size_mb",
@@ -365,7 +451,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "log_min_severity",
             default_value="10",
-            description="Minimum severity: DEBUG=10 INFO=20 WARN=30 ERROR=40 FATAL=50",
+            description=(
+                "Minimum severity: DEBUG=10 INFO=20 WARN=30 ERROR=40 FATAL=50"
+            ),
         ),
         OpaqueFunction(function=_configure_native_log_directory),
         log_recorder_node,
@@ -374,36 +462,82 @@ def generate_launch_description():
         ros2_control_node,
 
         joint_state_broadcaster_spawner,
-        
+
+        # Arm-only path: JSB -> dual arm -> grippers -> move_group.
         RegisterEventHandler(
-            OnProcessExit(target_action=joint_state_broadcaster_spawner,
-                          on_exit=[dual_arm_controller_spawner])
+            OnProcessExit(
+                target_action=joint_state_broadcaster_spawner,
+                on_exit=[dual_arm_controller_spawner],
+            ),
+            condition=IfCondition(arm_only_mode),
         ),
-        
-        
+
+        # Whenever torso/head hardware is enabled, start its controller first.
         RegisterEventHandler(
-            OnProcessExit(target_action=dual_arm_controller_spawner,
-                          on_exit=[left_gripper_controller_spawner])
+            OnProcessExit(
+                target_action=joint_state_broadcaster_spawner,
+                on_exit=[torso_head_controller_spawner],
+            ),
+            condition=IfCondition(enable_torso_head_hardware),
         ),
-               
+
+        # Combined path: torso/head does not suppress the dual-arm chain.
         RegisterEventHandler(
-            OnProcessExit(target_action=left_gripper_controller_spawner,
-                          on_exit=[right_gripper_controller_spawner])
+            OnProcessExit(
+                target_action=torso_head_controller_spawner,
+                on_exit=[dual_arm_controller_spawner],
+            ),
+            condition=IfCondition(both_arm_hardware_enabled),
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=dual_arm_controller_spawner,
+                on_exit=[left_gripper_controller_spawner],
+            ),
+            condition=IfCondition(both_arm_hardware_enabled),
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=left_gripper_controller_spawner,
+                on_exit=[right_gripper_controller_spawner],
+            ),
+            condition=IfCondition(both_arm_hardware_enabled),
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=right_gripper_controller_spawner,
+                on_exit=[move_group_node],
+            ),
+            condition=IfCondition(both_arm_hardware_enabled),
+        ),
+
+        # Torso/head-only path ends directly at move_group.
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=torso_head_controller_spawner,
+                on_exit=[move_group_node],
+            ),
+            condition=UnlessCondition(both_arm_hardware_enabled),
+        ),
+
+        # Keep MoveIt available when no trajectory hardware is selected.
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=joint_state_broadcaster_spawner,
+                on_exit=[move_group_node],
+            ),
+            condition=IfCondition(no_trajectory_hardware),
         ),
 
         RegisterEventHandler(
-            OnProcessExit(target_action=right_gripper_controller_spawner,
-                          on_exit=[move_group_node])
+            OnProcessStart(target_action=move_group_node, on_start=[commander_node])
         ),
 
+        # Start RViz only after the selected controller chain reaches move_group.
         RegisterEventHandler(
-            OnProcessStart(target_action=move_group_node,
-                           on_start=[commander_node])
-        ),
-
-        # 直接等 move_group 启动后开 RViz，不用 ros2 wait
-        RegisterEventHandler(
-            OnProcessStart(target_action=right_gripper_controller_spawner,
-                          on_start=[rviz_node])
+            OnProcessStart(
+                target_action=move_group_node,
+                on_start=[rviz_node],
+            )
         ),
     ])

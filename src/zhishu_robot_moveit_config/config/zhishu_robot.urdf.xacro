@@ -3,7 +3,11 @@
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
     <xacro:arg name="use_gazebo" default="false" />
     <xacro:arg name="use_fake_hardware" default="true" />
+    <xacro:arg name="enable_left_arm_hardware" default="true" />
+    <xacro:arg name="enable_right_arm_hardware" default="true" />
+    <xacro:arg name="enable_torso_head_hardware" default="false" />
     <xacro:arg name="enable_motors_on_activate" default="true" />
+    <xacro:arg name="torso_head_enable_motors_on_activate" default="false" />
     <xacro:arg name="pdo_diagnostics_auto_start" default="true" />
     <xacro:arg name="use_head_camera" default="false" />
     <xacro:arg name="hide_head_pitch_visual" default="false" />
@@ -15,21 +19,50 @@
     <!-- Import control_xacro -->
     <xacro:include filename="zhishu_robot.left_arm.ros2_control.xacro" />
     <xacro:include filename="zhishu_robot.right_arm.ros2_control.xacro" />
+    <xacro:include filename="zhishu_robot.torso_head.ros2_control.xacro" />
     <xacro:include filename="zhishu_robot.gazebo.ros2_control.xacro" />
 
     <xacro:unless value="$(arg use_gazebo)">
-        <xacro:zhishu_robot_left_arm_ros2_control
-            name="LeftArmSystem"
-            initial_positions_file="$(arg initial_positions_file)"
-            use_fake_hardware="$(arg use_fake_hardware)"
-            enable_motors_on_activate="$(arg enable_motors_on_activate)"
-            pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
-        <xacro:zhishu_robot_right_arm_ros2_control
-            name="RightArmSystem"
-            initial_positions_file="$(arg initial_positions_file)"
-            use_fake_hardware="$(arg use_fake_hardware)"
-            enable_motors_on_activate="$(arg enable_motors_on_activate)"
-            pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
+        <xacro:if value="$(arg enable_left_arm_hardware)">
+            <!-- If TorsoHeadSystem is present it owns waist_pitch/head_yaw/head_pitch;
+                 do not export the legacy passive copies from LeftArmSystem. -->
+            <xacro:if value="$(arg enable_torso_head_hardware)">
+                <xacro:zhishu_robot_left_arm_ros2_control
+                    name="LeftArmSystem"
+                    initial_positions_file="$(arg initial_positions_file)"
+                    use_fake_hardware="$(arg use_fake_hardware)"
+                    enable_motors_on_activate="$(arg enable_motors_on_activate)"
+                    pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"
+                    include_torso_head_state_joints="false"/>
+            </xacro:if>
+            <xacro:unless value="$(arg enable_torso_head_hardware)">
+                <xacro:zhishu_robot_left_arm_ros2_control
+                    name="LeftArmSystem"
+                    initial_positions_file="$(arg initial_positions_file)"
+                    use_fake_hardware="$(arg use_fake_hardware)"
+                    enable_motors_on_activate="$(arg enable_motors_on_activate)"
+                    pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"
+                    include_torso_head_state_joints="true"/>
+            </xacro:unless>
+        </xacro:if>
+
+        <xacro:if value="$(arg enable_right_arm_hardware)">
+            <xacro:zhishu_robot_right_arm_ros2_control
+                name="RightArmSystem"
+                initial_positions_file="$(arg initial_positions_file)"
+                use_fake_hardware="$(arg use_fake_hardware)"
+                enable_motors_on_activate="$(arg enable_motors_on_activate)"
+                pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
+        </xacro:if>
+
+        <xacro:if value="$(arg enable_torso_head_hardware)">
+            <xacro:zhishu_robot_torso_head_ros2_control
+                name="TorsoHeadSystem"
+                initial_positions_file="$(arg initial_positions_file)"
+                use_fake_hardware="$(arg use_fake_hardware)"
+                enable_motors_on_activate="$(arg torso_head_enable_motors_on_activate)"
+                pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
+        </xacro:if>
     </xacro:unless>
 
     <xacro:if value="$(arg use_gazebo)">
