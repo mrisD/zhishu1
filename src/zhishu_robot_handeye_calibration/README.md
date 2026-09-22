@@ -92,14 +92,25 @@ The launch also keeps a CameraInfo relay alive from
 `/camera_head/camera_info` to `/camera_head/color/camera_info`, matching the
 topic convention derived by the MoveIt image transport subscriber.
 
-The calibration launch enables the head camera, attaches the 7x5 ChArUco board to
-`left_gripper_tcp`, and hides only the rendered mesh of `head_pitch_link`.
+The calibration launch enables the head camera and replaces the rendered left
+gripper with the flange-mounted 7x5 ChArUco plate.  The plate is attached
+directly to `L_hand_link`; its printed face points along the free `+Z` side of
+the wrist flange toward the head camera.  The left-gripper links and joints stay
+in the robot model, but their visual and collision geometry is suppressed only
+in hand-eye mode so the existing SRDF and ros2_control configuration remain
+valid.  Ordinary Gazebo and MoveIt launches keep the complete left gripper.
+
+The simulated carrier is a photo-derived approximation of the supplied plate:
+240 x 220 x 3 mm, 0.43 kg, with four 5.5 mm visual alignment holes.  Replace
+these dimensions and the hole coordinates with measured CAD values before using
+the model for mechanical clearance or load calculations; they do not change the
+known printed pattern dimensions.
 
 In the HandEyeCalibration RViz display select Eye-to-Hand and configure:
 
 - sensor frame: `head_camera_optical_frame`
 - object frame: `handeye_target`
-- end-effector frame: `left_gripper_tcp`
+- end-effector frame: `L_hand_link`
 - robot base frame: `base_link`
 - image: `/camera_head/color/image_raw`
 - camera info: `/camera_head/camera_info`
@@ -117,9 +128,10 @@ ros2 run zhishu_robot_handeye_calibration check_camera_target.py
 ```
 
 The command saves an annotated frame to `/tmp/handeye_camera_check.png` and
-reports how many markers and interpolated ChArUco corners are visible. With the
-supplied pose sequence, 11 of 12 poses pass and accepted frames show 5--14
-markers; the default acceptance threshold is three.
+reports how many markers and interpolated ChArUco corners are visible.  The
+supplied pose sequence was generated for the direct flange mounting and keeps
+the plate front inside the head-camera view while MoveIt collision checking
+remains enabled; the default acceptance threshold is three markers.
 
 Run the interactive, collision-checked sample sequence in another terminal:
 

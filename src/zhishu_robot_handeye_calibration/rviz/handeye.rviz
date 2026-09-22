@@ -72,7 +72,7 @@ Visualization Manager:
       Ty: 0.0
       Tz: 0.0
       base: base_link
-      eef: left_gripper_tcp
+      eef: L_hand_link
       group: left_arm
       image_topic: /camera_head/color/image_raw
       marker border (bits): 1

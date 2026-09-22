@@ -37,6 +37,13 @@ def generate_launch_description():
         MoveItConfigsBuilder(
             "zhishu_robot", package_name="zhishu_robot_moveit_config"
         )
+        .robot_description(
+            mappings={
+                "handeye_target_enabled": handeye_target_enabled,
+                "use_head_camera": use_head_camera,
+                "hide_head_pitch_visual": hide_head_pitch_visual,
+            }
+        )
         .to_moveit_configs()
     )
 
@@ -155,7 +162,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "handeye_target_enabled",
                 default_value="false",
-                description="Attach the hand-eye target to the left TCP",
+                description="Replace the rendered left gripper with the flange-mounted hand-eye target",
             ),
             DeclareLaunchArgument(
                 "managed_move_group_shutdown",

@@ -2,10 +2,12 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <!-- Generated 7x5 DICT_4X4_50 ChArUco board:
        square_length=0.030 m, marker_length=0.022 m.
+       The photo-estimated carrier plate is 0.240 x 0.220 x 0.003 m.
        The pattern is mirrored onto local -X because that is the camera-facing side. -->
   <xacro:macro name="handeye_target_pattern">
     <visual name="handeye_board_backing">
-      <geometry><box size="0.003 0.2300000 0.1700000"/></geometry>
+      <origin xyz="0 0 -0.0200000" rpy="0 0 0"/>
+      <geometry><box size="0.0030000 0.2400000 0.2200000"/></geometry>
       <material name="handeye_white"><color rgba="1 1 1 1"/></material>
     </visual>
     <visual name="handeye_black_0">

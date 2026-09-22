@@ -77,6 +77,13 @@ def generate_launch_description():
         MoveItConfigsBuilder(
             "zhishu_robot", package_name="zhishu_robot_moveit_config"
         )
+        .robot_description(
+            mappings={
+                "handeye_target_enabled": "true",
+                "use_head_camera": "true",
+                "hide_head_pitch_visual": hide_head_pitch_visual,
+            }
+        )
         .to_moveit_configs()
     )
 

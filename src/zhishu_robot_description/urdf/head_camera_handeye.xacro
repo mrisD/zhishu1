@@ -58,20 +58,60 @@
     </xacro:if>
   </xacro:macro>
 
-  <!-- Calibration target is visual-only and fixed to the left TCP.  It is
-       named *_truth so the detector can publish handeye_target independently. -->
+  <!-- The physical calibration plate replaces the left gripper only while
+       hand-eye mode is enabled.  Dimensions and hole locations below are
+       estimated from the supplied photograph after rectifying it against the
+       known 30 mm ChArUco squares.  The ChArUco pattern frame remains at the
+       pattern center, with local -X as the printed/camera-facing side. -->
   <xacro:macro name="left_handeye_target" params="enabled">
     <xacro:if value="${enabled}">
       <link name="handeye_target_truth">
-        <!-- The board's local normal is +X. The generated macro uses colored
-             box geometry instead of a texture for headless OGRE compatibility. -->
+        <inertial>
+          <origin xyz="0 0 -0.020" rpy="0 0 0"/>
+          <mass value="0.43"/>
+          <inertia ixx="0.0037983" ixy="0" ixz="0"
+                   iyy="0.0017347" iyz="0" izz="0.0020643"/>
+        </inertial>
+        <collision>
+          <origin xyz="0 0 -0.020" rpy="0 0 0"/>
+          <geometry><box size="0.003 0.240 0.220"/></geometry>
+        </collision>
+        <!-- Generated box geometry is used instead of a texture so the
+             detector also works with the headless OGRE renderer. -->
         <xacro:handeye_target_pattern/>
+
+        <!-- Photo-estimated 5.5 mm flange holes.  URDF has no subtraction
+             primitive, so these thin dark discs are visual alignment marks;
+             the collision model remains one conservative plate box. -->
+        <visual name="handeye_mount_hole_1">
+          <origin xyz="-0.0017 -0.0207 -0.0912" rpy="0 ${pi / 2} 0"/>
+          <geometry><cylinder radius="0.00275" length="0.0004"/></geometry>
+          <material name="handeye_hole"><color rgba="0.35 0.35 0.35 1"/></material>
+        </visual>
+        <visual name="handeye_mount_hole_2">
+          <origin xyz="-0.0017 -0.0206 -0.1226" rpy="0 ${pi / 2} 0"/>
+          <geometry><cylinder radius="0.00275" length="0.0004"/></geometry>
+          <material name="handeye_hole"><color rgba="0.35 0.35 0.35 1"/></material>
+        </visual>
+        <visual name="handeye_mount_hole_3">
+          <origin xyz="-0.0017 0.0213 -0.0985" rpy="0 ${pi / 2} 0"/>
+          <geometry><cylinder radius="0.00275" length="0.0004"/></geometry>
+          <material name="handeye_hole"><color rgba="0.35 0.35 0.35 1"/></material>
+        </visual>
+        <visual name="handeye_mount_hole_4">
+          <origin xyz="-0.0017 0.0214 -0.1152" rpy="0 ${pi / 2} 0"/>
+          <geometry><cylinder radius="0.00275" length="0.0004"/></geometry>
+          <material name="handeye_hole"><color rgba="0.35 0.35 0.35 1"/></material>
+        </visual>
       </link>
       <joint name="handeye_target_mount_joint" type="fixed">
-        <parent link="left_gripper_tcp"/>
+        <parent link="L_hand_link"/>
         <child link="handeye_target_truth"/>
-        <!-- Simulated bracket keeps the board clear of the forearm silhouette. -->
-        <origin xyz="0.25 0.15 0" rpy="0 0 0"/>
+        <!-- The four-hole centroid is aligned with the flange origin.  The
+             L_hand_link mesh extends into -Z, so its free flange side is +Z.
+             The plate back (+X) touches z=0 and the printed face (-X) points
+             outward along L_hand_link +Z toward the head camera. -->
+        <origin xyz="0.1069 -0.0004 0.0015" rpy="0 ${pi / 2} 0"/>
       </joint>
     </xacro:if>
   </xacro:macro>

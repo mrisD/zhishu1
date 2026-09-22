@@ -2,13 +2,13 @@ initial_positions:
   gripper_left_finger_joint: 0.0
   left_gripper_left_finger_joint: 0.0
   # Start with the board already inside the head-camera calibration volume.
-  left_shoulder_pitch_joint: -2.270
-  left_shoulder_roll_joint: -0.296
-  left_shoulder_yaw_joint: 2.320
-  left_elbow_pitch_joint: 1.343
-  left_wrist_yaw_joint: 0.715
-  left_wrist_pitch_joint: 0.977
-  left_wrist_roll_joint: 0.663
+  left_shoulder_pitch_joint: -1.8010
+  left_shoulder_roll_joint: -0.0919
+  left_shoulder_yaw_joint: -1.4576
+  left_elbow_pitch_joint: 0.2305
+  left_wrist_yaw_joint: 1.1331
+  left_wrist_pitch_joint: 0.7153
+  left_wrist_roll_joint: -0.4490
   right_shoulder_pitch_joint: 0.0
   right_shoulder_roll_joint: 0.0
   right_shoulder_yaw_joint: 0.0

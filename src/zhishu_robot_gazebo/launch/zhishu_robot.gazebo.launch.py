@@ -178,7 +178,7 @@ def generate_launch_description():
     declare_handeye_target_enabled_cmd = DeclareLaunchArgument(
         name='handeye_target_enabled',
         default_value='false',
-        description='Attach the simulated ArUco target to left_gripper_tcp')
+        description='Replace the rendered left gripper with the flange-mounted ChArUco target')
 
     declare_managed_gazebo_shutdown_cmd = DeclareLaunchArgument(
         name='managed_gazebo_shutdown',

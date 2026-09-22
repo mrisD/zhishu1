@@ -15,6 +15,17 @@ WHITE_MARGIN = 0.010
 MARKER_BITS = 4
 BORDER_BITS = 1
 
+# Photo-derived dimensions of the physical aluminium carrier plate.  The
+# printed target occupies 210 x 150 mm; the carrier extends 15 mm beyond the
+# long target edges and approximately 15/55 mm beyond the short edges to make
+# room for the flange holes.  Keep these values in one place so measured CAD
+# dimensions can replace the estimate later without hand-editing the generated
+# xacro.
+PLATE_WIDTH = 0.240
+PLATE_HEIGHT = 0.220
+PLATE_CENTER_Z = -0.020
+PLATE_THICKNESS = 0.003
+
 
 def add_box(lines, index, y, z, size_y, size_z):
     lines.extend(
@@ -31,8 +42,6 @@ def add_box(lines, index, y, z, size_y, size_z):
 def generate_xacro(path, dictionary):
     board_width = SQUARES_X * SQUARE_LENGTH
     board_height = SQUARES_Y * SQUARE_LENGTH
-    backing_width = board_width + 2.0 * WHITE_MARGIN
-    backing_height = board_height + 2.0 * WHITE_MARGIN
     marker_margin = (SQUARE_LENGTH - MARKER_LENGTH) / 2.0
     marker_cells = MARKER_BITS + 2 * BORDER_BITS
     bit_length = MARKER_LENGTH / marker_cells
@@ -42,10 +51,12 @@ def generate_xacro(path, dictionary):
         '<robot xmlns:xacro="http://www.ros.org/wiki/xacro">',
         '  <!-- Generated 7x5 DICT_4X4_50 ChArUco board:',
         '       square_length=0.030 m, marker_length=0.022 m.',
+        '       The photo-estimated carrier plate is 0.240 x 0.220 x 0.003 m.',
         '       The pattern is mirrored onto local -X because that is the camera-facing side. -->',
         '  <xacro:macro name="handeye_target_pattern">',
         '    <visual name="handeye_board_backing">',
-        f'      <geometry><box size="0.003 {backing_width:.7f} {backing_height:.7f}"/></geometry>',
+        f'      <origin xyz="0 0 {PLATE_CENTER_Z:.7f}" rpy="0 0 0"/>',
+        f'      <geometry><box size="{PLATE_THICKNESS:.7f} {PLATE_WIDTH:.7f} {PLATE_HEIGHT:.7f}"/></geometry>',
         '      <material name="handeye_white"><color rgba="1 1 1 1"/></material>',
         '    </visual>',
     ]

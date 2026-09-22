@@ -11,14 +11,17 @@ base_link -> head_camera_optical_frame
 
 `handeye_auto.launch.py` 会自动完成以下工作：
 
-1. 启动 Gazebo Harmonic、ROS 2 控制器和 MoveIt。
+1. 启动 Gazebo Harmonic、ROS 2 控制器和 MoveIt。手眼模式将左夹爪的 visual/
+   collision 隐藏，并把标定板直接安装到 `L_hand_link` 法兰；夹爪关节和链接仍保留，
+   因此 SRDF 与 ros2_control 不需要另一套配置。普通 Gazebo、MoveIt 模式不受影响，
+   仍显示并使用左夹爪。
 2. 将头部关节保持为 `yaw=0.5 rad`、`pitch=0.15 rad`；自动节点在开始及每次
    采样时检查 `0.002 rad` 容差，越界立即失败。
 3. 依次规划并执行 12 组左臂关节姿态。
 4. 每次运动稳定后，从 `/camera_head/color/image_raw` 检测
    `DICT_4X4_50`、7×5 ChArUco（方格 30 mm、标记 22 mm），并使用相机内参估计
    `camera -> target` 位姿。
-5. 按图像时间戳读取 TF 中的 `base -> left_gripper_tcp` 位姿。
+5. 按图像时间戳读取 TF 中的 `base_link -> L_hand_link` 位姿。
 6. 分别运行 Tsai、Park、Horaud、Andreff、Daniilidis 五种 OpenCV
    Eye-to-Hand 求解器，并按 AX=XB 重投影误差选择结果。
 7. 将结果与独立 TF 真值 `base_link -> head_camera_optical_truth` 比较。该帧与
@@ -99,6 +102,13 @@ HandEyeCalibration 的 Target 页能持续收到相机内参和图像。
 `effector_wrt_world` 和 `object_wrt_sensor` 两个按行展开的 4×4 矩阵。它与包含
 PASS/FAIL、阈值、仿真真值和 solver 比较的完整结果文件用途不同。
 
+本方案中的 ChArUco 参数为 `DICT_4X4_50`、7×5 大方格、30 mm 方格边长和
+22 mm marker 边长。仿真载板根据用户照片和已知棋盘尺度作透视校正后近似为
+240×220×3 mm、0.43 kg；四孔仅以 5.5 mm 深色圆形作为视觉定位标记，碰撞体仍是
+保守的整板 box。孔位、板厚与质量属于照片估计值，机械装配和动力学验证前应以实测
+CAD 数据替换。`L_hand_link.STL` 主体从法兰零平面向 `-Z` 延伸，所以载板装在
+`+Z` 自由侧，印刷面朝头部相机。
+
 桌面模式下 Gazebo server 与 GUI 分进程运行，GUI 使用兼容性的 OGRE renderer，
 避免 Mesa/EGL 环境中 OGRE2 强制软件渲染导致的启动后闪退。
 
@@ -116,10 +126,10 @@ PASS/FAIL、阈值、仿真真值和 solver 比较的完整结果文件用途不
 | AX=XB 旋转 RMSE | ≤ 0.03 rad |
 | 求解器输出 | 所有矩阵元素为有限值 |
 
-标定板在部分大姿态下会被手臂遮挡。7×5 ChArUco 板使用默认
-`minimum_markers:=3` 时，本场景实测保留 11 个姿态；被拒绝的姿态5虽然能看到
-部分标记，但有效 ChArUco 角点分布不足。工程使用时可按可见性和姿态多样性的
-权衡调整该参数。
+法兰和腕部会遮挡靠近安装孔的一小部分棋盘，但不会影响当前序列求解。7×5
+ChArUco 板使用默认 `minimum_markers:=3` 时，本场景实测 12 个姿态全部通过
+MoveIt 碰撞检查和图像检测，每帧可见 10--17 个 marker。工程使用时仍可按
+可见性和姿态多样性的权衡调整该参数。
 
 ## 4. 本次自动验证结果
 
@@ -130,32 +140,34 @@ Harmonic、OpenCV 4.6.0。
 
 | 项目 | 数值 |
 |---|---:|
-| 有效样本 | 11 / 12 |
-| marker 数量 | 13, 10, 14, 14, 14, 5, 13, 13, 7, 11, 12 |
+| 有效样本 | 12 / 12 |
+| marker 数量 | 12, 13, 11, 10, 13, 10, 17, 17, 15, 14, 17, 17 |
 | 选中求解器 | Tsai1989 |
-| AX=XB 平移 RMSE | 0.00491847 m |
-| AX=XB 旋转 RMSE | 0.00828908 rad |
-| 真值平移误差 | 0.0129392 m |
-| 真值旋转误差 | 0.0153393 rad（约 0.8789°） |
+| AX=XB 平移 RMSE | 0.00170070 m |
+| AX=XB 旋转 RMSE | 0.00154722 rad |
+| 真值平移误差 | 0.000310068 m |
+| 真值旋转误差 | 0.000471788 rad（约 0.0270°） |
 
 标定结果：
 
 ```yaml
 parent_frame: base_link
 child_frame: head_camera_optical_frame
-translation_xyz_m: [0.0808436028, 0.0401418873, 1.3651852969]
-quaternion_xyzw: [-0.5976153515, 0.4011339263, -0.3262204205, 0.6128031511]
+translation_xyz_m: [0.0861995486, 0.0333533096, 1.3745618781]
+quaternion_xyzw: [-0.6009152097, 0.4044184949, -0.3209752217, 0.6101815294]
 transform_matrix:
-  - [ 0.4653436208, -0.0796297814,  0.8815409307, 0.0808436028]
-  - [-0.8792653881,  0.0728722578,  0.4707249849, 0.0401418873]
-  - [-0.1017236056, -0.9941572974, -0.0361050704, 1.3651852969]
+  - [ 0.4668411760, -0.0943361460,  0.8792951768, 0.0861995486]
+  - [-0.8777487527,  0.0717516356,  0.4737180911, 0.0333533096]
+  - [-0.1077796061, -0.9929513555, -0.0493068165, 1.3745618781]
   - [ 0.0,           0.0,           0.0,          1.0]
 ```
 
-本次无界面测试结果位于 `/tmp/handeye_charuco_result_v2.yaml`，其中还包含五种
-求解器的比较结果、仿真真值和每个样本的两组输入 TF。插件原生样本位于
-`/tmp/handeye_charuco_moveit_samples_v2.yaml`，检测图像位于
-`/tmp/handeye_charuco_samples_v2/`。
+本次带 Gazebo、MoveIt、RViz 界面的最终测试结果位于工作区
+`handeye_flange_board_result.yaml`，其中还包含五种求解器的比较结果、仿真真值和
+每个样本的两组输入 TF。插件原生样本位于
+`handeye_flange_board_moveit_samples.yaml`，12 张检测图像位于
+`handeye_flange_board_samples/`。自动流程完成后已暂停 Gazebo、删除仿真机器人并
+关闭全部 ROS 相关子进程。
 
 ## 5. 参数与结果文件
 
