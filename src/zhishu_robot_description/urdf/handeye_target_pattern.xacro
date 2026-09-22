@@ -1,895 +1,1046 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <!-- Generated geometric 3x4 DICT_5X5_250 board. The cells are mirrored
-       on local -X because the camera observes the physical board back face. -->
+  <!-- Generated 7x5 DICT_4X4_50 ChArUco board:
+       square_length=0.030 m, marker_length=0.022 m.
+       The pattern is mirrored onto local -X because that is the camera-facing side. -->
   <xacro:macro name="handeye_target_pattern">
     <visual name="handeye_board_backing">
-      <geometry><box size="0.003 0.240 0.315"/></geometry>
+      <geometry><box size="0.003 0.2300000 0.1700000"/></geometry>
       <material name="handeye_white"><color rgba="1 1 1 1"/></material>
     </visual>
     <visual name="handeye_black_0">
-      <origin xyz="-0.00175 0.0750000 0.1382143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 0.0600000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_1">
-      <origin xyz="-0.00175 0.1007143 0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0600000 0.0691667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_2">
-      <origin xyz="-0.00175 0.0835714 0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0691667 0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_3">
-      <origin xyz="-0.00175 0.0578571 0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0618333 0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_4">
-      <origin xyz="-0.00175 0.0964286 0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0508333 0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_5">
-      <origin xyz="-0.00175 0.0750000 0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0673333 0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_6">
-      <origin xyz="-0.00175 0.0492857 0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0581667 0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_7">
-      <origin xyz="-0.00175 0.0964286 0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0508333 0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_8">
-      <origin xyz="-0.00175 0.0578571 0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0655000 0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_9">
-      <origin xyz="-0.00175 0.1007143 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0508333 0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_10">
-      <origin xyz="-0.00175 0.0835714 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0655000 0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_11">
-      <origin xyz="-0.00175 0.0664286 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0526667 0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_12">
-      <origin xyz="-0.00175 0.0492857 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0600000 0.0508333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_13">
-      <origin xyz="-0.00175 0.1007143 0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0300000 0.0600000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_14">
-      <origin xyz="-0.00175 0.0578571 0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0000000 0.0691667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_15">
-      <origin xyz="-0.00175 0.0750000 0.0867857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0000000 0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_16">
-      <origin xyz="-0.00175 0.0000000 0.1382143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0091667 0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_17">
-      <origin xyz="-0.00175 0.0085714 0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0428571 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0091667 0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_18">
-      <origin xyz="-0.00175 -0.0257143 0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0091667 0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_19">
-      <origin xyz="-0.00175 0.0257143 0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0000000 0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_20">
-      <origin xyz="-0.00175 -0.0128571 0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0342857 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0091667 0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_21">
-      <origin xyz="-0.00175 0.0085714 0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0428571 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0091667 0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_22">
-      <origin xyz="-0.00175 -0.0257143 0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0018333 0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_23">
-      <origin xyz="-0.00175 0.0257143 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0073333 0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_24">
-      <origin xyz="-0.00175 0.0085714 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0000000 0.0508333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_25">
-      <origin xyz="-0.00175 -0.0257143 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0300000 0.0600000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_26">
-      <origin xyz="-0.00175 0.0171429 0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0600000 0.0691667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_27">
-      <origin xyz="-0.00175 -0.0214286 0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0545000 0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_28">
-      <origin xyz="-0.00175 0.0000000 0.0867857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0691667 0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_29">
-      <origin xyz="-0.00175 -0.0750000 0.1382143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0545000 0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_30">
-      <origin xyz="-0.00175 -0.0492857 0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0691667 0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_31">
-      <origin xyz="-0.00175 -0.0750000 0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0545000 0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_32">
-      <origin xyz="-0.00175 -0.0964286 0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0673333 0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_33">
-      <origin xyz="-0.00175 -0.0492857 0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0508333 0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_34">
-      <origin xyz="-0.00175 -0.0964286 0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0618333 0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_35">
-      <origin xyz="-0.00175 -0.0621429 0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0342857 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0691667 0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_36">
-      <origin xyz="-0.00175 -0.1007143 0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0600000 0.0508333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_37">
-      <origin xyz="-0.00175 -0.0492857 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0900000 0.0600000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_38">
-      <origin xyz="-0.00175 -0.0664286 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 0.0391667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_39">
-      <origin xyz="-0.00175 -0.0964286 0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0991667 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_40">
-      <origin xyz="-0.00175 -0.0492857 0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_41">
-      <origin xyz="-0.00175 -0.0835714 0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0808333 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_42">
-      <origin xyz="-0.00175 -0.1007143 0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0991667 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_43">
-      <origin xyz="-0.00175 -0.0750000 0.0867857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_44">
-      <origin xyz="-0.00175 0.0750000 0.0632143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0808333 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_45">
-      <origin xyz="-0.00175 0.1007143 0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0973333 0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_46">
-      <origin xyz="-0.00175 0.0664286 0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0428571 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0845000 0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_47">
-      <origin xyz="-0.00175 0.0921429 0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0973333 0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_48">
-      <origin xyz="-0.00175 0.0492857 0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0826667 0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_49">
-      <origin xyz="-0.00175 0.0921429 0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 0.0208333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_50">
-      <origin xyz="-0.00175 0.0664286 0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0600000 0.0300000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_51">
-      <origin xyz="-0.00175 0.0492857 0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0300000 0.0391667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_52">
-      <origin xyz="-0.00175 0.0964286 0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0373333 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_53">
-      <origin xyz="-0.00175 0.0492857 0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0281667 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_54">
-      <origin xyz="-0.00175 0.1007143 0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0208333 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_55">
-      <origin xyz="-0.00175 0.0835714 0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0373333 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_56">
-      <origin xyz="-0.00175 0.0492857 0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0245000 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_57">
-      <origin xyz="-0.00175 0.0750000 0.0117857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0391667 0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_58">
-      <origin xyz="-0.00175 0.0000000 0.0632143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0300000 0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_59">
-      <origin xyz="-0.00175 0.0257143 0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0208333 0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_60">
-      <origin xyz="-0.00175 0.0000000 0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0391667 0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_61">
-      <origin xyz="-0.00175 -0.0214286 0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0226667 0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_62">
-      <origin xyz="-0.00175 0.0257143 0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0300000 0.0208333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_63">
-      <origin xyz="-0.00175 -0.0085714 0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0000000 0.0300000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_64">
-      <origin xyz="-0.00175 -0.0257143 0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0300000 0.0391667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_65">
-      <origin xyz="-0.00175 0.0214286 0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0226667 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_66">
-      <origin xyz="-0.00175 -0.0085714 0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0391667 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_67">
-      <origin xyz="-0.00175 -0.0257143 0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0208333 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_68">
-      <origin xyz="-0.00175 0.0214286 0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0300000 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_69">
-      <origin xyz="-0.00175 -0.0042857 0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0391667 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_70">
-      <origin xyz="-0.00175 -0.0257143 0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0208333 0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_71">
-      <origin xyz="-0.00175 0.0171429 0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0355000 0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_72">
-      <origin xyz="-0.00175 -0.0171429 0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0208333 0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_73">
-      <origin xyz="-0.00175 0.0000000 0.0117857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0318333 0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_74">
-      <origin xyz="-0.00175 -0.0750000 0.0632143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0391667 0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_75">
-      <origin xyz="-0.00175 -0.0492857 0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0300000 0.0208333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_76">
-      <origin xyz="-0.00175 -0.0835714 0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0600000 0.0300000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_77">
-      <origin xyz="-0.00175 -0.1007143 0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0900000 0.0391667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_78">
-      <origin xyz="-0.00175 -0.0535714 0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0808333 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_79">
-      <origin xyz="-0.00175 -0.0878571 0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0342857 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0900000 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_80">
-      <origin xyz="-0.00175 -0.0621429 0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0342857 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0991667 0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_81">
-      <origin xyz="-0.00175 -0.0964286 0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0808333 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_82">
-      <origin xyz="-0.00175 -0.0664286 0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0428571 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0973333 0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_83">
-      <origin xyz="-0.00175 -0.1007143 0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0845000 0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_84">
-      <origin xyz="-0.00175 -0.0535714 0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0973333 0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_85">
-      <origin xyz="-0.00175 -0.0835714 0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0808333 0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_86">
-      <origin xyz="-0.00175 -0.1007143 0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0973333 0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_87">
-      <origin xyz="-0.00175 -0.0750000 0.0117857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0900000 0.0208333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_88">
-      <origin xyz="-0.00175 0.0750000 -0.0117857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 0.0000000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_89">
-      <origin xyz="-0.00175 0.0964286 -0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0600000 0.0091667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_90">
-      <origin xyz="-0.00175 0.0664286 -0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0691667 0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_91">
-      <origin xyz="-0.00175 0.0492857 -0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0545000 0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_92">
-      <origin xyz="-0.00175 0.0921429 -0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0673333 0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_93">
-      <origin xyz="-0.00175 0.0492857 -0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0545000 0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_94">
-      <origin xyz="-0.00175 0.1007143 -0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0691667 -0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_95">
-      <origin xyz="-0.00175 0.0835714 -0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0508333 -0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_96">
-      <origin xyz="-0.00175 0.0664286 -0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0655000 -0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_97">
-      <origin xyz="-0.00175 0.0492857 -0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0526667 -0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_98">
-      <origin xyz="-0.00175 0.1007143 -0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0600000 -0.0091667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_99">
-      <origin xyz="-0.00175 0.0492857 -0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0300000 0.0000000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_100">
-      <origin xyz="-0.00175 0.0964286 -0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0000000 0.0091667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_101">
-      <origin xyz="-0.00175 0.0578571 -0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0091667 0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_102">
-      <origin xyz="-0.00175 0.0750000 -0.0632143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0091667 0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_103">
-      <origin xyz="-0.00175 0.0000000 -0.0117857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0091667 0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_104">
-      <origin xyz="-0.00175 0.0214286 -0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0073333 0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_105">
-      <origin xyz="-0.00175 -0.0214286 -0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0091667 -0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_106">
-      <origin xyz="-0.00175 0.0171429 -0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0018333 -0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_107">
-      <origin xyz="-0.00175 -0.0171429 -0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0091667 -0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_108">
-      <origin xyz="-0.00175 0.0171429 -0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0091667 -0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_109">
-      <origin xyz="-0.00175 -0.0085714 -0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0018333 -0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_110">
-      <origin xyz="-0.00175 -0.0257143 -0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0073333 -0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_111">
-      <origin xyz="-0.00175 0.0128571 -0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0342857 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0000000 -0.0091667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_112">
-      <origin xyz="-0.00175 -0.0257143 -0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0300000 0.0000000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_113">
-      <origin xyz="-0.00175 0.0214286 -0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0600000 0.0091667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_114">
-      <origin xyz="-0.00175 0.0000000 -0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0508333 0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_115">
-      <origin xyz="-0.00175 -0.0257143 -0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0655000 0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_116">
-      <origin xyz="-0.00175 0.0000000 -0.0632143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0508333 0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_117">
-      <origin xyz="-0.00175 -0.0750000 -0.0117857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0691667 0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_118">
-      <origin xyz="-0.00175 -0.0492857 -0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0526667 -0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_119">
-      <origin xyz="-0.00175 -0.0835714 -0.0203571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0428571 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0618333 -0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_120">
-      <origin xyz="-0.00175 -0.0492857 -0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0691667 -0.0018333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_121">
-      <origin xyz="-0.00175 -0.0750000 -0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0526667 -0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_122">
-      <origin xyz="-0.00175 -0.0964286 -0.0289286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0673333 -0.0055000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_123">
-      <origin xyz="-0.00175 -0.0492857 -0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0600000 -0.0091667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_124">
-      <origin xyz="-0.00175 -0.0878571 -0.0375000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0342857 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0900000 0.0000000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_125">
-      <origin xyz="-0.00175 -0.0535714 -0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 -0.0208333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_126">
-      <origin xyz="-0.00175 -0.0792857 -0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0991667 -0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_127">
-      <origin xyz="-0.00175 -0.1007143 -0.0460714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0808333 -0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_128">
-      <origin xyz="-0.00175 -0.0492857 -0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0991667 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_129">
-      <origin xyz="-0.00175 -0.0707143 -0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_130">
-      <origin xyz="-0.00175 -0.0964286 -0.0546429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0808333 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_131">
-      <origin xyz="-0.00175 -0.0750000 -0.0632143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0991667 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_132">
-      <origin xyz="-0.00175 0.0750000 -0.0867857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_133">
-      <origin xyz="-0.00175 0.1007143 -0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0808333 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_134">
-      <origin xyz="-0.00175 0.0792857 -0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0936667 -0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0146667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_135">
-      <origin xyz="-0.00175 0.0492857 -0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0808333 -0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_136">
-      <origin xyz="-0.00175 0.0878571 -0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0342857 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 -0.0391667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_137">
-      <origin xyz="-0.00175 0.0535714 -0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0600000 -0.0300000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_138">
-      <origin xyz="-0.00175 0.0964286 -0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0300000 -0.0208333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_139">
-      <origin xyz="-0.00175 0.0492857 -0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0336667 -0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0146667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_140">
-      <origin xyz="-0.00175 0.1007143 -0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0208333 -0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_141">
-      <origin xyz="-0.00175 0.0664286 -0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0336667 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0146667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_142">
-      <origin xyz="-0.00175 0.0492857 -0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0208333 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_143">
-      <origin xyz="-0.00175 0.0921429 -0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0391667 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_144">
-      <origin xyz="-0.00175 0.0664286 -0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0318333 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_145">
-      <origin xyz="-0.00175 0.0492857 -0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0226667 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_146">
-      <origin xyz="-0.00175 0.0750000 -0.1382143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0373333 -0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_147">
-      <origin xyz="-0.00175 0.0000000 -0.0867857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0208333 -0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_148">
-      <origin xyz="-0.00175 0.0257143 -0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0300000 -0.0391667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_149">
-      <origin xyz="-0.00175 0.0042857 -0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0000000 -0.0300000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_150">
-      <origin xyz="-0.00175 -0.0257143 -0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0300000 -0.0208333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_151">
-      <origin xyz="-0.00175 0.0257143 -0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0300000 -0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_152">
-      <origin xyz="-0.00175 -0.0042857 -0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0208333 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_153">
-      <origin xyz="-0.00175 -0.0257143 -0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0373333 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_154">
-      <origin xyz="-0.00175 0.0257143 -0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0208333 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_155">
-      <origin xyz="-0.00175 0.0000000 -0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0281667 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_156">
-      <origin xyz="-0.00175 -0.0257143 -0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0391667 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_157">
-      <origin xyz="-0.00175 0.0257143 -0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0226667 -0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_158">
-      <origin xyz="-0.00175 -0.0085714 -0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0428571 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0391667 -0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_159">
-      <origin xyz="-0.00175 0.0128571 -0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0342857 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0300000 -0.0391667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_160">
-      <origin xyz="-0.00175 -0.0257143 -0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0600000 -0.0300000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_161">
-      <origin xyz="-0.00175 0.0000000 -0.1382143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0900000 -0.0208333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_162">
-      <origin xyz="-0.00175 -0.0750000 -0.0867857" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0845000 -0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_163">
-      <origin xyz="-0.00175 -0.0492857 -0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0973333 -0.0245000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_164">
-      <origin xyz="-0.00175 -0.0750000 -0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0808333 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_165">
-      <origin xyz="-0.00175 -0.0964286 -0.0953571" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0881667 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_166">
-      <origin xyz="-0.00175 -0.0578571 -0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0257143 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0973333 -0.0281667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_167">
-      <origin xyz="-0.00175 -0.0835714 -0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0900000 -0.0318333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_168">
-      <origin xyz="-0.00175 -0.1007143 -0.1039286" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0808333 -0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_169">
-      <origin xyz="-0.00175 -0.0492857 -0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0991667 -0.0355000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_170">
-      <origin xyz="-0.00175 -0.0664286 -0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 -0.0900000 -0.0391667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_171">
-      <origin xyz="-0.00175 -0.0964286 -0.1125000" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0900000 -0.0600000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_172">
-      <origin xyz="-0.00175 -0.0492857 -0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0600000 -0.0508333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_173">
-      <origin xyz="-0.00175 -0.0664286 -0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0085714 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0655000 -0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_174">
-      <origin xyz="-0.00175 -0.0964286 -0.1210714" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0171429 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0526667 -0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_175">
-      <origin xyz="-0.00175 -0.0750000 -0.1296429" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0673333 -0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
     <visual name="handeye_black_176">
-      <origin xyz="-0.00175 -0.0750000 -0.1382143" rpy="0 0 0"/>
-      <geometry><box size="0.0005 0.0600000 0.0085714"/></geometry>
+      <origin xyz="-0.00175 0.0545000 -0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_177">
+      <origin xyz="-0.00175 0.0691667 -0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_178">
+      <origin xyz="-0.00175 0.0618333 -0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_179">
+      <origin xyz="-0.00175 0.0508333 -0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_180">
+      <origin xyz="-0.00175 0.0636667 -0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0146667 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_181">
+      <origin xyz="-0.00175 0.0508333 -0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_182">
+      <origin xyz="-0.00175 0.0600000 -0.0691667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_183">
+      <origin xyz="-0.00175 0.0300000 -0.0600000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_184">
+      <origin xyz="-0.00175 0.0000000 -0.0508333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_185">
+      <origin xyz="-0.00175 0.0055000 -0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_186">
+      <origin xyz="-0.00175 -0.0073333 -0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_187">
+      <origin xyz="-0.00175 0.0073333 -0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_188">
+      <origin xyz="-0.00175 -0.0073333 -0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_189">
+      <origin xyz="-0.00175 0.0055000 -0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_190">
+      <origin xyz="-0.00175 -0.0091667 -0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_191">
+      <origin xyz="-0.00175 0.0091667 -0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_192">
+      <origin xyz="-0.00175 -0.0073333 -0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_193">
+      <origin xyz="-0.00175 0.0000000 -0.0691667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_194">
+      <origin xyz="-0.00175 -0.0300000 -0.0600000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_195">
+      <origin xyz="-0.00175 -0.0600000 -0.0508333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_196">
+      <origin xyz="-0.00175 -0.0526667 -0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_197">
+      <origin xyz="-0.00175 -0.0655000 -0.0545000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0110000 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_198">
+      <origin xyz="-0.00175 -0.0526667 -0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_199">
+      <origin xyz="-0.00175 -0.0673333 -0.0581667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_200">
+      <origin xyz="-0.00175 -0.0526667 -0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_201">
+      <origin xyz="-0.00175 -0.0673333 -0.0618333" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_202">
+      <origin xyz="-0.00175 -0.0526667 -0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0073333 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_203">
+      <origin xyz="-0.00175 -0.0618333 -0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_204">
+      <origin xyz="-0.00175 -0.0691667 -0.0655000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0036667 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_205">
+      <origin xyz="-0.00175 -0.0600000 -0.0691667" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0220000 0.0036667"/></geometry>
+      <material name="handeye_black"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <visual name="handeye_black_206">
+      <origin xyz="-0.00175 -0.0900000 -0.0600000" rpy="0 0 0"/>
+      <geometry><box size="0.0005 0.0300000 0.0300000"/></geometry>
       <material name="handeye_black"><color rgba="0 0 0 1"/></material>
     </visual>
   </xacro:macro>

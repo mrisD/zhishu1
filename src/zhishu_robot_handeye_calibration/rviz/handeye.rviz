@@ -62,7 +62,7 @@ Visualization Manager:
       Transport Hint: raw
       Value: true
     - Class: moveit_rviz_plugin/HandEyeCalibration
-      ArUco dictionary: DICT_5X5_250
+      ArUco dictionary: DICT_4X4_50
       Enabled: true
       Name: HandEyeCalibration
       Rx: 0.0
@@ -76,17 +76,18 @@ Visualization Manager:
       group: left_arm
       image_topic: /camera_head/color/image_raw
       marker border (bits): 1
-      marker separation (px): 50
-      marker size (px): 200
-      markers, X: 3
-      markers, Y: 4
-      measured marker size (m): 0.06
-      measured separation (m): 0.015
+      longest board side (m): 0.21
+      margin size (px): 0
+      marker size (px): 220
+      measured marker size (m): 0.022
       object: handeye_target
       sensor: head_camera_optical_frame
       sensor_mount_type: 0
       solver: Horaud1995
-      target_type: HandEyeTarget/Aruco
+      square size (px): 300
+      squares, X: 7
+      squares, Y: 5
+      target_type: HandEyeTarget/Charuco
       Value: true
   Enabled: true
   Global Options:

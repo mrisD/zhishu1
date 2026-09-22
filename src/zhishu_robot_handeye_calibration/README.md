@@ -92,7 +92,7 @@ The launch also keeps a CameraInfo relay alive from
 `/camera_head/camera_info` to `/camera_head/color/camera_info`, matching the
 topic convention derived by the MoveIt image transport subscriber.
 
-The calibration launch enables the head camera, attaches the 3x4 ArUco board to
+The calibration launch enables the head camera, attaches the 7x5 ChArUco board to
 `left_gripper_tcp`, and hides only the rendered mesh of `head_pitch_link`.
 
 In the HandEyeCalibration RViz display select Eye-to-Hand and configure:
@@ -103,8 +103,9 @@ In the HandEyeCalibration RViz display select Eye-to-Hand and configure:
 - robot base frame: `base_link`
 - image: `/camera_head/color/image_raw`
 - camera info: `/camera_head/camera_info`
-- ArUco dictionary: `DICT_5X5_250`
-- board: 3 x 4, marker size 0.06 m, separation 0.015 m
+- target type: `HandEyeTarget/Charuco`
+- ArUco dictionary: `DICT_4X4_50`
+- board: 7 x 5 squares, square length 0.030 m, marker length 0.022 m
 
 The calibration launch fixes the head at yaw `0.5` rad and pitch `0.15` rad.
 Those values must remain unchanged for every sample and for the final solve.
@@ -116,8 +117,9 @@ ros2 run zhishu_robot_handeye_calibration check_camera_target.py
 ```
 
 The command saves an annotated frame to `/tmp/handeye_camera_check.png` and
-reports how many markers are visible. The supplied pose sequence typically
-shows 3--9 markers; the default acceptance threshold is three.
+reports how many markers and interpolated ChArUco corners are visible. With the
+supplied pose sequence, 11 of 12 poses pass and accepted frames show 5--14
+markers; the default acceptance threshold is three.
 
 Run the interactive, collision-checked sample sequence in another terminal:
 

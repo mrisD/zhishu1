@@ -8,4 +8,9 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/managed_process.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

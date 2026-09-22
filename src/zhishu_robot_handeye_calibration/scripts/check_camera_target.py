@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture one head-camera frame and report visible ArUco target markers."""
+"""Capture one head-camera frame and report visible ChArUco target features."""
 
 import sys
 import time
@@ -19,6 +19,7 @@ class CameraTargetCheck(Node):
         self.declare_parameter("output_path", "/tmp/handeye_camera_check.png")
         self.bridge = CvBridge()
         self.marker_count = None
+        self.charuco_corner_count = None
         topic = self.get_parameter("image_topic").value
         self.create_subscription(Image, topic, self.on_image, qos_profile_sensor_data)
 
@@ -27,19 +28,30 @@ class CameraTargetCheck(Node):
             return
         image = self.bridge.imgmsg_to_cv2(message, desired_encoding="bgr8")
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_250)
+        dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        board = cv2.aruco.CharucoBoard_create(7, 5, 0.030, 0.022, dictionary)
         parameters = cv2.aruco.DetectorParameters_create()
         corners, ids, _ = cv2.aruco.detectMarkers(
             gray, dictionary, parameters=parameters
         )
         self.marker_count = 0 if ids is None else len(ids)
+        self.charuco_corner_count = 0
         if ids is not None:
             cv2.aruco.drawDetectedMarkers(image, corners, ids)
+            _, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
+                corners, ids, gray, board
+            )
+            if charuco_ids is not None:
+                self.charuco_corner_count = len(charuco_ids)
+                cv2.aruco.drawDetectedCornersCharuco(
+                    image, charuco_corners, charuco_ids
+                )
         output_path = self.get_parameter("output_path").value
         cv2.imwrite(output_path, image)
         self.get_logger().info(
             f"captured {image.shape[1]}x{image.shape[0]}, "
-            f"detected {self.marker_count} marker(s), saved {output_path}"
+            f"detected {self.marker_count} marker(s) and "
+            f"{self.charuco_corner_count} ChArUco corner(s), saved {output_path}"
         )
 
 

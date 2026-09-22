@@ -12,11 +12,12 @@ from launch.actions import (
     ExecuteProcess,
     GroupAction,
     IncludeLaunchDescription,
+    SetEnvironmentVariable,
     TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import EnvironmentVariable, LaunchConfiguration
 from launch_ros.actions import Node
 from moveit_configs_utils import MoveItConfigsBuilder
 
@@ -55,6 +56,8 @@ def generate_launch_description():
                     "use_head_camera": "true",
                     "hide_head_pitch_visual": hide_head_pitch_visual,
                     "handeye_target_enabled": "true",
+                    "managed_move_group_shutdown": "true",
+                    "managed_gazebo_shutdown": "true",
                     "software_rendering": "true",
                     "initial_positions_file": os.path.join(
                         package_share, "config", "initial_positions.yaml"
@@ -146,6 +149,13 @@ def generate_launch_description():
                 "hide_head_pitch_visual",
                 default_value="true",
                 description="Hide only head_pitch_link visual geometry",
+            ),
+            SetEnvironmentVariable(
+                "GZ_PARTITION",
+                [
+                    "zhishu_handeye_",
+                    EnvironmentVariable("ROS_DOMAIN_ID", default_value="0"),
+                ],
             ),
             calibration_resources,
             simulation,

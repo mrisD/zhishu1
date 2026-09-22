@@ -2,10 +2,9 @@
 """Start Gazebo, MoveIt move_group, and RViz against one controller stack."""
 
 import os
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -21,6 +20,8 @@ def generate_launch_description():
     use_head_camera = LaunchConfiguration("use_head_camera")
     hide_head_pitch_visual = LaunchConfiguration("hide_head_pitch_visual")
     handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
+    managed_move_group_shutdown = LaunchConfiguration("managed_move_group_shutdown")
+    managed_gazebo_shutdown = LaunchConfiguration("managed_gazebo_shutdown")
 
     gazebo_share = FindPackageShare("zhishu_robot_gazebo").find(
         "zhishu_robot_gazebo"
@@ -56,6 +57,7 @@ def generate_launch_description():
             "use_head_camera": use_head_camera,
             "hide_head_pitch_visual": hide_head_pitch_visual,
             "handeye_target_enabled": handeye_target_enabled,
+            "managed_gazebo_shutdown": managed_gazebo_shutdown,
         }.items(),
     )
 
@@ -68,6 +70,27 @@ def generate_launch_description():
             move_group_common_params,
             {"use_sim_time": True},
         ],
+        condition=UnlessCondition(managed_move_group_shutdown),
+    )
+
+    # MoveIt 2.12.x on Jazzy has a known executor-destructor crash on both
+    # SIGINT and SIGTERM.  This optional supervisor preserves all runtime
+    # failures but bypasses only that broken shutdown path.
+    managed_move_group = Node(
+        package="zhishu_robot_gazebo",
+        executable="managed_process.py",
+        name="move_group",
+        output="screen",
+        arguments=[
+            "--managed-target",
+            "/opt/ros/jazzy/lib/moveit_ros_move_group/move_group",
+        ],
+        parameters=[
+            moveit_config.to_dict(),
+            move_group_common_params,
+            {"use_sim_time": True},
+        ],
+        condition=IfCondition(managed_move_group_shutdown),
     )
 
     rviz = Node(
@@ -94,7 +117,7 @@ def generate_launch_description():
     # without creating a second fake ros2_control stack.
     start_visualization = TimerAction(
         period=4.0,
-        actions=[move_group, rviz],
+        actions=[move_group, managed_move_group, rviz],
     )
 
     return LaunchDescription(
@@ -133,6 +156,16 @@ def generate_launch_description():
                 "handeye_target_enabled",
                 default_value="false",
                 description="Attach the hand-eye target to the left TCP",
+            ),
+            DeclareLaunchArgument(
+                "managed_move_group_shutdown",
+                default_value="false",
+                description="Work around the MoveIt Jazzy shutdown crash",
+            ),
+            DeclareLaunchArgument(
+                "managed_gazebo_shutdown",
+                default_value="false",
+                description="Work around known Gazebo teardown crashes",
             ),
             gazebo,
             start_visualization,

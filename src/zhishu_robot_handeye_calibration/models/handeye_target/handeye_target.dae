@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
   <asset>
-    <contributor><authoring_tool>Zhishu hand-eye calibration</authoring_tool></contributor>
+    <contributor><authoring_tool>Zhishu 7x5 ChArUco hand-eye calibration</authoring_tool></contributor>
     <unit name="meter" meter="1"/>
     <up_axis>Z_UP</up_axis>
   </asset>
@@ -27,7 +27,7 @@
     <geometry id="board-geometry">
       <mesh>
         <source id="board-positions">
-          <float_array id="board-positions-array" count="12">0 -0.08 -0.105 0 0.08 -0.105 0 0.08 0.105 0 -0.08 0.105</float_array>
+          <float_array id="board-positions-array" count="12">0 -0.115 -0.085 0 0.115 -0.085 0 0.115 0.085 0 -0.115 0.085</float_array>
           <technique_common><accessor source="#board-positions-array" count="4" stride="3"><param name="X" type="float"/><param name="Y" type="float"/><param name="Z" type="float"/></accessor></technique_common>
         </source>
         <source id="board-normals">

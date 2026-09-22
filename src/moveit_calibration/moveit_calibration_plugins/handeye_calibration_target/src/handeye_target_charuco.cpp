@@ -183,7 +183,7 @@ bool HandEyeCharucoTarget::detectTargetPose(cv::Mat& image)
 #if CV_MAJOR_VERSION == 3 && CV_MINOR_VERSION == 2
     params_ptr->doCornerRefinement = true;
 #else
-    params_ptr->cornerRefinementMethod = cv::aruco::CORNER_REFINE_NONE;
+    params_ptr->cornerRefinementMethod = cv::aruco::CORNER_REFINE_SUBPIX;
 #endif
 
     std::vector<int> marker_ids;
@@ -202,9 +202,29 @@ bool HandEyeCharucoTarget::detectTargetPose(cv::Mat& image)
     cv::aruco::interpolateCornersCharuco(marker_corners, marker_ids, image, board, charuco_corners, charuco_ids,
                                          camera_matrix_, distortion_coeffs_);
 
-    // Estimate aruco board pose
+    // Estimate the pose from interpolated ChArUco corners first.  When a
+    // robot link occludes some of the inner chessboard corners, OpenCV can
+    // still detect several complete ArUco markers but refuse the ChArUco
+    // interpolation/PnP step.  Recover the same board pose from those marker
+    // corners before rejecting the frame; this keeps partially occluded
+    // calibration poses usable without inventing a target transform.
     bool valid = cv::aruco::estimatePoseCharucoBoard(charuco_corners, charuco_ids, board, camera_matrix_,
                                                      distortion_coeffs_, rotation_vect_, translation_vect_);
+    if (!valid && marker_ids.size() >= 4)
+    {
+      std::vector<std::vector<cv::Point2f>> rejected_corners;
+      cv::aruco::refineDetectedMarkers(image, board, marker_corners, marker_ids, rejected_corners,
+                                       camera_matrix_, distortion_coeffs_);
+      const int marker_inliers = cv::aruco::estimatePoseBoard(
+          marker_corners, marker_ids, board, camera_matrix_, distortion_coeffs_, rotation_vect_, translation_vect_);
+      valid = marker_inliers >= 4;
+      if (valid)
+      {
+        RCLCPP_INFO_STREAM_THROTTLE(
+            LOGGER_CALIBRATION_TARGET, clock, LOG_THROTTLE_PERIOD,
+            "ChArUco corner pose unavailable; recovered board pose from " << marker_inliers << " ArUco markers.");
+      }
+    }
 
     // Draw the markers and frame axis if at least one marker is detected
     if (!valid)

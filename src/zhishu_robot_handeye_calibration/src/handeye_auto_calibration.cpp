@@ -2,7 +2,7 @@
 
 #include <cv_bridge/cv_bridge.hpp>
 #include <moveit/handeye_calibration_solver/handeye_solver_opencv.h>
-#include <moveit/handeye_calibration_target/handeye_target_aruco.h>
+#include <moveit/handeye_calibration_target/handeye_target_charuco.h>
 #include <rclcpp/parameter_client.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
@@ -16,6 +16,7 @@
 
 #include <Eigen/Geometry>
 #include <opencv2/aruco.hpp>
+#include <opencv2/aruco/charuco.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -191,16 +192,17 @@ public:
     reprojection_rotation_tolerance_ = node_->declare_parameter<double>(
       "reprojection_rotation_tolerance", 0.03);
 
-    detector_.setParameter("markers, X", 3);
-    detector_.setParameter("markers, Y", 4);
-    detector_.setParameter("marker size (px)", 200);
-    detector_.setParameter("marker separation (px)", 50);
+    detector_.setParameter("squares, X", 7);
+    detector_.setParameter("squares, Y", 5);
+    detector_.setParameter("marker size (px)", 220);
+    detector_.setParameter("square size (px)", 300);
+    detector_.setParameter("margin size (px)", 0);
     detector_.setParameter("marker border (bits)", 1);
-    detector_.setParameter("ArUco dictionary", std::string("DICT_5X5_250"));
-    detector_.setParameter("measured marker size (m)", 0.06);
-    detector_.setParameter("measured separation (m)", 0.015);
+    detector_.setParameter("ArUco dictionary", std::string("DICT_4X4_50"));
+    detector_.setParameter("longest board side (m)", 0.21);
+    detector_.setParameter("measured marker size (m)", 0.022);
     if (!detector_.initialize()) {
-      throw std::runtime_error("failed to initialize the ArUco target detector");
+      throw std::runtime_error("failed to initialize the ChArUco target detector");
     }
 
     sample_markers_publisher_ =
@@ -534,7 +536,7 @@ private:
       return false;
     }
 
-    const auto dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_250);
+    const auto dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
     std::vector<int> ids;
     std::vector<std::vector<cv::Point2f>> corners;
     cv::aruco::detectMarkers(gray, dictionary, corners, ids);
@@ -741,7 +743,7 @@ private:
   rclcpp::Node::SharedPtr node_;
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
-  moveit_handeye_calibration::HandEyeArucoTarget detector_;
+  moveit_handeye_calibration::HandEyeCharucoTarget detector_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_subscription_;

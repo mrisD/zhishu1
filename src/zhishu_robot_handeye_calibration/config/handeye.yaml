@@ -13,10 +13,10 @@ handeye:
     head_yaw_joint: 0.5
     head_pitch_joint: 0.15
     tolerance: 0.002
-  aruco:
-    dictionary: DICT_5X5_250
-    markers_x: 3
-    markers_y: 4
-    marker_size: 0.06
-    marker_separation: 0.015
+  charuco:
+    dictionary: DICT_4X4_50
+    squares_x: 7
+    squares_y: 5
+    square_length: 0.030
+    marker_length: 0.022
     first_marker_id: 0

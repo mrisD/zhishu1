@@ -16,7 +16,7 @@ base_link -> head_camera_optical_frame
    采样时检查 `0.002 rad` 容差，越界立即失败。
 3. 依次规划并执行 12 组左臂关节姿态。
 4. 每次运动稳定后，从 `/camera_head/color/image_raw` 检测
-   `DICT_5X5_250`、3×4 ArUco GridBoard，并使用相机内参估计
+   `DICT_4X4_50`、7×5 ChArUco（方格 30 mm、标记 22 mm），并使用相机内参估计
    `camera -> target` 位姿。
 5. 按图像时间戳读取 TF 中的 `base -> left_gripper_tcp` 位姿。
 6. 分别运行 Tsai、Park、Horaud、Andreff、Daniilidis 五种 OpenCV
@@ -28,6 +28,11 @@ base_link -> head_camera_optical_frame
 9. RViz 已运行时，通过 `/handeye_calibration/auto_load_samples` 通知插件；插件在
    Qt 主线程中填充自己的 `Pose samples` 树，选中本轮最佳 solver，自动 Solve，
    并显示平移、四元数与重投影误差。
+10. 自动节点退出后先暂停 Gazebo 世界，再删除机器人，使物理线程停止访问模型并让
+    相机与 `gz_ros2_control` 插件完成卸载，最后结束其余 Launch 进程。针对当前
+    Gazebo Harmonic 和 MoveIt 2.12.x/Jazzy 在退出析构阶段的已知崩溃，手眼标定
+    启动栈使用隔离包装器绕开有缺陷的退出路径；正常运行期间的真实退出错误仍会
+    原样上报。
 
 这里明确区分两类误差：
 
@@ -111,45 +116,46 @@ PASS/FAIL、阈值、仿真真值和 solver 比较的完整结果文件用途不
 | AX=XB 旋转 RMSE | ≤ 0.03 rad |
 | 求解器输出 | 所有矩阵元素为有限值 |
 
-标定板在部分大姿态下会被手臂遮挡。默认 `minimum_markers:=3` 保留完整的
-12 个姿态；若设置为 6，本场景实测会保留 8 个姿态。两种设置都通过了
-真值验证。工程使用时可按可见性和姿态多样性的权衡调整该参数。
+标定板在部分大姿态下会被手臂遮挡。7×5 ChArUco 板使用默认
+`minimum_markers:=3` 时，本场景实测保留 11 个姿态；被拒绝的姿态5虽然能看到
+部分标记，但有效 ChArUco 角点分布不足。工程使用时可按可见性和姿态多样性的
+权衡调整该参数。
 
 ## 4. 本次自动验证结果
 
-运行日期：2026-09-14；环境为 Ubuntu 24.04、ROS 2 Jazzy、Gazebo
+运行日期：2026-09-22；环境为 Ubuntu 24.04、ROS 2 Jazzy、Gazebo
 Harmonic、OpenCV 4.6.0。
 
 结果：`PASS`
 
 | 项目 | 数值 |
 |---|---:|
-| 有效样本 | 12 / 12 |
-| marker 数量 | 6, 6, 9, 9, 6, 6, 3, 6, 3, 5, 3, 7 |
-| 选中求解器 | Horaud1995 |
-| AX=XB 平移 RMSE | 0.00750606 m |
-| AX=XB 旋转 RMSE | 0.00993169 rad |
-| 真值平移误差 | 0.00799582 m |
-| 真值旋转误差 | 0.00594544 rad（约 0.3407°） |
+| 有效样本 | 11 / 12 |
+| marker 数量 | 13, 10, 14, 14, 14, 5, 13, 13, 7, 11, 12 |
+| 选中求解器 | Tsai1989 |
+| AX=XB 平移 RMSE | 0.00491847 m |
+| AX=XB 旋转 RMSE | 0.00828908 rad |
+| 真值平移误差 | 0.0129392 m |
+| 真值旋转误差 | 0.0153393 rad（约 0.8789°） |
 
 标定结果：
 
 ```yaml
 parent_frame: base_link
 child_frame: head_camera_optical_frame
-translation_xyz_m: [0.0850798518, 0.0251614026, 1.3738529878]
-quaternion_xyzw: [-0.5998740692, 0.4026319156, -0.3221149919, 0.6117847445]
+translation_xyz_m: [0.0808436028, 0.0401418873, 1.3651852969]
+quaternion_xyzw: [-0.5976153515, 0.4011339263, -0.3262204205, 0.6128031511]
 transform_matrix:
-  - [ 0.4682589451, -0.0889268151,  0.8791049891, 0.0850798518]
-  - [-0.8771869673,  0.0727860662,  0.4746000559, 0.0251614026]
-  - [-0.1061912654, -0.9933751608, -0.0439227167, 1.3738529878]
+  - [ 0.4653436208, -0.0796297814,  0.8815409307, 0.0808436028]
+  - [-0.8792653881,  0.0728722578,  0.4707249849, 0.0401418873]
+  - [-0.1017236056, -0.9941572974, -0.0361050704, 1.3651852969]
   - [ 0.0,           0.0,           0.0,          1.0]
 ```
 
-本次按上面的示例命令覆盖了默认输出路径，因此完整结果位于工作空间根目录的
-`handeye_calibration_result.yaml`，其中还包含五种求解器的比较结果、仿真真值
-和每个样本的两组输入 TF。插件原生样本位于 `handeye_moveit_samples.yaml`，
-检测图像位于 `handeye_calibration_samples/`。
+本次无界面测试结果位于 `/tmp/handeye_charuco_result_v2.yaml`，其中还包含五种
+求解器的比较结果、仿真真值和每个样本的两组输入 TF。插件原生样本位于
+`/tmp/handeye_charuco_moveit_samples_v2.yaml`，检测图像位于
+`/tmp/handeye_charuco_samples_v2/`。
 
 ## 5. 参数与结果文件
 
@@ -189,6 +195,6 @@ transform_matrix:
 - 真值矩阵变成单位阵：不要用 `head_camera_optical_frame` 作为仿真真值。MoveIt
   HandEye Context 会在求解前向该帧发布单位初始猜测；使用模型中的
   `head_camera_optical_truth`。
-- launch 结束时 MoveGroup 在当前 ROS 2 Jazzy 版本可能打印 SIGINT 退出栈；
-  标定进程已先写完结果且以 0 退出，结果有效性应以 YAML 的 `status` 和误差
-  字段为准。
+- 若退出阶段仍出现超时，确认 `/world/handeye_empty/control` 和
+  `/world/handeye_empty/remove` 服务存在，并检查是否有其他 Gazebo 实例占用了
+  同一个分区或 ROS 域。

@@ -65,6 +65,7 @@ protected:
 private:
   // Predefined ARUCO dictionaries in OpenCV for creating CHARUCO marker board
   const std::map<std::string, cv::aruco::PREDEFINED_DICTIONARY_NAME> ARUCO_DICTIONARY = {
+    { "DICT_4X4_50", cv::aruco::DICT_4X4_50 },
     { "DICT_4X4_250", cv::aruco::DICT_4X4_250 },
     { "DICT_5X5_250", cv::aruco::DICT_5X5_250 },
     { "DICT_6X6_250", cv::aruco::DICT_6X6_250 },

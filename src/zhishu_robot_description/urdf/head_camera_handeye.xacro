@@ -36,8 +36,11 @@
             <optical_frame_id>head_camera_optical_frame</optical_frame_id>
             <horizontal_fov>1.0471975512</horizontal_fov>
             <image>
-              <width>640</width>
-              <height>480</height>
+              <!-- The real 22 mm markers are much smaller than the previous
+                   60 mm GridBoard markers.  Use enough pixels for reliable
+                   ChArUco corner interpolation in the headless renderer. -->
+              <width>1280</width>
+              <height>960</height>
               <format>R8G8B8</format>
             </image>
             <clip>

@@ -10,10 +10,12 @@ a zhishu_robot robot.
 """
 
 import os
+import sys
 from launch import LaunchDescription
 from launch.actions import (
     AppendEnvironmentVariable,
     DeclareLaunchArgument,
+    ExecuteProcess,
     IncludeLaunchDescription,
     SetEnvironmentVariable,
 )
@@ -70,6 +72,7 @@ def generate_launch_description():
     use_head_camera = LaunchConfiguration('use_head_camera')
     hide_head_pitch_visual = LaunchConfiguration('hide_head_pitch_visual')
     handeye_target_enabled = LaunchConfiguration('handeye_target_enabled')
+    managed_gazebo_shutdown = LaunchConfiguration('managed_gazebo_shutdown')
     robot_description = ParameterValue(
         Command([
             FindExecutable(name='xacro'), ' ', robot_xacro,
@@ -176,6 +179,11 @@ def generate_launch_description():
         name='handeye_target_enabled',
         default_value='false',
         description='Attach the simulated ArUco target to left_gripper_tcp')
+
+    declare_managed_gazebo_shutdown_cmd = DeclareLaunchArgument(
+        name='managed_gazebo_shutdown',
+        default_value='false',
+        description='Work around known Gazebo teardown crashes')
 
     declare_use_gazebo_cmd = DeclareLaunchArgument(
         name='use_gazebo',
@@ -310,8 +318,39 @@ def generate_launch_description():
             ' ', world_path,
         ])],
         condition=IfCondition(PythonExpression([
-            "'", use_gazebo, "' == 'true' and '", headless, "' == 'true'",
+            "'", use_gazebo, "' == 'true' and '", headless,
+            "' == 'true' and '", managed_gazebo_shutdown, "' != 'true'",
         ])))
+
+    managed_gazebo_headless_cmd = ExecuteProcess(
+        cmd=[
+            sys.executable,
+            os.path.join(
+                pkg_share_gazebo,
+                '..',
+                '..',
+                'lib',
+                package_name_gazebo,
+                'managed_process.py',
+            ),
+            '--managed-target',
+            '/opt/ros/jazzy/opt/gz_tools_vendor/bin/gz',
+            'sim',
+            '-s',
+            '-v',
+            '4',
+            '-r',
+            world_path,
+            '--force-version',
+            '8',
+        ],
+        name='managed_gazebo',
+        output='screen',
+        condition=IfCondition(PythonExpression([
+            "'", use_gazebo, "' == 'true' and '", headless,
+            "' == 'true' and '", managed_gazebo_shutdown, "' == 'true'",
+        ])),
+    )
 
     # Bridge ROS topics and Gazebo messages for establishing communication
     start_gazebo_ros_bridge_cmd = Node(
@@ -373,6 +412,7 @@ def generate_launch_description():
     ld.add_action(declare_use_head_camera_cmd)
     ld.add_action(declare_hide_head_pitch_visual_cmd)
     ld.add_action(declare_handeye_target_enabled_cmd)
+    ld.add_action(declare_managed_gazebo_shutdown_cmd)
     ld.add_action(declare_use_gazebo_cmd)
     ld.add_action(declare_use_rviz_cmd)
     ld.add_action(declare_use_robot_state_pub_cmd)
@@ -396,6 +436,7 @@ def generate_launch_description():
     ld.add_action(robot_state_publisher_cmd)
     ld.add_action(start_gazebo_cmd)
     ld.add_action(start_gazebo_headless_cmd)
+    ld.add_action(managed_gazebo_headless_cmd)
     ld.add_action(start_gazebo_ros_bridge_cmd)
     ld.add_action(start_gazebo_ros_image_bridge_cmd)
     ld.add_action(start_gazebo_ros_spawner_cmd)
