@@ -191,7 +191,7 @@ bool HandEyeCharucoTarget::detectTargetPose(cv::Mat& image)
     cv::aruco::detectMarkers(image, dictionary, marker_corners, marker_ids, params_ptr);
     if (marker_ids.empty())
     {
-      RCLCPP_DEBUG_STREAM_THROTTLE(LOGGER_CALIBRATION_TARGET, clock, 1,
+      RCLCPP_DEBUG_STREAM_THROTTLE(LOGGER_CALIBRATION_TARGET, clock, LOG_THROTTLE_PERIOD,
                                    "No aruco marker detected. Dictionary ID: " << dictionary_id_);
       return false;
     }
@@ -229,14 +229,15 @@ bool HandEyeCharucoTarget::detectTargetPose(cv::Mat& image)
     // Draw the markers and frame axis if at least one marker is detected
     if (!valid)
     {
-      RCLCPP_WARN_STREAM_THROTTLE(LOGGER_CALIBRATION_TARGET, clock, 1, "Cannot estimate aruco board pose.");
+      RCLCPP_WARN_STREAM_THROTTLE(LOGGER_CALIBRATION_TARGET, clock, LOG_THROTTLE_PERIOD,
+                                  "Cannot estimate aruco board pose.");
       return false;
     }
 
     if (cv::norm(rotation_vect_) > 3.2 || std::log10(std::fabs(translation_vect_[0])) > 4 ||
         std::log10(std::fabs(translation_vect_[1])) > 4 || std::log10(std::fabs(translation_vect_[2])) > 4)
     {
-      RCLCPP_WARN_STREAM_THROTTLE(LOGGER_CALIBRATION_TARGET, clock, 1,
+      RCLCPP_WARN_STREAM_THROTTLE(LOGGER_CALIBRATION_TARGET, clock, LOG_THROTTLE_PERIOD,
                                   "Invalid target pose, please check CameraInfo msg.");
       return false;
     }
@@ -249,7 +250,7 @@ bool HandEyeCharucoTarget::detectTargetPose(cv::Mat& image)
   }
   catch (const cv::Exception& e)
   {
-    RCLCPP_ERROR_STREAM_THROTTLE(LOGGER_CALIBRATION_TARGET, clock, 1,
+    RCLCPP_ERROR_STREAM_THROTTLE(LOGGER_CALIBRATION_TARGET, clock, LOG_THROTTLE_PERIOD,
                                  "ChArUco target detection exception: " << e.what());
     return false;
   }

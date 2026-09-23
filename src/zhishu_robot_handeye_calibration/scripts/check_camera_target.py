@@ -66,6 +66,11 @@ def main():
     success = node.marker_count is not None
     if not success:
         node.get_logger().error("no camera image received within 10 seconds")
+        node.get_logger().error(
+            "The target cannot be sampled without an image stream. Check the "
+            "Gemini Pro USB connection, or start the Gazebo workflow with: ros2 "
+            "launch zhishu_robot_handeye_calibration handeye_gazebo.launch.py"
+        )
     else:
         minimum_markers = node.get_parameter("minimum_markers").value
         minimum_charuco_corners = node.get_parameter("minimum_charuco_corners").value

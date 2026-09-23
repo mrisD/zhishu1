@@ -50,6 +50,9 @@ def generate_launch_description():
                 torso_head_enable_motors_on_activate
             ),
             "use_rviz": use_rviz,
+            "rviz_config_file": os.path.join(
+                handeye_share, "rviz", "handeye.rviz"
+            ),
             "enable_commander": enable_commander,
             "handeye_target_enabled": "true",
             "initial_positions_file": os.path.join(

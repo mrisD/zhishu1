@@ -100,6 +100,7 @@ def generate_launch_description():
     log_max_file_size_mb = LaunchConfiguration("log_max_file_size_mb")
     log_min_severity = LaunchConfiguration("log_min_severity")
     use_rviz = LaunchConfiguration("use_rviz")
+    rviz_config_file = LaunchConfiguration("rviz_config_file")
     handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
     initial_positions_file = LaunchConfiguration("initial_positions_file")
     # ==============================
@@ -113,7 +114,9 @@ def generate_launch_description():
     # 配置文件路径
     # ==============================
     controllers_yaml = os.path.join(robot_moveit_config_share, "config", "ros2_controllers.yaml")
-    rviz_config = os.path.join(robot_moveit_config_share, "config", "moveit.rviz")
+    default_rviz_config = os.path.join(
+        robot_moveit_config_share, "config", "moveit.rviz"
+    )
     commander_yaml = os.path.join(commander_share, "config", "commander.yaml")
 
     # ==============================
@@ -338,7 +341,7 @@ def generate_launch_description():
         executable="rviz2",
         name="rviz2",
         output="screen",
-        arguments=["-d", rviz_config],
+        arguments=["-d", rviz_config_file],
         parameters=[moveit_all_params, {"use_sim_time": False}],
         additional_env={
             "LC_NUMERIC": "C",
@@ -406,6 +409,14 @@ def generate_launch_description():
             "use_rviz",
             default_value="true",
             description="Start RViz2",
+        ),
+        DeclareLaunchArgument(
+            "rviz_config_file",
+            default_value=default_rviz_config,
+            description=(
+                "RViz configuration file. Hand-eye bringup overrides this with "
+                "the pre-filled calibration layout"
+            ),
         ),
         DeclareLaunchArgument(
             "handeye_target_enabled",

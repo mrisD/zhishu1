@@ -435,7 +435,11 @@ bool ControlTabWidget::takeTransformSamples()
   }
   catch (tf2::TransformException& e)
   {
-    RCLCPP_WARN(node_->get_logger(), "TF exception: %s", e.what());
+    const std::string error_message = std::string("Cannot record sample: ") + e.what();
+    calibration_display_->setStatusStd(rviz_common::properties::StatusProperty::Error, "Calibration",
+                                       error_message);
+    RCLCPP_WARN(node_->get_logger(), "%s", error_message.c_str());
+    QMessageBox::warning(this, tr("Sample Not Recorded"), QString::fromStdString(error_message));
     return false;
   }
 
@@ -620,6 +624,10 @@ void ControlTabWidget::takeSampleBtnClicked([[maybe_unused]] bool clicked)
 {
   if (frameNamesEmpty() || !takeTransformSamples())
     return;
+
+  calibration_display_->setStatusStd(
+      rviz_common::properties::StatusProperty::Ok, "Calibration",
+      "Sample " + std::to_string(effector_wrt_world_.size()) + " recorded.");
 
   if (effector_wrt_world_.size() == object_wrt_sensor_.size() && effector_wrt_world_.size() > 4)
     if (!solveCameraRobotPose())

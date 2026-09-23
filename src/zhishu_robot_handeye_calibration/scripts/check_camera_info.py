@@ -129,6 +129,11 @@ def main():
         node.get_logger().error(
             f"timed out waiting for {node.image_topic} and {node.info_topic}"
         )
+        node.get_logger().error(
+            "No Gemini Pro image stream is available. Check USB connection and "
+            "permissions. For Gazebo hand-eye simulation, run: ros2 launch "
+            "zhishu_robot_handeye_calibration handeye_gazebo.launch.py"
+        )
         success = False
     else:
         success = node.validate()

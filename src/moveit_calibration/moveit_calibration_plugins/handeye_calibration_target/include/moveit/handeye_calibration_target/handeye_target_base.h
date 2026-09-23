@@ -56,7 +56,11 @@ namespace moveit_handeye_calibration
 namespace
 {
 const rclcpp::Logger LOGGER_CALIBRATION_TARGET = rclcpp::get_logger("moveit_handeye_calibration_target");
-constexpr size_t LOG_THROTTLE_PERIOD = 2;
+// rclcpp throttle periods are expressed in milliseconds.  The old value of
+// 2 effectively logged once per camera frame, flooding RViz output and
+// competing with target detection.  Two seconds keeps diagnostics useful
+// without degrading the image callback.
+constexpr size_t LOG_THROTTLE_PERIOD = 2000;
 }  // namespace
 
 /**

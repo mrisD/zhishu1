@@ -167,7 +167,7 @@ public:
     image_topic_ = node_->declare_parameter<std::string>(
       "image_topic", "/camera_head/color/image_raw");
     camera_info_topic_ = node_->declare_parameter<std::string>(
-      "camera_info_topic", "/camera_head/camera_info");
+      "camera_info_topic", "/camera_head/color/camera_info");
     output_file_ = node_->declare_parameter<std::string>(
       "output_file", "/tmp/handeye_calibration_result.yaml");
     image_directory_ = node_->declare_parameter<std::string>(

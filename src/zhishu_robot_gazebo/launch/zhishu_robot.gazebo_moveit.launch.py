@@ -20,6 +20,7 @@ def generate_launch_description():
     use_head_camera = LaunchConfiguration("use_head_camera")
     hide_head_pitch_visual = LaunchConfiguration("hide_head_pitch_visual")
     handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
+    initial_positions_file = LaunchConfiguration("initial_positions_file")
     managed_move_group_shutdown = LaunchConfiguration("managed_move_group_shutdown")
     managed_gazebo_shutdown = LaunchConfiguration("managed_gazebo_shutdown")
 
@@ -64,6 +65,7 @@ def generate_launch_description():
             "use_head_camera": use_head_camera,
             "hide_head_pitch_visual": hide_head_pitch_visual,
             "handeye_target_enabled": handeye_target_enabled,
+            "initial_positions_file": initial_positions_file,
             "managed_gazebo_shutdown": managed_gazebo_shutdown,
         }.items(),
     )
@@ -163,6 +165,13 @@ def generate_launch_description():
                 "handeye_target_enabled",
                 default_value="false",
                 description="Replace the rendered left gripper with the flange-mounted hand-eye target",
+            ),
+            DeclareLaunchArgument(
+                "initial_positions_file",
+                default_value=os.path.join(
+                    moveit_share, "config", "initial_positions.yaml"
+                ),
+                description="Absolute path to the ros2_control initial joint positions YAML",
             ),
             DeclareLaunchArgument(
                 "managed_move_group_shutdown",

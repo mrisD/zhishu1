@@ -97,10 +97,23 @@ shows translation, quaternion, and reprojection error in that panel.
 ros2 launch zhishu_robot_handeye_calibration handeye_gazebo.launch.py
 ```
 
+Use this command for Gazebo simulation.  The similarly named
+`zhishu_robot_bringup zhishu_robot.handeye.launch.py` entry point is for a
+physical Gemini Pro camera; it cannot publish an image when no USB camera is
+connected.  In that case RViz reports `No Image` and no target transform is
+available for `Take sample`.
+
 The launch runs the Gazebo server separately from a GUI-only OGRE client.  This
 avoids the Mesa/EGL crash seen when OGRE2 is combined with forced software
-rendering.  RViz opens with `HandEye Sample Poses`, `HandEye Detection Image`,
-`MotionPlanning`, and `HandEyeCalibration` enabled.
+rendering.  RViz opens with `HandEye Sample Poses`, `Head Camera RGB`,
+`HandEye Target Detection`, `MotionPlanning`, and `HandEyeCalibration`
+enabled.
+
+The real-robot `zhishu_robot.handeye.launch.py` also overrides the ordinary
+MoveIt RViz layout with this hand-eye layout.  Target and Context values are
+therefore restored automatically rather than requiring a manually-added
+display.  The plugin subscribes to the configured image topic immediately,
+even when the camera publisher appears after RViz starts.
 
 The launch also keeps a CameraInfo relay alive from
 `/camera_head/camera_info` to `/camera_head/color/camera_info`, matching the
@@ -127,10 +140,15 @@ In the HandEyeCalibration RViz display select Eye-to-Hand and configure:
 - end-effector frame: `L_hand_link`
 - robot base frame: `base_link`
 - image: `/camera_head/color/image_raw`
-- camera info: `/camera_head/camera_info`
+- camera info used by the RViz plugin: `/camera_head/color/camera_info`
 - target type: `HandEyeTarget/Charuco`
 - ArUco dictionary: `DICT_4X4_50`
 - board: 7 x 5 squares, square length 0.030 m, marker length 0.022 m
+
+The RViz layout contains separate image displays for the raw RGB stream and
+the interactive plugin output `/handeye_calibration/target_detection`.
+`/handeye_calibration/annotated_image` is kept disabled by default because it
+is published only by the automatic calibration executable.
 
 The calibration launch fixes the head at yaw `0.5` rad and pitch `0.15` rad.
 Those values must remain unchanged for every sample and for the final solve.

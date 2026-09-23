@@ -50,7 +50,33 @@ Visualization Manager:
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
-      Name: HandEye Detection Image
+      Name: Head Camera RGB
+      Normalize Range: true
+      Queue Size: 2
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /camera_head/color/image_raw
+      Transport Hint: raw
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: HandEye Target Detection
+      Normalize Range: true
+      Queue Size: 2
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /handeye_calibration/target_detection
+      Transport Hint: raw
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: false
+      Name: Automatic Calibration Detection
       Normalize Range: true
       Queue Size: 2
       Topic:
@@ -60,7 +86,7 @@ Visualization Manager:
         Reliability Policy: Best Effort
         Value: /handeye_calibration/annotated_image
       Transport Hint: raw
-      Value: true
+      Value: false
     - Class: moveit_rviz_plugin/HandEyeCalibration
       ArUco dictionary: DICT_4X4_50
       Enabled: true

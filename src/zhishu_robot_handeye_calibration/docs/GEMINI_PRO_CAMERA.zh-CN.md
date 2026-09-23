@@ -92,6 +92,12 @@ ros2 launch zhishu_robot_handeye_calibration gemini_pro_camera.launch.py
 /camera_head/depth_to_color               深度到 RGB 的设备外参
 ```
 
+使用 `zhishu_robot.handeye.launch.py` 时会自动加载手眼标定专用 RViz 配置：
+Target 页预填 7×5 ChArUco、`DICT_4X4_50`、30 mm 方格和 22 mm marker，Context
+页预填 Eye-to-Hand、`head_camera_optical_frame`、`handeye_target`、`L_hand_link`
+和 `base_link`。RViz 同时显示原始 RGB 话题与插件检测输出
+`/handeye_calibration/target_detection`；无需再从 By topic 手工添加。
+
 RGB、注册深度和两类点云统一使用：
 
 ```text

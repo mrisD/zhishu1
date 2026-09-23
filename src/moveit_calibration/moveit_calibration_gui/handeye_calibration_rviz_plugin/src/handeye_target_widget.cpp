@@ -51,6 +51,12 @@ bool RosTopicComboBox::hasTopic(const QString& topic_name)
 
 bool RosTopicComboBox::getFilteredTopics()
 {
+  // Keep a configured topic visible while publishers are still starting.  A
+  // camera driver can take several seconds to enumerate the USB device; if we
+  // discard the saved value here, the hand-eye panel silently falls back to
+  // an empty combo box and never subscribes when the publisher appears.
+  const QString configured_topic = currentText();
+
   // Get all topic names
   std::map<std::string, std::vector<std::string>> topic_names_and_types = node_->get_topic_names_and_types();
   image_topics_.clear();
@@ -71,6 +77,11 @@ bool RosTopicComboBox::getFilteredTopics()
   {
     addItem(topic);
   }
+
+  if (!configured_topic.isEmpty() && findText(configured_topic) == -1)
+    addItem(configured_topic);
+  if (!configured_topic.isEmpty())
+    setCurrentText(configured_topic);
 
   return !image_topics_.isEmpty();
 }
@@ -194,25 +205,19 @@ void TargetTabWidget::loadWidget(const rviz_common::Config& config)
   for (const std::pair<const std::string, RosTopicComboBox*>& topic : ros_topics_)
   {
     QString topic_name;
-    if (config.mapGetString(topic.first.c_str(), &topic_name))
+    if (config.mapGetString(topic.first.c_str(), &topic_name) && !topic_name.isEmpty())
     {
-      if (topic.second->hasTopic(topic_name))
-      {
-        topic.second->setCurrentText(topic_name);
-        try
-        {
-          if (!topic.first.compare("image_topic"))
-          {
-            camera_sub_.shutdown();
-            camera_sub_ = it_.subscribeCamera(topic_name.toStdString(), 1, &TargetTabWidget::cameraCallback, this);
-          }
-        }
-        catch (const image_transport::TransportLoadException& e)
-        {
-          RCLCPP_ERROR_STREAM(node_->get_logger(),
-                              "Subscribe to " << topic_name.toStdString() << " fail: " << e.what());
-        }
-      }
+      // Do not require the publisher to exist during RViz configuration
+      // loading.  ROS subscriptions are allowed before publishers, and this
+      // removes the startup race that otherwise leaves Camera Image Topic
+      // blank until the user manually selects it.
+      topic.second->getFilteredTopics();
+      if (topic.second->findText(topic_name) == -1)
+        topic.second->addItem(topic_name);
+      topic.second->setCurrentText(topic_name);
+
+      if (!topic.first.compare("image_topic"))
+        imageTopicComboboxChanged(topic_name);
     }
   }
 }
