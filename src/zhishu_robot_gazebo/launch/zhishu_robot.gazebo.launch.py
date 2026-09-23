@@ -11,6 +11,7 @@ a zhishu_robot robot.
 
 import os
 import sys
+from ament_index_python.packages import get_package_prefix
 from launch import LaunchDescription
 from launch.actions import (
     AppendEnvironmentVariable,
@@ -56,6 +57,8 @@ def generate_launch_description():
 
     # Set the path to different files and folders
     pkg_ros_gz_sim = FindPackageShare(package='ros_gz_sim').find('ros_gz_sim')
+    gz_ros2_control_lib = os.path.join(
+        get_package_prefix('gz_ros2_control'), 'lib')
     pkg_share_gazebo = FindPackageShare(package=package_name_gazebo).find(package_name_gazebo)
     pkg_share_description = FindPackageShare(
         package=package_name_description).find(package_name_description)
@@ -283,6 +286,12 @@ def generate_launch_description():
     set_env_vars_robot_resources = AppendEnvironmentVariable(
         'GZ_SIM_RESOURCE_PATH',
         os.path.dirname(pkg_share_description))
+    # Gazebo Sim does not reliably discover ROS 2 system plugins from
+    # LD_LIBRARY_PATH alone.  Make the gz_ros2_control plugin directory
+    # available to every Gazebo launch, including the hand-eye simulation.
+    set_env_vars_system_plugins = AppendEnvironmentVariable(
+        'GZ_SIM_SYSTEM_PLUGIN_PATH',
+        gz_ros2_control_lib)
 
     set_qt_x11 = SetEnvironmentVariable(
         'QT_QPA_PLATFORM',
@@ -431,6 +440,7 @@ def generate_launch_description():
     # Add the actions to the launch description
     ld.add_action(set_env_vars_model_resources)
     ld.add_action(set_env_vars_robot_resources)
+    ld.add_action(set_env_vars_system_plugins)
     ld.add_action(set_qt_x11)
     ld.add_action(set_software_rendering)
     ld.add_action(robot_state_publisher_cmd)
