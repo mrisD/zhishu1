@@ -4,6 +4,20 @@ This package simulates calibration between the movable robot arm and the RGB
 camera mounted under `head_camera_link`.  During sample collection the head is
 treated as fixed relative to `base_link`.
 
+## Real Gemini Pro camera preparation
+
+The legacy Gemini Pro is driven by the official `orbbec_camera` ROS 2 wrapper.
+The launch publishes `640x480@30` RGB and registered depth, hardware D2C, a
+depth point cloud, and a colored point cloud under `/camera_head`.  RGB uses the
+robot-owned `head_camera_optical_frame`, so the camera driver does not publish a
+duplicate TF.  An interactive ChArUco intrinsic calibration tool writes a
+standard CameraInfo YAML and a separate checker validates that the image,
+calibration, resolution, timestamps, and frame ID agree.
+
+See [`docs/GEMINI_PRO_CAMERA.zh-CN.md`](docs/GEMINI_PRO_CAMERA.zh-CN.md) for the
+camera-only installation, launch, calibration, and verification procedure.  It
+does not start robot hardware or motion planning.
+
 ## Fully automatic simulation and validation
 
 Install declared system dependencies, then build the package and its workspace

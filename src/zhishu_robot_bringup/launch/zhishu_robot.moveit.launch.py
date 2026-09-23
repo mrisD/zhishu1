@@ -100,6 +100,8 @@ def generate_launch_description():
     log_max_file_size_mb = LaunchConfiguration("log_max_file_size_mb")
     log_min_severity = LaunchConfiguration("log_min_severity")
     use_rviz = LaunchConfiguration("use_rviz")
+    handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
+    initial_positions_file = LaunchConfiguration("initial_positions_file")
     # ==============================
     # 包路径查找
     # ==============================
@@ -132,6 +134,8 @@ def generate_launch_description():
                     torso_head_enable_motors_on_activate
                 ),
                 "pdo_diagnostics_auto_start": pdo_diagnostics_auto_start,
+                "handeye_target_enabled": handeye_target_enabled,
+                "initial_positions_file": initial_positions_file,
             },
         )
         .robot_description_semantic(file_path="config/zhishu_robot.srdf")
@@ -402,6 +406,26 @@ def generate_launch_description():
             "use_rviz",
             default_value="true",
             description="Start RViz2",
+        ),
+        DeclareLaunchArgument(
+            "handeye_target_enabled",
+            default_value="false",
+            description=(
+                "Replace the left gripper geometry with the flange-mounted "
+                "ChArUco calibration target; the right gripper is unchanged"
+            ),
+        ),
+        DeclareLaunchArgument(
+            "initial_positions_file",
+            default_value=os.path.join(
+                robot_moveit_config_share,
+                "config",
+                "initial_positions.yaml",
+            ),
+            description=(
+                "YAML file containing ros2_control initial joint positions; "
+                "the hand-eye launch overrides this with its calibration pose"
+            ),
         ),
 
         # EtherCAT/PDO diagnostics

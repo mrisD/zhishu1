@@ -17,6 +17,8 @@ class CameraTargetCheck(Node):
         super().__init__("handeye_camera_target_check")
         self.declare_parameter("image_topic", "/camera_head/color/image_raw")
         self.declare_parameter("output_path", "/tmp/handeye_camera_check.png")
+        self.declare_parameter("minimum_markers", 1)
+        self.declare_parameter("minimum_charuco_corners", 4)
         self.bridge = CvBridge()
         self.marker_count = None
         self.charuco_corner_count = None
@@ -64,6 +66,21 @@ def main():
     success = node.marker_count is not None
     if not success:
         node.get_logger().error("no camera image received within 10 seconds")
+    else:
+        minimum_markers = node.get_parameter("minimum_markers").value
+        minimum_charuco_corners = node.get_parameter("minimum_charuco_corners").value
+        if node.marker_count < minimum_markers:
+            node.get_logger().error(
+                f"detected {node.marker_count} marker(s), expected at least "
+                f"{minimum_markers}"
+            )
+            success = False
+        if node.charuco_corner_count < minimum_charuco_corners:
+            node.get_logger().error(
+                f"detected {node.charuco_corner_count} ChArUco corner(s), expected "
+                f"at least {minimum_charuco_corners}"
+            )
+            success = False
     node.destroy_node()
     rclpy.shutdown()
     return 0 if success else 1

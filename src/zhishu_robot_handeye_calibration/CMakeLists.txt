@@ -51,7 +51,9 @@ install(TARGETS
 install(PROGRAMS
   scripts/head_lock_guard.py
   scripts/check_camera_target.py
+  scripts/check_camera_info.py
   scripts/camera_info_relay.py
+  scripts/calibrate_charuco_intrinsics.py
   DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY config docs launch models rviz DESTINATION share/${PROJECT_NAME})

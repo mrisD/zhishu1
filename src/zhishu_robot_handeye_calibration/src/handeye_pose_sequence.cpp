@@ -99,7 +99,12 @@ int main(int argc, char ** argv)
       std::cout << '[' << index + 1 << '/' << kCalibrationPoses.size()
                 << "] Press Enter to plan and execute, or q then Enter to stop: ";
       std::string answer;
-      std::getline(std::cin, answer);
+      if (!std::getline(std::cin, answer)) {
+        RCLCPP_ERROR(
+          node->get_logger(), "stdin closed; aborting pose sequence before any further motion");
+        exit_code = 1;
+        break;
+      }
       if (answer == "q" || answer == "Q") {
         break;
       }

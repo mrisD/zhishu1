@@ -27,8 +27,12 @@
   <exec_depend>moveit_calibration_gui</exec_depend>
   <exec_depend>moveit_configs_utils</exec_depend>
   <exec_depend>moveit_ros_visualization</exec_depend>
+  <exec_depend>orbbec_camera</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
   <exec_depend>rclpy</exec_depend>
+  <exec_depend>rclcpp_components</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>zhishu_robot_gazebo</exec_depend>
   <exec_depend>zhishu_robot_moveit_config</exec_depend>

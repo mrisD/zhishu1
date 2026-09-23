@@ -8,7 +8,7 @@ handeye:
   target_frame: handeye_target
   target_truth_frame: handeye_target_truth
   image_topic: /camera_head/color/image_raw
-  camera_info_topic: /camera_head/camera_info
+  camera_info_topic: /camera_head/color/camera_info
   head_lock:
     head_yaw_joint: 0.5
     head_pitch_joint: 0.15
