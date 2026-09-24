@@ -23,6 +23,7 @@ def generate_launch_description():
     initial_positions_file = LaunchConfiguration("initial_positions_file")
     managed_move_group_shutdown = LaunchConfiguration("managed_move_group_shutdown")
     managed_gazebo_shutdown = LaunchConfiguration("managed_gazebo_shutdown")
+    use_left_arm_controller = LaunchConfiguration("use_left_arm_controller")
 
     gazebo_share = FindPackageShare("zhishu_robot_gazebo").find(
         "zhishu_robot_gazebo"
@@ -67,6 +68,7 @@ def generate_launch_description():
             "handeye_target_enabled": handeye_target_enabled,
             "initial_positions_file": initial_positions_file,
             "managed_gazebo_shutdown": managed_gazebo_shutdown,
+            "use_left_arm_controller": use_left_arm_controller,
         }.items(),
     )
 
@@ -182,6 +184,14 @@ def generate_launch_description():
                 "managed_gazebo_shutdown",
                 default_value="false",
                 description="Work around known Gazebo teardown crashes",
+            ),
+            DeclareLaunchArgument(
+                "use_left_arm_controller",
+                default_value="false",
+                description=(
+                    "Use left_arm_controller instead of dual_arm_controller "
+                    "for left-arm-only execution"
+                ),
             ),
             gazebo,
             start_visualization,

@@ -58,6 +58,7 @@ def generate_launch_description():
                     "handeye_target_enabled": "true",
                     "managed_move_group_shutdown": "true",
                     "managed_gazebo_shutdown": "true",
+                    "use_left_arm_controller": "true",
                     "software_rendering": "true",
                     "initial_positions_file": os.path.join(
                         package_share, "config", "initial_positions.yaml"

@@ -90,6 +90,7 @@ def generate_launch_description():
 
     # Launch configuration variables
     load_controllers = LaunchConfiguration('load_controllers')
+    use_left_arm_controller = LaunchConfiguration('use_left_arm_controller')
     headless = LaunchConfiguration('headless')
     paused = LaunchConfiguration('paused')
     force_x11 = LaunchConfiguration('force_x11')
@@ -126,6 +127,13 @@ def generate_launch_description():
         name='load_controllers',
         default_value='true',
         description='Flag to enable loading of ROS 2 controllers')
+
+    declare_use_left_arm_controller_cmd = DeclareLaunchArgument(
+        name='use_left_arm_controller',
+        default_value='false',
+        description=(
+            'Use left_arm_controller instead of dual_arm_controller for '
+            'left-arm-only execution'))
 
     declare_headless_cmd = DeclareLaunchArgument(
         name='headless',
@@ -257,8 +265,10 @@ def generate_launch_description():
         condition=IfCondition(use_robot_state_pub)
     )
 
-    # Gazebo's controller manager owns the simulated arm joints.
-    gazebo_controller_spawner_cmd = Node(
+    # Gazebo's controller manager owns the simulated arm joints. The normal
+    # simulation uses the combined controller; hand-eye pose sampling needs a
+    # left-arm-only controller because MoveIt sends goals to left_arm.
+    gazebo_controller_spawner_dual_cmd = Node(
         package='controller_manager',
         executable='spawner',
         arguments=[
@@ -272,7 +282,30 @@ def generate_launch_description():
             '--param-file', controllers_yaml,
         ],
         output='screen',
-        condition=IfCondition(load_controllers),
+        condition=IfCondition(PythonExpression([
+            "'", load_controllers, "' == 'true' and '",
+            use_left_arm_controller, "' == 'false'"
+        ])),
+    )
+
+    gazebo_controller_spawner_left_cmd = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'joint_state_broadcaster',
+            'body_posture_controller',
+            'left_arm_controller',
+            'left_gripper_controller',
+            'right_gripper_controller',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '60',
+            '--param-file', controllers_yaml,
+        ],
+        output='screen',
+        condition=IfCondition(PythonExpression([
+            "'", load_controllers, "' == 'true' and '",
+            use_left_arm_controller, "' == 'true'"
+        ])),
     )
 
     # Gazebo resolves model:// assets from this package's models directory.
@@ -417,6 +450,7 @@ def generate_launch_description():
     ld.add_action(declare_software_rendering_cmd)
     ld.add_action(declare_jsp_gui_cmd)
     ld.add_action(declare_load_controllers_cmd)
+    ld.add_action(declare_use_left_arm_controller_cmd)
     ld.add_action(declare_use_camera_cmd)
     ld.add_action(declare_use_head_camera_cmd)
     ld.add_action(declare_hide_head_pitch_visual_cmd)
@@ -450,6 +484,7 @@ def generate_launch_description():
     ld.add_action(start_gazebo_ros_bridge_cmd)
     ld.add_action(start_gazebo_ros_image_bridge_cmd)
     ld.add_action(start_gazebo_ros_spawner_cmd)
-    ld.add_action(gazebo_controller_spawner_cmd)
+    ld.add_action(gazebo_controller_spawner_dual_cmd)
+    ld.add_action(gazebo_controller_spawner_left_cmd)
 
     return ld
