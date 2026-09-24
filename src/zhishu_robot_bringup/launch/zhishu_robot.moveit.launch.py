@@ -82,6 +82,17 @@ def generate_launch_description():
         both_arm_hardware_enabled,
         torso_head_hardware_disabled,
     )
+    left_arm_only_mode = AndSubstitution(
+        enable_left_arm_hardware,
+        NotSubstitution(enable_right_arm_hardware),
+    )
+    torso_head_only_mode = AndSubstitution(
+        enable_torso_head_hardware,
+        AndSubstitution(
+            NotSubstitution(enable_left_arm_hardware),
+            NotSubstitution(enable_right_arm_hardware),
+        ),
+    )
     no_arm_hardware = NotSubstitution(both_arm_hardware_enabled)
     no_trajectory_hardware = AndSubstitution(
         no_arm_hardware,
@@ -516,6 +527,41 @@ def generate_launch_description():
             condition=IfCondition(enable_torso_head_hardware),
         ),
 
+        # Left-arm-only path used by hand-eye calibration.  Keep the torso/head
+        # controller first when it is enabled, then start the left trajectory
+        # controller before MoveIt so left_arm goals can actually execute.
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=joint_state_broadcaster_spawner,
+                on_exit=[left_arm_controller_spawner],
+            ),
+            condition=IfCondition(
+                AndSubstitution(
+                    left_arm_only_mode,
+                    torso_head_hardware_disabled,
+                )
+            ),
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=torso_head_controller_spawner,
+                on_exit=[left_arm_controller_spawner],
+            ),
+            condition=IfCondition(
+                AndSubstitution(
+                    left_arm_only_mode,
+                    enable_torso_head_hardware,
+                )
+            ),
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=left_arm_controller_spawner,
+                on_exit=[move_group_node],
+            ),
+            condition=IfCondition(left_arm_only_mode),
+        ),
+
         # Combined path: torso/head does not suppress the dual-arm chain.
         RegisterEventHandler(
             OnProcessExit(
@@ -552,7 +598,7 @@ def generate_launch_description():
                 target_action=torso_head_controller_spawner,
                 on_exit=[move_group_node],
             ),
-            condition=UnlessCondition(both_arm_hardware_enabled),
+            condition=IfCondition(torso_head_only_mode),
         ),
 
         # Keep MoveIt available when no trajectory hardware is selected.

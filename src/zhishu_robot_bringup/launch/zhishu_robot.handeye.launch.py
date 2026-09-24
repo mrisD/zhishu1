@@ -107,22 +107,22 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "use_fake_hardware",
-                default_value="true",
+                default_value="false",
                 description="Use mock hardware; set false only for a verified real robot",
             ),
             DeclareLaunchArgument("enable_left_arm_hardware", default_value="true"),
-            DeclareLaunchArgument("enable_right_arm_hardware", default_value="true"),
+            DeclareLaunchArgument("enable_right_arm_hardware", default_value="false"),
             DeclareLaunchArgument("enable_torso_head_hardware", default_value="true"),
             DeclareLaunchArgument(
                 "enable_motors_on_activate",
-                default_value="false",
+                default_value="true",
                 description=(
                     "Keep arm drives disabled by default; explicitly set true only "
                     "after the real robot pose and collision checks pass"
                 ),
             ),
             DeclareLaunchArgument(
-                "torso_head_enable_motors_on_activate", default_value="false"
+                "torso_head_enable_motors_on_activate", default_value="true"
             ),
             DeclareLaunchArgument("use_rviz", default_value="true"),
             DeclareLaunchArgument("enable_commander", default_value="false"),

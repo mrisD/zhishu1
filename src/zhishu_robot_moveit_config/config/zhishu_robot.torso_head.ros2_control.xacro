@@ -37,7 +37,8 @@
                 <param name="pdo_diagnostics_max_cycles">20000</param>
                 <param name="enable_motors_on_activate">${enable_motors_on_activate}</param>
 
-                <param name="master_index">0</param>
+                <!-- Real-hardware test topology: torso/head drives are on IgH master 1. -->
+                <param name="master_index">1</param>
                 <param name="alias">0</param>
                 <param name="vendor_id">0x00206688</param>
                 <param name="product_code">0x26483052</param>
