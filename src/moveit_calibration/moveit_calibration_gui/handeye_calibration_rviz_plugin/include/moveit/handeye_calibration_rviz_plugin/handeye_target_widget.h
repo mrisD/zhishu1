@@ -52,6 +52,8 @@
 #include <QMessageBox>
 #include <QFileDialog>
 
+#include <mutex>
+
 // opencv
 #include <opencv2/aruco.hpp>
 #include <opencv2/opencv.hpp>
@@ -65,6 +67,7 @@
 #include <image_transport/image_transport.hpp>
 
 #include <pluginlib/class_loader.hpp>
+#include <rviz_common/properties/status_property.hpp>
 #include <rviz_visual_tools/tf_visual_tools.hpp>
 #include <moveit/handeye_calibration_target/handeye_target_base.h>
 #include <moveit/handeye_calibration_rviz_plugin/handeye_calibration_display.h>
@@ -155,6 +158,10 @@ private Q_SLOTS:
   // Called when the item of image_topic_field_ combobox is selected
   void imageTopicComboboxChanged(const QString& topic);
 
+  // Apply target parameters after the user finishes editing them.  This slot
+  // always runs on Qt's GUI thread; camera callbacks must never read widgets.
+  void targetParametersChanged();
+
 Q_SIGNALS:
 
   void cameraInfoChanged(sensor_msgs::msg::CameraInfo msg);
@@ -162,6 +169,8 @@ Q_SIGNALS:
   void opticalFrameChanged(const std::string& frame_id);
 
 private:
+  void postDetectionStatus(rviz_common::properties::StatusProperty::Level level, const std::string& message);
+
   HandEyeCalibrationDisplay* calibration_display_;
 
   // **************************************************************
@@ -200,6 +209,8 @@ private:
   rclcpp::Node::SharedPtr node_;
   std::unique_ptr<pluginlib::ClassLoader<moveit_handeye_calibration::HandEyeTargetBase> > target_plugins_loader_;
   pluginlib::UniquePtr<moveit_handeye_calibration::HandEyeTargetBase> target_;
+  std::mutex target_mutex_;
+  bool target_ready_{ false };
   image_transport::ImageTransport it_;
   image_transport::CameraSubscriber camera_sub_;
   image_transport::Publisher image_pub_;

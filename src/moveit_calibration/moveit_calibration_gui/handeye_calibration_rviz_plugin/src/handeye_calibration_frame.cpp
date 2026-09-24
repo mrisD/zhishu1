@@ -100,7 +100,12 @@ HandEyeCalibrationFrame::HandEyeCalibrationFrame(HandEyeCalibrationDisplay* pdis
   RCLCPP_INFO_STREAM(node_->get_logger(), "handeye calibration gui created.");
 }
 
-HandEyeCalibrationFrame::~HandEyeCalibrationFrame() = default;
+HandEyeCalibrationFrame::~HandEyeCalibrationFrame()
+{
+  executor_.cancel();
+  if (executor_thread_.joinable())
+    executor_thread_.join();
+}
 
 void HandEyeCalibrationFrame::saveWidget(rviz_common::Config& config) const
 {

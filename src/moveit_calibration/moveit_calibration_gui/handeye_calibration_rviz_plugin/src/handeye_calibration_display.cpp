@@ -46,7 +46,8 @@
 
 namespace moveit_rviz_plugin
 {
-HandEyeCalibrationDisplay::HandEyeCalibrationDisplay([[maybe_unused]] QWidget* parent) : Display()
+HandEyeCalibrationDisplay::HandEyeCalibrationDisplay([[maybe_unused]] QWidget* parent)
+  : Display(), frame_dock_(nullptr), frame_(nullptr)
 {
   move_group_ns_property_ =
       new rviz_common::properties::StringProperty("Move Group Namespace", "",

@@ -152,6 +152,7 @@ TargetTabWidget::TargetTabWidget(rclcpp::Node::SharedPtr node, HandEyeCalibratio
 
   // Load available target plugins
   loadAvailableTargetPlugins();
+  createTargetInstance();
 
   // Initialize image publisher
   image_pub_ = it_.advertise("/handeye_calibration/target_detection", 1);
@@ -201,6 +202,10 @@ void TargetTabWidget::loadWidget(const rviz_common::Config& config)
         break;
     }
   }
+
+  // The saved values above were written into Qt widgets.  Apply them once on
+  // the GUI thread before the camera subscription starts.
+  createTargetInstance();
 
   for (const std::pair<const std::string, RosTopicComboBox*>& topic : ros_topics_)
   {
@@ -285,6 +290,9 @@ bool TargetTabWidget::loadInputWidgetsForTargetType(const std::string& plugin_na
   if (plugin_name.empty())
     return false;
 
+  std::lock_guard<std::mutex> lock(target_mutex_);
+  target_ready_ = false;
+
   try
   {
     target_ = target_plugins_loader_->createUniqueInstance(plugin_name);
@@ -303,11 +311,15 @@ bool TargetTabWidget::loadInputWidgetsForTargetType(const std::string& plugin_na
           target_param_inputs_.insert(std::make_pair(param.name_, new QLineEdit()));
           target_param_layout_->addRow(param.name_.c_str(), target_param_inputs_[param.name_]);
           static_cast<QLineEdit*>(target_param_inputs_[param.name_])->setText(std::to_string(param.value_.i).c_str());
+          connect(target_param_inputs_[param.name_], SIGNAL(editingFinished()), this,
+                  SLOT(targetParametersChanged()));
           break;
         case moveit_handeye_calibration::HandEyeTargetBase::Parameter::ParameterType::Float:
           target_param_inputs_.insert(std::make_pair(param.name_, new QLineEdit()));
           target_param_layout_->addRow(param.name_.c_str(), target_param_inputs_[param.name_]);
           static_cast<QLineEdit*>(target_param_inputs_[param.name_])->setText(std::to_string(param.value_.f).c_str());
+          connect(target_param_inputs_[param.name_], SIGNAL(editingFinished()), this,
+                  SLOT(targetParametersChanged()));
           break;
         case moveit_handeye_calibration::HandEyeTargetBase::Parameter::ParameterType::Enum:
           QComboBox* combo_box = new QComboBox();
@@ -318,6 +330,7 @@ bool TargetTabWidget::loadInputWidgetsForTargetType(const std::string& plugin_na
           target_param_inputs_.insert(std::make_pair(param.name_, combo_box));
           target_param_layout_->addRow(param.name_.c_str(), target_param_inputs_[param.name_]);
           static_cast<QComboBox*>(target_param_inputs_[param.name_])->setCurrentIndex(param.value_.e);
+          connect(combo_box, SIGNAL(activated(int)), this, SLOT(targetParametersChanged()));
           break;
       }
     }
@@ -333,6 +346,9 @@ bool TargetTabWidget::loadInputWidgetsForTargetType(const std::string& plugin_na
 
 bool TargetTabWidget::createTargetInstance()
 {
+  std::lock_guard<std::mutex> lock(target_mutex_);
+  target_ready_ = false;
+
   if (!target_)
     return false;
 
@@ -356,7 +372,9 @@ bool TargetTabWidget::createTargetInstance()
           break;
       }
     }
-    target_->initialize();
+    target_ready_ = target_->initialize();
+    if (camera_info_)
+      target_->setCameraIntrinsicParams(camera_info_);
   }
   catch (pluginlib::PluginlibException& ex)
   {
@@ -377,13 +395,11 @@ void TargetTabWidget::cameraCallback(const sensor_msgs::msg::Image::ConstSharedP
 
 void TargetTabWidget::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr& msg)
 {
-  createTargetInstance();
-
   // Depth image format `16UC1` cannot be converted to `MONO8`
   if (msg->encoding == "16UC1")
   {
-    calibration_display_->setStatus(rviz_common::properties::StatusProperty::Error, "Target detection",
-                                    "Received 16-bit image, which cannot be processed.");
+    postDetectionStatus(rviz_common::properties::StatusProperty::Error,
+                        "Received 16-bit image, which cannot be processed.");
     return;
   }
 
@@ -399,16 +415,14 @@ void TargetTabWidget::imageCallback(const sensor_msgs::msg::Image::ConstSharedPt
   else
   {
     RCLCPP_ERROR_STREAM(node_->get_logger(), "Image msg has empty frame_id.");
-    calibration_display_->setStatus(rviz_common::properties::StatusProperty::Error, "Target detection",
-                                    "Image message has empty frame ID.");
+    postDetectionStatus(rviz_common::properties::StatusProperty::Error, "Image message has empty frame ID.");
     return;
   }
 
   if (msg->data.empty())
   {
     RCLCPP_ERROR_STREAM(node_->get_logger(), "Image msg has empty data.");
-    calibration_display_->setStatus(rviz_common::properties::StatusProperty::Error, "Target detection",
-                                    "Image message is empty.");
+    postDetectionStatus(rviz_common::properties::StatusProperty::Error, "Image message is empty.");
     return;
   }
 
@@ -418,66 +432,90 @@ void TargetTabWidget::imageCallback(const sensor_msgs::msg::Image::ConstSharedPt
     cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
 
     sensor_msgs::msg::Image::SharedPtr pub_msg;
-    if (target_ && target_->detectTargetPose(cv_ptr->image))
+    bool detected = false;
+    bool intrinsics_reasonable = false;
+    geometry_msgs::msg::TransformStamped target_transform;
+    {
+      std::lock_guard<std::mutex> lock(target_mutex_);
+      if (!target_ || !target_ready_)
+      {
+        postDetectionStatus(rviz_common::properties::StatusProperty::Warn,
+                            "Target detector is being reconfigured.");
+        return;
+      }
+
+      detected = target_->detectTargetPose(cv_ptr->image);
+      if (detected)
+      {
+        target_transform = target_->getTransformStamped(optical_frame_);
+        intrinsics_reasonable = target_->areIntrinsicsReasonable();
+      }
+    }
+
+    if (detected)
     {
       pub_msg = cv_bridge::CvImage(std_msgs::msg::Header(), "rgb8", cv_ptr->image).toImageMsg();
 
-      geometry_msgs::msg::TransformStamped tf2_msg = target_->getTransformStamped(optical_frame_);
-      tf_pub_->sendTransform(tf2_msg);
-      if (!target_->areIntrinsicsReasonable())
+      tf_pub_->sendTransform(target_transform);
+      if (!intrinsics_reasonable)
       {
-        calibration_display_->setStatus(
-            rviz_common::properties::StatusProperty::Warn, "Target detection",
-            "Target detector has not received reasonable intrinsics. Attempted detection anyway.");
+        postDetectionStatus(rviz_common::properties::StatusProperty::Warn,
+                            "Target detector has not received reasonable intrinsics. Attempted detection anyway.");
       }
       else
       {
-        calibration_display_->setStatus(rviz_common::properties::StatusProperty::Ok, "Target detection",
-                                        "Target pose detected.");
+        postDetectionStatus(rviz_common::properties::StatusProperty::Ok, "Target pose detected.");
       }
     }
     else
     {
       pub_msg = cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", cv_ptr->image).toImageMsg();
-      calibration_display_->setStatus(rviz_common::properties::StatusProperty::Error, "Target detection",
-                                      "Target detection failed.");
+      postDetectionStatus(rviz_common::properties::StatusProperty::Error, "Target detection failed.");
     }
     image_pub_.publish(pub_msg);
   }
   catch (cv_bridge::Exception& e)
   {
     std::string error_message = "cv_bridge exception: " + std::string(e.what());
-    calibration_display_->setStatusStd(rviz_common::properties::StatusProperty::Error, "Target detection",
-                                       error_message);
+    postDetectionStatus(rviz_common::properties::StatusProperty::Error, error_message);
     RCLCPP_ERROR(node_->get_logger(), "%s", error_message.c_str());
   }
   catch (cv::Exception& e)
   {
     std::string error_message = "cv exception: " + std::string(e.what());
-    calibration_display_->setStatusStd(rviz_common::properties::StatusProperty::Error, "Target detection",
-                                       error_message);
+    postDetectionStatus(rviz_common::properties::StatusProperty::Error, error_message);
     RCLCPP_ERROR(node_->get_logger(), "%s", error_message.c_str());
   }
 }
 
 void TargetTabWidget::cameraInfoCallback(sensor_msgs::msg::CameraInfo::ConstSharedPtr msg)
 {
-  if (!camera_info_ || msg->k != camera_info_->k || msg->p != camera_info_->p)
+  bool camera_info_changed = false;
+  sensor_msgs::msg::CameraInfo camera_info_copy;
   {
-    if (target_ && msg->height > 0 && msg->width > 0 && !msg->k.empty() && !msg->d.empty())
+    std::lock_guard<std::mutex> lock(target_mutex_);
+    if (!camera_info_ || msg->k != camera_info_->k || msg->p != camera_info_->p)
     {
-      RCLCPP_DEBUG(node_->get_logger(), "Received camera info.");
-      camera_info_ = msg;
-      target_->setCameraIntrinsicParams(camera_info_);
-      Q_EMIT cameraInfoChanged(*camera_info_);
+      if (target_ && target_ready_ && msg->height > 0 && msg->width > 0 && !msg->k.empty() && !msg->d.empty())
+      {
+        RCLCPP_DEBUG(node_->get_logger(), "Received camera info.");
+        camera_info_ = msg;
+        target_->setCameraIntrinsicParams(camera_info_);
+        camera_info_copy = *camera_info_;
+        camera_info_changed = true;
+      }
+      else
+      {
+        const std::string error_message = "Invalid CameraInfo message was received.";
+        postDetectionStatus(rviz_common::properties::StatusProperty::Error, error_message);
+        RCLCPP_ERROR(node_->get_logger(), "%s", error_message.c_str());
+      }
     }
-    else
-    {
-      std::string error_message = "Invalid CameraInfo message was received.";
-      calibration_display_->setStatusStd(rviz_common::properties::StatusProperty::Error, "Target detection",
-                                         error_message);
-      RCLCPP_ERROR(node_->get_logger(), "%s", error_message.c_str());
-    }
+  }
+
+  if (camera_info_changed)
+  {
+    Q_EMIT cameraInfoChanged(camera_info_copy);
   }
 }
 
@@ -486,22 +524,25 @@ void TargetTabWidget::targetTypeComboboxChanged(const QString& text)
   if (!text.isEmpty())
   {
     loadInputWidgetsForTargetType(text.toStdString());
-    if (target_)
-    {
-      target_->setCameraIntrinsicParams(camera_info_);
-    }
+    createTargetInstance();
   }
+}
+
+void TargetTabWidget::targetParametersChanged()
+{
+  createTargetInstance();
 }
 
 void TargetTabWidget::createTargetImageBtnClicked([[maybe_unused]] bool clicked)
 {
   createTargetInstance();
-  if (target_)
   {
-    target_->createTargetImage(target_image_);
+    std::lock_guard<std::mutex> lock(target_mutex_);
+    if (target_ && target_ready_)
+      target_->createTargetImage(target_image_);
+    else
+      QMessageBox::warning(this, tr("Fail to create a target image."), "No available target plugin.");
   }
-  else
-    QMessageBox::warning(this, tr("Fail to create a target image."), "No available target plugin.");
 
   if (!target_image_.empty())
   {
@@ -549,6 +590,10 @@ void TargetTabWidget::imageTopicComboboxChanged(const QString& topic)
 {
   camera_sub_.shutdown();
 
+  // This slot is invoked by Qt, so it is safe to read and apply the current
+  // parameter widgets before the background camera callback starts.
+  createTargetInstance();
+
   calibration_display_->setStatusStd(rviz_common::properties::StatusProperty::Warn, "Target detection",
                                      "Not subscribed to image topic.");
   if (!topic.isNull() and !topic.isEmpty())
@@ -565,6 +610,17 @@ void TargetTabWidget::imageTopicComboboxChanged(const QString& topic)
                                          "Failed to subscribe to image topic.");
     }
   }
+}
+
+void TargetTabWidget::postDetectionStatus(rviz_common::properties::StatusProperty::Level level,
+                                          const std::string& message)
+{
+  QMetaObject::invokeMethod(
+      this,
+      [this, level, message]() {
+        calibration_display_->setStatusStd(level, "Target detection", message);
+      },
+      Qt::QueuedConnection);
 }
 
 }  // namespace moveit_rviz_plugin
