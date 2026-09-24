@@ -93,7 +93,7 @@ int main(int argc, char ** argv)
     std::cout << "\nEye-to-Hand sample sequence\n"
               << "Verify the ArUco board is detected, then click Take Sample "
               << "in RViz after each move.\n"
-              << "The head must remain at yaw=0.5, pitch=0.15 for the whole run.\n\n";
+              << "The head must remain at yaw=0.5, pitch=-0.15 for the whole run.\n\n";
 
     for (std::size_t index = 0; index < kCalibrationPoses.size(); ++index) {
       std::cout << '[' << index + 1 << '/' << kCalibrationPoses.size()

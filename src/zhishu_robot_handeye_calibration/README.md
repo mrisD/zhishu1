@@ -217,7 +217,7 @@ the interactive plugin output `/handeye_calibration/target_detection`.
 `/handeye_calibration/annotated_image` is kept disabled by default because it
 is published only by the automatic calibration executable.
 
-The calibration launch fixes the head at yaw `0.5` rad and pitch `0.15` rad.
+The calibration launch fixes the head at yaw `0.5` rad and pitch `-0.15` rad.
 Those values must remain unchanged for every sample and for the final solve.
 
 Before sampling, verify the image and marker detector:

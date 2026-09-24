@@ -181,7 +181,7 @@ public:
     sample_attempts_per_pose_ = node_->declare_parameter<int>("sample_attempts_per_pose", 3);
     settle_seconds_ = node_->declare_parameter<double>("settle_seconds", 1.0);
     head_yaw_target_ = node_->declare_parameter<double>("head_yaw_target", 0.5);
-    head_pitch_target_ = node_->declare_parameter<double>("head_pitch_target", 0.15);
+    head_pitch_target_ = node_->declare_parameter<double>("head_pitch_target", -0.15);
     head_tolerance_ = node_->declare_parameter<double>("head_tolerance", 0.002);
     translation_tolerance_ = node_->declare_parameter<double>(
       "translation_tolerance", 0.03);

@@ -123,7 +123,7 @@ def generate_launch_description():
             "-p",
             "head_yaw_target:=0.5",
             "-p",
-            "head_pitch_target:=0.15",
+            "head_pitch_target:=-0.15",
             "-p",
             "tolerance:=0.002",
         ],

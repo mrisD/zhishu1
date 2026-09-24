@@ -11,7 +11,7 @@ handeye:
   camera_info_topic: /camera_head/color/camera_info
   head_lock:
     head_yaw_joint: 0.5
-    head_pitch_joint: 0.15
+    head_pitch_joint: -0.15
     tolerance: 0.002
   charuco:
     dictionary: DICT_4X4_50

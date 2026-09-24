@@ -23,6 +23,6 @@ initial_positions:
   # Fixed calibration view toward the left arm. These must not change between
   # samples or the Eye-to-Hand transform becomes invalid.
   head_yaw_joint: 0.5
-  head_pitch_joint: 0.15
+  head_pitch_joint: -0.15
   left_wheel_joint: 0.0
   right_wheel_joint: 0.0

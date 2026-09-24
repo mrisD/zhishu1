@@ -15,7 +15,7 @@ base_link -> head_camera_optical_frame
    collision 隐藏，并把标定板直接安装到 `L_hand_link` 法兰；夹爪关节和链接仍保留，
    因此 SRDF 与 ros2_control 不需要另一套配置。普通 Gazebo、MoveIt 模式不受影响，
    仍显示并使用左夹爪。
-2. 将头部关节保持为 `yaw=0.5 rad`、`pitch=0.15 rad`；自动节点在开始及每次
+2. 将头部关节保持为 `yaw=0.5 rad`、`pitch=-0.15 rad`；自动节点在开始及每次
    采样时检查 `0.002 rad` 容差，越界立即失败。
 3. 依次规划并执行 12 组左臂关节姿态。
 4. 每次运动稳定后，从 `/camera_head/color/image_raw` 检测
@@ -203,7 +203,7 @@ transform_matrix:
 - MoveIt 执行失败：检查 `dual_arm_controller` 是否为 `active`，以及
   `/joint_states` 是否持续发布。
 - 头部锁定告警：不要继续使用该轮样本，确认初始位置文件和 guard 参数均为
-  `0.5/0.15 rad`。
+  `0.5/-0.15 rad`。
 - 真值矩阵变成单位阵：不要用 `head_camera_optical_frame` 作为仿真真值。MoveIt
   HandEye Context 会在求解前向该帧发布单位初始猜测；使用模型中的
   `head_camera_optical_truth`。
