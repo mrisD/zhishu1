@@ -9,6 +9,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from moveit_configs_utils import MoveItConfigsBuilder
 
 
 def generate_launch_description():
@@ -19,10 +20,27 @@ def generate_launch_description():
     rviz_config_file = LaunchConfiguration("rviz_config_file")
     use_sim_time = LaunchConfiguration("use_sim_time")
 
+    # The robot descriptions still come from the RK3588.  These local-only
+    # planning parameters populate the RViz pipeline/planner selectors so a
+    # valid planner_id is sent with every remote MoveGroup request.
+    moveit_config = (
+        MoveItConfigsBuilder(
+            "zhishu_robot", package_name="zhishu_robot_moveit_config"
+        )
+        .robot_description_kinematics(
+            file_path="config/kinematics.yaml"
+        )
+        .joint_limits(file_path="config/joint_limits.yaml")
+        .planning_pipelines(
+            default_planning_pipeline="ompl",
+            pipelines=["ompl", "pilz_industrial_motion_planner"],
+        )
+        .to_moveit_configs()
+    )
+
     # robot_description, robot_description_semantic, joint states, planning
-    # scene, MoveIt actions, and camera images all come from the RK3588.  Do
-    # not generate a second local model: it could silently diverge from the
-    # hardware launch arguments used by the remote machine.
+    # scene, and MoveIt actions come from the RK3588.  Do not pass a second
+    # local robot model: it could silently diverge from the remote machine.
     rviz = Node(
         package="rviz2",
         executable="rviz2",
@@ -30,6 +48,9 @@ def generate_launch_description():
         output="screen",
         arguments=["-d", rviz_config_file],
         parameters=[
+            moveit_config.robot_description_kinematics,
+            moveit_config.planning_pipelines,
+            moveit_config.joint_limits,
             {
                 "use_sim_time": ParameterValue(
                     use_sim_time, value_type=bool

@@ -174,11 +174,13 @@ ros2 launch zhishu_robot_handeye_calibration handeye_rviz.launch.py
 ```
 
 This local launch does not start hardware, controllers, a camera driver,
-`robot_state_publisher`, or `move_group`.  It loads the hand-eye RViz layout,
-then receives the matching robot model (including the calibration plate on the
-left flange), joint states, planning scene, camera image, services, and actions
-from the RK3588.  Both machines must use the same `ROS_DOMAIN_ID`, compatible
-RMW/DDS settings, and be able to discover each other on the network.
+`robot_state_publisher`, or `move_group`. It loads the hand-eye RViz layout and
+local planner-selection parameters, then receives the matching robot model
+(including the calibration plate on the left flange), joint states, planning
+scene, camera image, services, and actions from the RK3588. The Gemini Pro must
+be connected to the RK3588 for its hand-eye launch to publish the camera
+topics. Both machines must use the same `ROS_DOMAIN_ID`, compatible RMW/DDS
+settings, and be able to discover each other on the network.
 
 The launch also keeps a CameraInfo relay alive from
 `/camera_head/camera_info` to `/camera_head/color/camera_info`, matching the
