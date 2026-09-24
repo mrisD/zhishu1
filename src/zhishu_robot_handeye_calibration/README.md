@@ -18,6 +18,48 @@ See [`docs/GEMINI_PRO_CAMERA.zh-CN.md`](docs/GEMINI_PRO_CAMERA.zh-CN.md) for the
 camera-only installation, launch, calibration, and verification procedure.  It
 does not start robot hardware or motion planning.
 
+### Gemini Pro RGB intrinsic calibration
+
+Start the camera in the first terminal:
+
+```bash
+cd /home/zhul/online/guohua_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch zhishu_robot_handeye_calibration gemini_pro_camera.launch.py
+```
+
+Run the interactive ChArUco calibration tool in a second terminal:
+
+```bash
+cd /home/zhul/online/guohua_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 run zhishu_robot_handeye_calibration calibrate_charuco_intrinsics.py
+```
+
+Use `Space` to capture a valid view, `R` to remove the latest view, `C` to
+calculate without saving, `S` to calculate and save, and `Q` or `Esc` to quit.
+Collect 30--50 sharp views covering the image center, corners, edges, several
+distances, and different board tilts.
+
+The calibration tool writes its working result and quality report to
+`~/.ros/camera_info/`.  The production camera launch deliberately loads the
+version-controlled calibration from
+`config/gemini_pro_rgb_640x480.yaml` through the package share directory.  After
+accepting a new calibration, copy the generated CameraInfo YAML into that
+source path and rebuild this package:
+
+```bash
+cp ~/.ros/camera_info/gemini_pro_rgb_640x480.yaml \
+  src/zhishu_robot_handeye_calibration/config/gemini_pro_rgb_640x480.yaml
+colcon build --symlink-install --packages-select zhishu_robot_handeye_calibration
+source install/setup.bash
+```
+
+The checked-in calibration was produced from 50 samples at `640x480`; its RMS
+reprojection error is `0.2375 px`.
+
 ## Fully automatic simulation and validation
 
 Install declared system dependencies, then build the package and its workspace

@@ -3,6 +3,7 @@
 
 from pathlib import Path
 
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.substitutions import LaunchConfiguration
@@ -11,7 +12,11 @@ from launch_ros.descriptions import ComposableNode
 
 
 def _default_camera_info_url():
-    path = Path.home() / ".ros" / "camera_info" / "gemini_pro_rgb_640x480.yaml"
+    path = (
+        Path(get_package_share_directory("zhishu_robot_handeye_calibration"))
+        / "config"
+        / "gemini_pro_rgb_640x480.yaml"
+    )
     return path.as_uri()
 
 

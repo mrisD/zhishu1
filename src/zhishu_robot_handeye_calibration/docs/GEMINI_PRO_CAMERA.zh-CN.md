@@ -120,8 +120,8 @@ ros2 launch zhishu_robot_handeye_calibration gemini_pro_camera.launch.py \
 
 ## ChArUco RGB 内参标定
 
-驱动在没有用户 YAML 时会发布设备工厂内参。手眼标定仍以最终分辨率下重新标定的
-RGB 内参为准。保持相机 launch 运行，在第二个终端执行：
+驱动在没有用户 YAML 时会发布设备工厂内参。当前工程已经内置经过标定的 `640 x 480`
+RGB 内参；以下流程用于重新标定。保持相机 launch 运行，在第二个终端执行：
 
 ```bash
 cd /home/zhul/online/guohua_ws
@@ -152,17 +152,32 @@ marker_length = 0.022 m
 反光和运动模糊。只有 RMS 重投影误差不超过 `0.8 px` 才会保存，建议达到 `0.5 px`
 以下。
 
-输出文件：
+标定工具默认输出工作文件和质量报告：
 
 ```text
 ~/.ros/camera_info/gemini_pro_rgb_640x480.yaml
 ~/.ros/camera_info/gemini_pro_rgb_640x480.report.yaml
 ```
 
-停止并重新启动相机后，launch 会自动加载第一个文件，并替代工厂 RGB CameraInfo。
-标定程序写入的 `camera_name` 默认为 `camera_head_color`，与官方驱动的 RGB
-CameraInfo 管理器一致。
-也可以显式指定：
+正式启动默认不读取用户主目录，而是从源码包安装后的路径加载：
+
+```text
+src/zhishu_robot_handeye_calibration/config/gemini_pro_rgb_640x480.yaml
+install/zhishu_robot_handeye_calibration/share/zhishu_robot_handeye_calibration/config/gemini_pro_rgb_640x480.yaml
+```
+
+确认新标定结果后，将 CameraInfo YAML 同步到源码包并重新构建：
+
+```bash
+cd /home/zhul/online/guohua_ws
+cp ~/.ros/camera_info/gemini_pro_rgb_640x480.yaml \
+  src/zhishu_robot_handeye_calibration/config/gemini_pro_rgb_640x480.yaml
+colcon build --symlink-install --packages-select zhishu_robot_handeye_calibration
+source install/setup.bash
+```
+
+当前包内结果使用 50 组样本，RMS 重投影误差为 `0.2375 px`。临时验证尚未同步到
+源码包的新结果时，也可以显式指定用户目录中的文件：
 
 ```bash
 ros2 launch zhishu_robot_handeye_calibration gemini_pro_camera.launch.py \
@@ -207,8 +222,8 @@ udev 规则并重新插拔相机。
 
 ### CameraInfo 提示 `rational_polynomial`
 
-这是设备工厂内参的畸变模型，不代表驱动失败。完成 ChArUco 内参标定并重启后，项目
-生成的 YAML 会提供 `plumb_bob` 模型。
+这是设备工厂内参的畸变模型，不代表驱动失败。使用显式 `camera_info_url` 验证新结果，
+或将新结果同步到包内并重新构建后，项目 YAML 会提供 `plumb_bob` 模型。
 
 ### 点云尺寸异常
 
