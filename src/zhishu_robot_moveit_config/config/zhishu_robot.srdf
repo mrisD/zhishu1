@@ -74,6 +74,17 @@
         <joint name="left_wrist_roll_joint" value="0"/>
         <joint name="left_wrist_yaw_joint" value="0"/>
     </group_state>
+    <group_state name="left_arm_handeye_home" group="left_arm">
+        <!-- Hand-eye home: joint 2 is raised -15 degrees; all other axes
+             remain at home. Keep the elbow just inside its 0 rad limit. -->
+        <joint name="left_elbow_pitch_joint" value="0.001"/>
+        <joint name="left_shoulder_pitch_joint" value="0"/>
+        <joint name="left_shoulder_roll_joint" value="-0.261799"/>
+        <joint name="left_shoulder_yaw_joint" value="0"/>
+        <joint name="left_wrist_pitch_joint" value="0"/>
+        <joint name="left_wrist_roll_joint" value="0"/>
+        <joint name="left_wrist_yaw_joint" value="0"/>
+    </group_state>
     <group_state name="left_arm_pose1" group="left_arm">
         <joint name="left_elbow_pitch_joint" value="0.7"/>
         <joint name="left_shoulder_pitch_joint" value="0.18"/>

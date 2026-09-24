@@ -157,6 +157,29 @@ therefore restored automatically rather than requiring a manually-added
 display.  The plugin subscribes to the configured image topic immediately,
 even when the camera publisher appears after RViz starts.
 
+### RK3588 bringup with RViz on a separate PC
+
+Run the robot, camera, MoveIt, and calibration support nodes on the RK3588,
+but disable its RViz process:
+
+```bash
+ros2 launch zhishu_robot_bringup zhishu_robot.handeye.launch.py use_rviz:=false
+```
+
+On the local PC, source a build of the same workspace revision and start only
+the hand-eye RViz client:
+
+```bash
+ros2 launch zhishu_robot_handeye_calibration handeye_rviz.launch.py
+```
+
+This local launch does not start hardware, controllers, a camera driver,
+`robot_state_publisher`, or `move_group`.  It loads the hand-eye RViz layout,
+then receives the matching robot model (including the calibration plate on the
+left flange), joint states, planning scene, camera image, services, and actions
+from the RK3588.  Both machines must use the same `ROS_DOMAIN_ID`, compatible
+RMW/DDS settings, and be able to discover each other on the network.
+
 The launch also keeps a CameraInfo relay alive from
 `/camera_head/camera_info` to `/camera_head/color/camera_info`, matching the
 topic convention derived by the MoveIt image transport subscriber.
