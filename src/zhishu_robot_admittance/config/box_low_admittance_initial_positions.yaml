@@ -1,0 +1,31 @@
+initial_positions:
+  # Low-box trial: box bottom at z=0.20 m, box height 0.20 m, center x=0.42 m.
+  # At x=0.32 m, the box bottom would overlap the base collision box;
+  # shifting 0.10 m forward leaves 36 mm nominal clearance at the back edge.
+  # Waist pitch is at its URDF lower limit (forward/downward bend).
+  left_gripper_left_finger_joint: 0.0
+  gripper_left_finger_joint: 0.0
+  waist_up_down_joint: 0.0
+  waist_pitch_joint: -0.7854
+  head_yaw_joint: 0.0
+  head_pitch_joint: 0.0
+  left_wheel_joint: 0.0
+  right_wheel_joint: 0.0
+
+  # Numerical FK/IK seed matches the reference side-rim grasp TCP orientation.
+  # TCP targets: x=0.42 m, y=+/-0.195 m, z=0.38 m (20 mm below the top rim).
+  left_shoulder_pitch_joint: -1.094625
+  left_shoulder_roll_joint: -0.611541
+  left_shoulder_yaw_joint: 1.479234
+  left_elbow_pitch_joint: 1.387766
+  left_wrist_yaw_joint: 1.361658
+  left_wrist_pitch_joint: -0.307256
+  left_wrist_roll_joint: 0.820585
+
+  right_shoulder_pitch_joint: 1.094728
+  right_shoulder_roll_joint: 0.611545
+  right_shoulder_yaw_joint: -1.479176
+  right_elbow_pitch_joint: 1.387764
+  right_wrist_yaw_joint: -1.361786
+  right_wrist_pitch_joint: -0.307165
+  right_wrist_roll_joint: -0.820567

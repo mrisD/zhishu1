@@ -107,6 +107,37 @@ ros2 run zhishu_robot_admittance run_admittance_validation --ros-args \
   -p linear_direction:=1.0
 ```
 
+### 离地 20 cm 箱体测试
+
+低位场景与上述常规场景分开，常规启动不变。低位箱体外形为
+`0.30 × 0.40 × 0.20 m`，箱底在离地 `0.20 m` 的支撑台上，箱体中心在
+`x=0.42 m, y=0`。腰部俯仰预置为 URDF 下限 `-0.7854 rad`（约 −45°）；
+两臂初始关节位由这个腰部姿态和箱体上沿抓取点求逆运动学得到。该场景将夹爪
+闭合目标设为 `0.055 m`，而常规场景仍为 `0.050 m`。
+
+```bash
+ros2 launch zhishu_robot_admittance dual_arm_box_admittance_sim.launch.py \
+  scenario:=low_box headless:=true use_rviz:=false
+```
+
+等自动夹持、附着和力传感器去皮完成后，在另一终端运行：
+
+```bash
+ros2 run zhishu_robot_admittance run_admittance_validation --ros-args \
+  -p arm_linear_distance_m:=0.0 \
+  -p cross_track_feedback_gain:=3.0 \
+  -p output_path:=/tmp/zhishu_low_box_validation.json
+```
+
+该测试让腰部升降轴贡献全部 `0.20 m`，两臂通过箱体实测位置反馈补偿 X/Y
+偏移；横向反馈速度每轴限制在 `0.02 m/s`。不启用反馈时，该低位姿态的
+横向偏移约 `12 mm`，超过 `5 mm` 的验收阈值。2026-09-26 的本机
+Gazebo 测试中，箱体实际抬升 `0.1985 m`，最大横向偏移 `0.00057 m`，
+其余间距、姿态、停稳与传感器检查均通过。这里验证的是仿真中的夹持抬升，
+不是水平转运、放置或真机验证。Gazebo 仍使用左手到箱体的可拆卸固定关节；
+通过该测试不代表单靠双侧摩擦夹持就能承载箱体，真机使用前还需验证实际
+夹爪接触、负载和碰撞余量。
+
 ## 箱体共同运动命令
 
 参考速度必须使用 `base_link` 坐标系。下面命令让箱体以 `0.015 m/s` 向上运动；

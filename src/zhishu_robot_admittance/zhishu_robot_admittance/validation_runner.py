@@ -16,6 +16,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
 from rosgraph_msgs.msg import Clock
+from sensor_msgs.msg import JointState
 from std_srvs.srv import SetBool, Trigger
 from tf2_ros import Buffer, TransformException, TransformListener
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -148,6 +149,8 @@ class ValidationRunner(Node):
         # A vertical straight line avoids the horizontal singularities and the
         # support-table friction of the original lift-then-forward profile.
         self.declare_parameter("linear_direction", 1.0)
+        self.declare_parameter("cross_track_feedback_gain", 0.0)
+        self.declare_parameter("cross_track_feedback_max_speed_mps", 0.020)
         self.declare_parameter("output_path", "")
         self.tare_client = self.create_client(Trigger, "/dual_arm_admittance/tare")
         self.enable_client = self.create_client(SetBool, "/dual_arm_admittance/enable")
@@ -159,8 +162,15 @@ class ValidationRunner(Node):
         self.max_sensor_skew = 0.0
         self.command_history = {"left": [], "right": []}
         self.sim_time = None
+        self.current_waist_pitch = None
         self.create_subscription(
             Clock, "/clock", self._clock_callback, qos_profile_sensor_data
+        )
+        self.create_subscription(
+            JointState,
+            "/joint_states",
+            self._joint_states_callback,
+            qos_profile_sensor_data,
         )
         self.create_subscription(
             WrenchStamped,
@@ -221,6 +231,14 @@ class ValidationRunner(Node):
     def _clock_callback(self, message):
         self.sim_time = message.clock.sec + 1e-9 * message.clock.nanosec
 
+    def _joint_states_callback(self, message):
+        if "waist_pitch_joint" in message.name:
+            index = message.name.index("waist_pitch_joint")
+            if index < len(message.position):
+                value = float(message.position[index])
+                if math.isfinite(value):
+                    self.current_waist_pitch = value
+
     def wait_ready(self, timeout=30.0):
         for client in (self.tare_client, self.enable_client):
             if not client.wait_for_service(timeout_sec=timeout):
@@ -228,7 +246,11 @@ class ValidationRunner(Node):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             rclpy.spin_once(self, timeout_sec=0.05)
-            if min(self.sensor_counts.values()) >= 20 and self.sim_time is not None:
+            if (
+                min(self.sensor_counts.values()) >= 20
+                and self.sim_time is not None
+                and self.current_waist_pitch is not None
+            ):
                 return
         raise RuntimeError("Force/torque sensors did not provide 20 samples")
 
@@ -266,7 +288,17 @@ class ValidationRunner(Node):
             self.max_tcp_distance_change, abs(distance - self.initial_tcp_distance)
         )
 
-    def publish_profile(self, duration, axis=None, peak=0.0, ramp=0.5):
+    def publish_profile(
+        self,
+        duration,
+        axis=None,
+        peak=0.0,
+        ramp=0.5,
+        pose_tracker=None,
+        line_start=None,
+        cross_track_gain=0.0,
+        cross_track_max_speed=0.020,
+    ):
         if self.sim_time is None:
             raise RuntimeError("Simulation clock is unavailable")
         start = self.sim_time
@@ -295,11 +327,33 @@ class ValidationRunner(Node):
             message.header.stamp.nanosec = int((now - int(now)) * 1e9)
             message.header.frame_id = "base_link"
             setattr(message.twist.linear, axis or "x", speed)
+            if (
+                cross_track_gain > 0.0
+                and pose_tracker is not None
+                and line_start is not None
+            ):
+                pose = pose_tracker.latest()
+                if pose is None or time.monotonic() - pose.sample_time > 0.5:
+                    raise RuntimeError("Gazebo box pose feedback is stale")
+                for other in "xyz":
+                    if other == axis:
+                        continue
+                    correction = cross_track_gain * (
+                        axis_value(line_start, other) - axis_value(pose, other)
+                    )
+                    correction = max(
+                        -cross_track_max_speed,
+                        min(cross_track_max_speed, correction),
+                    )
+                    setattr(message.twist.linear, other, correction)
             self.publisher.publish(message)
             self._sample_tcp_distance()
             next_tick += 0.01
 
     def publish_waist_profile(self, duration, distance, ramp=0.5):
+        if self.current_waist_pitch is None:
+            raise RuntimeError("Current waist_pitch_joint state is unavailable")
+        waist_pitch = self.current_waist_pitch
         deadline = time.monotonic() + 5.0
         while self.body_publisher.get_subscription_count() == 0:
             if time.monotonic() >= deadline:
@@ -321,7 +375,7 @@ class ValidationRunner(Node):
             point = JointTrajectoryPoint()
             point.positions = [
                 trapezoid_position(elapsed, duration, peak, ramp),
-                0.0,
+                waist_pitch,
                 0.0,
                 0.0,
             ]
@@ -419,6 +473,18 @@ def main(args=None):
         )
         if requested_distance <= 0.0 or requested_speed <= 0.0:
             raise RuntimeError("linear_distance_m and linear_speed_mps must be positive")
+        cross_track_gain = float(runner.get_parameter("cross_track_feedback_gain").value)
+        cross_track_max_speed = float(
+            runner.get_parameter("cross_track_feedback_max_speed_mps").value
+        )
+        if not math.isfinite(cross_track_gain) or cross_track_gain < 0.0:
+            raise RuntimeError(
+                "cross_track_feedback_gain must be finite and nonnegative"
+            )
+        if not math.isfinite(cross_track_max_speed) or cross_track_max_speed <= 0.0:
+            raise RuntimeError(
+                "cross_track_feedback_max_speed_mps must be finite and positive"
+            )
         if arm_distance >= requested_distance:
             raise RuntimeError("arm_linear_distance_m must be below linear_distance_m")
         waist_distance = requested_distance - arm_distance
@@ -435,6 +501,10 @@ def main(args=None):
             axis=linear_axis,
             peak=direction * arm_peak,
             ramp=line_ramp,
+            pose_tracker=tracker,
+            line_start=start,
+            cross_track_gain=cross_track_gain,
+            cross_track_max_speed=cross_track_max_speed,
         )
         line_end = tracker.latest()
         runner.publish_profile(0.5)
@@ -467,6 +537,8 @@ def main(args=None):
             "requested_linear_distance_m": requested_distance,
             "commanded_arm_distance_m": arm_distance,
             "commanded_waist_distance_m": waist_distance,
+            "cross_track_feedback_gain": cross_track_gain,
+            "cross_track_feedback_max_speed_mps": cross_track_max_speed,
             "linear_axis_displacement_m": direction
             * (axis_value(final, linear_axis) - axis_value(start, linear_axis)),
             "linear_distance_m": displacement(start, final),

@@ -6,7 +6,8 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, LogInfo
-from launch.actions import IncludeLaunchDescription, RegisterEventHandler, TimerAction
+from launch.actions import IncludeLaunchDescription, OpaqueFunction
+from launch.actions import RegisterEventHandler, TimerAction
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
@@ -37,7 +38,7 @@ def continue_if_success(next_action, description):
     return on_exit
 
 
-def generate_launch_description():
+def _build_launch_description(scenario):
     package_name = "zhishu_robot_admittance"
     moveit_package = "zhishu_robot_moveit_config"
     gazebo_package = "zhishu_robot_gazebo"
@@ -56,9 +57,15 @@ def generate_launch_description():
     force_x11 = LaunchConfiguration("force_x11")
     render_engine_gui = LaunchConfiguration("render_engine_gui")
     software_rendering = LaunchConfiguration("software_rendering")
-    initial_positions = os.path.join(
-        package_share, "config", "box_admittance_initial_positions.yaml"
-    )
+    if scenario == "low_box":
+        initial_positions_file = "box_low_admittance_initial_positions.yaml"
+        world_file = "dual_arm_box_low_admittance.sdf"
+    elif scenario == "reference":
+        initial_positions_file = "box_admittance_initial_positions.yaml"
+        world_file = "dual_arm_box_admittance.sdf"
+    else:
+        raise ValueError("scenario must be 'reference' or 'low_box'")
+    initial_positions = os.path.join(package_share, "config", initial_positions_file)
 
     moveit_config = (
         MoveItConfigsBuilder("zhishu_robot", package_name=moveit_package)
@@ -94,7 +101,7 @@ def generate_launch_description():
             "render_engine_gui": render_engine_gui,
             "software_rendering": software_rendering,
             "paused": "true",
-            "world_file": "dual_arm_box_admittance.sdf",
+            "world_file": world_file,
             "initial_positions_file": initial_positions,
             "load_controllers": "false",
             "use_gazebo": "true",
@@ -383,8 +390,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "gripper_position",
-                default_value="0.050",
-                description="Finger joint target matching the 10 mm crate wall",
+                default_value="0.055" if scenario == "low_box" else "0.050",
+                description="Finger joint target; low_box closes to the 10 mm wall",
             ),
             DeclareLaunchArgument(
                 "grasp_duration",
@@ -402,5 +409,23 @@ def generate_launch_description():
             start_admittance_after_grasp,
             start_nodes_after_activation,
             joint_state_spawner,
+        ]
+    )
+
+
+def _launch_for_scenario(context):
+    scenario = LaunchConfiguration("scenario").perform(context)
+    return list(_build_launch_description(scenario).entities)
+
+
+def generate_launch_description():
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                "scenario",
+                default_value="reference",
+                description="reference or low_box (box bottom 0.20 m, height 0.20 m)",
+            ),
+            OpaqueFunction(function=_launch_for_scenario),
         ]
     )
