@@ -1,6 +1,6 @@
 # zhishu_robot_commander_cpp
 
-智枢双臂机器人 MoveIt 2 C++ SDK，提供机械臂、夹爪的 C++ 调用接口和 ROS 2
+智枢机器人 MoveIt 2 C++ SDK，提供机械臂、头腰关节、夹爪的 C++ 调用接口和 ROS 2
 话题桥接节点。Commander 复用已经运行的 `move_group`，不会重复启动控制器，节点
 启动时也不会自行发送运动命令。
 
@@ -8,11 +8,106 @@
 
 - 左/右臂：命名目标、7 关节目标、Hand 位姿目标、真实夹爪 TCP 位姿目标、笛卡尔目标
 - 双臂：命名目标、14 关节目标、左右末端双目标同步规划
+- 头腰：命名目标、3 关节目标和当前关节角度读取
 - 夹爪：左/右独立控制、双夹爪同步控制和打开/关闭快捷命令
 - C++ SDK 动态库：`libzhishu_robot_commander_cpp.so`
 - ROS 2 话题桥接节点：`commander_node`
 - 结构化状态：`zhishu_robot_interfaces/msg/CommanderStatus`
 - 稳定性测试：命名姿态循环、14 轴 Joint/EtherCAT 循环
+
+## 躯干 / 头部接口
+
+- MoveIt 规划组：`torso_head`
+- ros2_control 轨迹控制器：`torso_head_controller`
+- 关节目标固定按 `[waist_pitch_joint, head_yaw_joint, head_pitch_joint]` 排列，单位为弧度（rad）。
+- 命名目标直接使用 SRDF 中为 `torso_head` 组定义的 named target。
+
+### Commander API
+
+结构化结果接口：
+
+```cpp
+Result moveTorsoHeadNamedResult(const std::string & target_name);
+Result moveTorsoHeadJointsResult(const std::vector<double> & joints);
+std::vector<double> getTorsoHeadJoints() const;
+```
+
+同时提供便捷的 `bool` 包装接口 `moveTorsoHeadNamed()` 和
+`moveTorsoHeadJoints()`；它们分别调用对应的 `Result` 接口并返回是否成功。
+关节目标必须正好包含上述三个关节，顺序不可交换。
+
+### RobotSdk API
+
+同步接口：
+
+```cpp
+Result moveTorsoHeadNamed(const std::string & target_name);
+Result moveTorsoHeadJoints(const std::vector<double> & joints);
+std::vector<double> getTorsoHeadJoints() const;
+```
+
+异步接口：
+
+```cpp
+MotionHandle moveTorsoHeadNamedAsync(std::string target_name);
+MotionHandle moveTorsoHeadJointsAsync(std::vector<double> joints);
+```
+
+状态结构 `RobotState` 包含 `torso_head_joints`，按
+`[waist_pitch_joint, head_yaw_joint, head_pitch_joint]` 顺序返回当前关节位置，单位为 rad。
+若只启用头腰部假硬件，可用 `getTorsoHeadJoints()` 单独读取这三个关节，
+不依赖双臂关节状态；状态不可用时抛出异常。
+
+### C++ 可运行示例
+
+先启动含 `torso_head_controller`、MoveIt 和 Commander 的系统。仅验证假硬件时可用：
+
+```bash
+ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
+  use_fake_hardware:=true enable_torso_head_hardware:=true \
+  enable_left_arm_hardware:=false enable_right_arm_hardware:=false \
+  enable_commander:=true use_rviz:=false
+```
+
+另开终端并 `source install/setup.bash`。示例默认只读取状态，不会发运动命令：
+
+```bash
+ros2 run zhishu_robot_commander_cpp sdk_torso_head_example
+```
+
+只有显式设置 `execute_motion:=true` 才会发送一次运动命令：
+
+```bash
+ros2 run zhishu_robot_commander_cpp sdk_torso_head_example --ros-args \
+  -p execute_motion:=true -p motion:=joints -p joints:="[0.0, 0.05, -0.05]"
+ros2 run zhishu_robot_commander_cpp sdk_torso_head_example --ros-args \
+  -p execute_motion:=true -p motion:=named -p named_target:=torso_head_origin
+```
+
+真机运行前须核对实际位置、关节方向、限位和周边空间；上面的两条
+`execute_motion:=true` 命令会实际请求运动。
+
+### ROS 话题桥接
+
+桥接节点私有话题（`~` 表示节点命名空间下的相对名称）：
+
+| 话题 | 类型 | 内容 |
+| --- | --- | --- |
+| `~/torso_head/joint_command` | `std_msgs/msg/Float64MultiArray` | 三个 rad 关节目标，按 waist pitch、head yaw、head pitch 排列 |
+| `~/torso_head/named_target` | `std_msgs/msg/String` | SRDF 中 `torso_head` 组的命名目标 |
+
+可先用以下只读命令确认桥接节点和接口是否已启动：
+
+```bash
+ros2 node list
+ros2 topic list | grep torso_head
+ros2 topic info /zhishu_robot_commander/torso_head/joint_command
+ros2 topic echo /joint_states --once
+```
+
+若桥接节点名或命名空间不同，应以 `ros2 node list` 和 `ros2 node info <节点名>`
+显示的实际私有话题全名为准。发布 `joint_command` 或 `named_target` 会请求机器人运动；
+真机上执行前应核对当前关节状态、规划目标和机械限位。接口定义本身不会触发运动。
 
 ## 编译与启动
 

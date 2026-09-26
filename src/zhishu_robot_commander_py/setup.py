@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'commander_example = zhishu_robot_commander_py.example:main',
+            'torso_head_example = zhishu_robot_commander_py.torso_head_example:main',
         ],
     },
 )

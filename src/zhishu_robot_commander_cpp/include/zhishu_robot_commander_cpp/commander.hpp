@@ -25,6 +25,7 @@ public:
     std::string left_arm_group{"left_arm"};
     std::string right_arm_group{"right_arm"};
     std::string both_arms_group{"both_arms"};
+    std::string torso_head_group{"torso_head"};
     std::string left_gripper_group{"left_gripper"};
     std::string right_gripper_group{"right_gripper"};
     std::string both_grippers_group{"both_grippers"};
@@ -52,10 +53,13 @@ public:
   bool moveLeftArmNamed(const std::string & target_name);
   bool moveRightArmNamed(const std::string & target_name);
   bool moveBothArmsNamed(const std::string & target_name);
+  bool moveTorsoHeadNamed(const std::string & target_name);
 
   bool moveLeftArmJoints(const std::vector<double> & joints);
   bool moveRightArmJoints(const std::vector<double> & joints);
   bool moveBothArmsJoints(const std::vector<double> & joints);
+  // Joint order: waist_pitch, head_yaw, head_pitch (radians).
+  bool moveTorsoHeadJoints(const std::vector<double> & joints);
 
   bool moveLeftArmPose(
     const geometry_msgs::msg::PoseStamped & target,
@@ -96,10 +100,12 @@ public:
   Result moveLeftArmNamedResult(const std::string & target_name);
   Result moveRightArmNamedResult(const std::string & target_name);
   Result moveBothArmsNamedResult(const std::string & target_name);
+  Result moveTorsoHeadNamedResult(const std::string & target_name);
 
   Result moveLeftArmJointsResult(const std::vector<double> & joints);
   Result moveRightArmJointsResult(const std::vector<double> & joints);
   Result moveBothArmsJointsResult(const std::vector<double> & joints);
+  Result moveTorsoHeadJointsResult(const std::vector<double> & joints);
 
   Result moveLeftArmPoseResult(
     const geometry_msgs::msg::PoseStamped & target,
@@ -136,6 +142,7 @@ public:
   std::vector<double> getLeftArmJoints() const;
   std::vector<double> getRightArmJoints() const;
   std::vector<double> getBothArmsJoints() const;
+  std::vector<double> getTorsoHeadJoints() const;
   std::vector<double> getLeftGripperJoints() const;
   std::vector<double> getRightGripperJoints() const;
   std::vector<double> getBothGrippersJoints() const;
@@ -180,6 +187,7 @@ private:
   std::unique_ptr<MoveGroupInterface> left_arm_;
   std::unique_ptr<MoveGroupInterface> right_arm_;
   std::unique_ptr<MoveGroupInterface> both_arms_;
+  std::unique_ptr<MoveGroupInterface> torso_head_;
   std::unique_ptr<MoveGroupInterface> left_gripper_;
   std::unique_ptr<MoveGroupInterface> right_gripper_;
   std::unique_ptr<MoveGroupInterface> both_grippers_;

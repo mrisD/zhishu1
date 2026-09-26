@@ -173,6 +173,7 @@ class Commander:
             'left_arm/named_target': self._publisher(String, 'left_arm/named_target'),
             'right_arm/named_target': self._publisher(String, 'right_arm/named_target'),
             'both_arms/named_target': self._publisher(String, 'both_arms/named_target'),
+            'torso_head/named_target': self._publisher(String, 'torso_head/named_target'),
             'left_arm/joint_command': self._publisher(
                 Float64MultiArray, 'left_arm/joint_command'
             ),
@@ -181,6 +182,9 @@ class Commander:
             ),
             'both_arms/joint_command': self._publisher(
                 Float64MultiArray, 'both_arms/joint_command'
+            ),
+            'torso_head/joint_command': self._publisher(
+                Float64MultiArray, 'torso_head/joint_command'
             ),
             'left_arm/pose_command': self._publisher(
                 PoseStamped, 'left_arm/pose_command'
@@ -302,6 +306,38 @@ class Commander:
         command = f'{self._arm_prefix(arm)}/joint_command'
         return self._send(
             command, Float64MultiArray(data=values), timeout=timeout
+        )
+
+    def move_torso_head_named(
+        self,
+        target_name: str,
+        *,
+        timeout: Optional[float] = None,
+    ) -> Result:
+        """Move the ``torso_head`` group to a named SRDF state."""
+        if not isinstance(target_name, str) or not target_name.strip():
+            return self._invalid('target_name must not be empty')
+        return self._send(
+            'torso_head/named_target',
+            String(data=target_name.strip()),
+            timeout=timeout,
+        )
+
+    def move_torso_head_joints(
+        self,
+        joints: Iterable[float],
+        *,
+        timeout: Optional[float] = None,
+    ) -> Result:
+        """Move [waist_pitch, head_yaw, head_pitch], in radians."""
+        try:
+            values = self._validated_values(joints, 3, 'torso/head joints')
+        except (TypeError, ValueError) as exc:
+            return self._invalid(str(exc))
+        return self._send(
+            'torso_head/joint_command',
+            Float64MultiArray(data=values),
+            timeout=timeout,
         )
 
     def move_pose(

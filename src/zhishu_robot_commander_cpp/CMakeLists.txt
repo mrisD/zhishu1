@@ -55,6 +55,10 @@ add_executable(sdk_example src/sdk_example.cpp)
 target_link_libraries(sdk_example ${PROJECT_NAME})
 ament_target_dependencies(sdk_example rclcpp)
 
+add_executable(sdk_torso_head_example src/sdk_torso_head_example.cpp)
+target_link_libraries(sdk_torso_head_example ${PROJECT_NAME})
+ament_target_dependencies(sdk_torso_head_example rclcpp)
+
 add_executable(sdk_named_pose_loop src/sdk_named_pose_loop.cpp)
 target_link_libraries(sdk_named_pose_loop ${PROJECT_NAME})
 ament_target_dependencies(sdk_named_pose_loop rclcpp std_srvs)
@@ -78,7 +82,7 @@ install(
   INCLUDES DESTINATION include
 )
 install(
-  TARGETS commander_node sdk_example sdk_named_pose_loop sdk_joint_ethercat_loop
+  TARGETS commander_node sdk_example sdk_torso_head_example sdk_named_pose_loop sdk_joint_ethercat_loop
   DESTINATION lib/${PROJECT_NAME}
 )
 install(

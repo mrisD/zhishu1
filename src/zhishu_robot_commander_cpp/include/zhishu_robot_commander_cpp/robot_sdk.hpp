@@ -38,6 +38,7 @@ struct RobotState
   Result result{Result::failure(ErrorCode::kNotReady, "robot state is unavailable")};
   std::vector<double> left_arm_joints;
   std::vector<double> right_arm_joints;
+  std::vector<double> torso_head_joints;
   std::vector<double> left_gripper_joints;
   std::vector<double> right_gripper_joints;
   geometry_msgs::msg::PoseStamped left_arm_pose;
@@ -65,6 +66,8 @@ public:
 
   Result moveNamed(ArmGroup group, const std::string & target_name);
   Result moveJoints(ArmGroup group, const std::vector<double> & joints);
+  Result moveTorsoHeadNamed(const std::string & target_name);
+  Result moveTorsoHeadJoints(const std::vector<double> & joints);
   Result movePose(
     ArmGroup group,
     const geometry_msgs::msg::PoseStamped & target,
@@ -89,6 +92,8 @@ public:
 
   MotionHandle moveNamedAsync(ArmGroup group, std::string target_name);
   MotionHandle moveJointsAsync(ArmGroup group, std::vector<double> joints);
+  MotionHandle moveTorsoHeadNamedAsync(std::string target_name);
+  MotionHandle moveTorsoHeadJointsAsync(std::vector<double> joints);
   MotionHandle movePoseAsync(
     ArmGroup group,
     geometry_msgs::msg::PoseStamped target,
@@ -113,6 +118,8 @@ public:
 
   bool cancelActiveMotion();
   SdkStatus status() const;
+  // Returns [waist_pitch, head_yaw, head_pitch] in radians; throws if unavailable.
+  std::vector<double> getTorsoHeadJoints() const;
   RobotState readState() const;
 
 private:

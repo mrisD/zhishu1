@@ -47,10 +47,55 @@ with Commander(default_timeout=60.0) as robot:
     robot.open_gripper(GripperGroup.BOTH).raise_for_error()
 ```
 
+### 头腰部 SDK 示例
+
+先启动包含 `torso_head_controller` 和 Commander bridge 的系统。以下命令使用假硬件，
+不会连接 EtherCAT 电机：
+
+```bash
+ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
+  use_fake_hardware:=true enable_torso_head_hardware:=true \
+  enable_left_arm_hardware:=false enable_right_arm_hardware:=false \
+  enable_commander:=true use_rviz:=false
+```
+
+另开终端并 `source install/setup.bash` 后运行示例。默认仅检查 bridge 是否就绪，
+不发送运动命令：
+
+```bash
+ros2 run zhishu_robot_commander_py torso_head_example
+```
+
+确认目标和工作空间安全后，才显式加 `--execute`。三关节顺序固定为
+`[waist_pitch_joint, head_yaw_joint, head_pitch_joint]`，单位 rad：
+
+```bash
+ros2 run zhishu_robot_commander_py torso_head_example \
+  --execute --joints 0.0 0.05 -0.05
+ros2 run zhishu_robot_commander_py torso_head_example \
+  --execute --named torso_head_origin
+```
+
+应用代码中可直接调用：
+
+```python
+from zhishu_robot_commander_py import Commander
+
+with Commander() as robot:
+    if not robot.wait_until_ready(10.0):
+        raise RuntimeError("Commander bridge 未就绪")
+    robot.move_torso_head_joints([0.0, 0.05, -0.05]).raise_for_error()
+    robot.move_torso_head_named("torso_head_origin").raise_for_error()
+```
+
+最后一段 Python 代码会实际请求运动，不要在未检查真机状态时运行。
+
 ## API
 
 - `move_named()`：命名姿态。
 - `move_joints()`：单臂 7 轴 / 双臂 14 轴，单位 rad。
+- `move_torso_head_joints()`：头腰部 3 轴，顺序为腰俯仰、头偏航、头俯仰，单位 rad。
+- `move_torso_head_named()`：`torso_head` 组的 SRDF 命名目标。
 - `move_pose()` / `move_both_poses()`：Hand link 位姿。
 - `move_tcp_pose()` / `move_both_tcp_poses()`：真实夹爪 TCP 位姿。
 - `move_gripper()` / `move_both_grippers()`：当前 guohua_ws 夹爪位置范围 `[0.0, 0.06]` m。

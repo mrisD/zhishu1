@@ -65,6 +65,24 @@ Result RobotSdk::moveJoints(ArmGroup group, const std::vector<double> & joints)
     });
 }
 
+Result RobotSdk::moveTorsoHeadNamed(const std::string & target_name)
+{
+  return runSynchronous(
+    "torso_head.move_named",
+    [target_name](Commander & commander) {
+      return commander.moveTorsoHeadNamedResult(target_name);
+    });
+}
+
+Result RobotSdk::moveTorsoHeadJoints(const std::vector<double> & joints)
+{
+  return runSynchronous(
+    "torso_head.move_joints",
+    [joints](Commander & commander) {
+      return commander.moveTorsoHeadJointsResult(joints);
+    });
+}
+
 Result RobotSdk::movePose(
   ArmGroup group,
   const geometry_msgs::msg::PoseStamped & target,
@@ -204,6 +222,24 @@ MotionHandle RobotSdk::moveJointsAsync(ArmGroup group, std::vector<double> joint
           return commander.moveBothArmsJointsResult(joints);
       }
       return Result::failure(ErrorCode::kInvalidArgument, "invalid arm group");
+    });
+}
+
+MotionHandle RobotSdk::moveTorsoHeadNamedAsync(std::string target_name)
+{
+  return submit(
+    "torso_head.move_named",
+    [target_name = std::move(target_name)](Commander & commander) {
+      return commander.moveTorsoHeadNamedResult(target_name);
+    });
+}
+
+MotionHandle RobotSdk::moveTorsoHeadJointsAsync(std::vector<double> joints)
+{
+  return submit(
+    "torso_head.move_joints",
+    [joints = std::move(joints)](Commander & commander) {
+      return commander.moveTorsoHeadJointsResult(joints);
     });
 }
 
@@ -361,12 +397,18 @@ SdkStatus RobotSdk::status() const
   return result;
 }
 
+std::vector<double> RobotSdk::getTorsoHeadJoints() const
+{
+  return commander_->getTorsoHeadJoints();
+}
+
 RobotState RobotSdk::readState() const
 {
   RobotState state;
   try {
     state.left_arm_joints = commander_->getLeftArmJoints();
     state.right_arm_joints = commander_->getRightArmJoints();
+    state.torso_head_joints = commander_->getTorsoHeadJoints();
     state.left_gripper_joints = commander_->getLeftGripperJoints();
     state.right_gripper_joints = commander_->getRightGripperJoints();
     state.left_arm_pose = commander_->getLeftArmPose();

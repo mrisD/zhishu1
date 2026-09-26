@@ -5,6 +5,7 @@
 #include <Eigen/Geometry>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <map>
 #include <stdexcept>
@@ -16,6 +17,10 @@ namespace
 {
 constexpr std::size_t kSingleArmJointCount = 7;
 constexpr std::size_t kDualArmJointCount = 14;
+constexpr std::size_t kTorsoHeadJointCount = 3;
+constexpr std::array<const char *, kTorsoHeadJointCount> kTorsoHeadJointNames{
+  "waist_pitch_joint", "head_yaw_joint", "head_pitch_joint"
+};
 constexpr double kGripperMinimum = 0.0;
 // Prismatic master-finger limits from zhishu_robot_description/urdf/gripper.xacro (m).
 constexpr double kGripperMaximum = 0.06;
@@ -81,6 +86,7 @@ void validateOptions(const Commander::Options & options)
     options.left_arm_group,
     options.right_arm_group,
     options.both_arms_group,
+    options.torso_head_group,
     options.left_gripper_group,
     options.right_gripper_group,
     options.both_grippers_group,
@@ -139,6 +145,7 @@ Commander::Commander(const rclcpp::Node::SharedPtr & node, const Options & optio
   left_arm_ = std::make_unique<MoveGroupInterface>(node_, options_.left_arm_group);
   right_arm_ = std::make_unique<MoveGroupInterface>(node_, options_.right_arm_group);
   both_arms_ = std::make_unique<MoveGroupInterface>(node_, options_.both_arms_group);
+  torso_head_ = std::make_unique<MoveGroupInterface>(node_, options_.torso_head_group);
   left_gripper_ = std::make_unique<MoveGroupInterface>(node_, options_.left_gripper_group);
   right_gripper_ = std::make_unique<MoveGroupInterface>(node_, options_.right_gripper_group);
   both_grippers_ = std::make_unique<MoveGroupInterface>(node_, options_.both_grippers_group);
@@ -146,6 +153,7 @@ Commander::Commander(const rclcpp::Node::SharedPtr & node, const Options & optio
   configureMoveGroup(*left_arm_);
   configureMoveGroup(*right_arm_);
   configureMoveGroup(*both_arms_);
+  configureMoveGroup(*torso_head_);
   configureMoveGroup(*left_gripper_);
   configureMoveGroup(*right_gripper_);
   configureMoveGroup(*both_grippers_);
@@ -153,6 +161,7 @@ Commander::Commander(const rclcpp::Node::SharedPtr & node, const Options & optio
   left_arm_->startStateMonitor();
   right_arm_->startStateMonitor();
   both_arms_->startStateMonitor();
+  torso_head_->startStateMonitor();
   left_gripper_->startStateMonitor();
   right_gripper_->startStateMonitor();
   both_grippers_->startStateMonitor();
@@ -183,6 +192,11 @@ bool Commander::moveBothArmsNamed(const std::string & target_name)
   return moveBothArmsNamedResult(target_name).ok();
 }
 
+bool Commander::moveTorsoHeadNamed(const std::string & target_name)
+{
+  return moveTorsoHeadNamedResult(target_name).ok();
+}
+
 bool Commander::moveLeftArmJoints(const std::vector<double> & joints)
 {
   return moveLeftArmJointsResult(joints).ok();
@@ -196,6 +210,11 @@ bool Commander::moveRightArmJoints(const std::vector<double> & joints)
 bool Commander::moveBothArmsJoints(const std::vector<double> & joints)
 {
   return moveBothArmsJointsResult(joints).ok();
+}
+
+bool Commander::moveTorsoHeadJoints(const std::vector<double> & joints)
+{
+  return moveTorsoHeadJointsResult(joints).ok();
 }
 
 bool Commander::moveLeftArmPose(
@@ -306,6 +325,12 @@ Result Commander::moveBothArmsNamedResult(const std::string & target_name)
   return moveNamed(*both_arms_, target_name);
 }
 
+Result Commander::moveTorsoHeadNamedResult(const std::string & target_name)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return moveNamed(*torso_head_, target_name);
+}
+
 Result Commander::moveLeftArmJointsResult(const std::vector<double> & joints)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
@@ -322,6 +347,12 @@ Result Commander::moveBothArmsJointsResult(const std::vector<double> & joints)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
   return moveJoints(*both_arms_, joints, kDualArmJointCount, "both arms");
+}
+
+Result Commander::moveTorsoHeadJointsResult(const std::vector<double> & joints)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  return moveJoints(*torso_head_, joints, kTorsoHeadJointCount, "torso/head");
 }
 
 Result Commander::moveLeftArmPoseResult(
@@ -555,6 +586,21 @@ std::vector<double> Commander::getBothArmsJoints() const
   return both_arms_->getCurrentJointValues();
 }
 
+std::vector<double> Commander::getTorsoHeadJoints() const
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  const auto state = torso_head_->getCurrentState();
+  if (!state) {
+    throw std::runtime_error("current torso/head joint state is unavailable");
+  }
+  std::vector<double> joints;
+  joints.reserve(kTorsoHeadJointCount);
+  for (const auto * name : kTorsoHeadJointNames) {
+    joints.push_back(state->getVariablePosition(name));
+  }
+  return joints;
+}
+
 std::vector<double> Commander::getLeftGripperJoints() const
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
@@ -602,6 +648,7 @@ void Commander::stop()
   left_arm_->stop();
   right_arm_->stop();
   both_arms_->stop();
+  torso_head_->stop();
   left_gripper_->stop();
   right_gripper_->stop();
   both_grippers_->stop();
@@ -614,6 +661,7 @@ void Commander::clearTargets()
   left_arm_->clearPoseTargets();
   right_arm_->clearPoseTargets();
   both_arms_->clearPoseTargets();
+  torso_head_->clearPoseTargets();
 }
 
 Result Commander::moveNamed(MoveGroupInterface & group, const std::string & target_name)
@@ -669,9 +717,12 @@ Result Commander::moveJoints(
     "right_wrist_pitch_joint",
     "right_wrist_roll_joint"
   };
-
   std::map<std::string, double> targets;
-  if (expected_size == kSingleArmJointCount) {
+  if (expected_size == kTorsoHeadJointCount) {
+    for (std::size_t index = 0; index < kTorsoHeadJointNames.size(); ++index) {
+      targets[kTorsoHeadJointNames[index]] = joints[index];
+    }
+  } else if (expected_size == kSingleArmJointCount) {
     const auto & names = label == "left arm" ? left_joint_names : right_joint_names;
     for (std::size_t index = 0; index < names.size(); ++index) {
       targets[names[index]] = joints[index];

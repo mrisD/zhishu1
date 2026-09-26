@@ -60,6 +60,12 @@ public:
       [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
         publishResult("both_arms/joint_command", commander_->moveBothArmsJointsResult(msg->data));
       });
+    torso_head_joint_sub_ = node_->create_subscription<std_msgs::msg::Float64MultiArray>(
+      "~/torso_head/joint_command", 10,
+      [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
+        publishResult(
+          "torso_head/joint_command", commander_->moveTorsoHeadJointsResult(msg->data));
+      });
 
     // Legacy arm-tip pose commands: targets refer to L_hand_link / R_hand_link by default.
     left_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -154,6 +160,10 @@ public:
       "~/both_arms/named_target",
       "both_arms/named_target",
       [this](const std::string & name) {return commander_->moveBothArmsNamedResult(name);});
+    torso_head_named_sub_ = createNamedSubscription(
+      "~/torso_head/named_target",
+      "torso_head/named_target",
+      [this](const std::string & name) {return commander_->moveTorsoHeadNamedResult(name);});
 
     left_gripper_sub_ = node_->create_subscription<std_msgs::msg::Float64>(
       "~/left_gripper/command", 10,
@@ -277,6 +287,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr left_joint_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr right_joint_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr both_joint_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr torso_head_joint_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr left_pose_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr right_pose_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr both_pose_sub_;
@@ -290,6 +301,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr left_named_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr right_named_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr both_named_sub_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr torso_head_named_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr left_gripper_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr right_gripper_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr both_grippers_sub_;
