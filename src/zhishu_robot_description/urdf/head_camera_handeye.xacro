@@ -1,46 +1,75 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:include filename="$(find zhishu_robot_description)/urdf/handeye_target_pattern.xacro"/>
-  <!-- Add the REP-103 optical frame and, in simulation, the RGB sensor used
-       by MoveIt Calibration.  Gazebo cameras look along camera_link +X; this
-       fixed rotation exposes the conventional optical +Z-forward frame. -->
+  <!-- Add the REP-103 optical frame and, in simulation, an RGB-D sensor with
+       the same aligned color/depth geometry used by the Gemini Pro driver.
+       Gazebo cameras look along camera_link +X; this fixed rotation exposes
+       the conventional optical +Z-forward frame. -->
   <xacro:macro name="head_camera_sensor" params="enabled">
     <link name="head_camera_optical_frame"/>
-    <joint name="head_camera_optical_joint" type="fixed">
-      <parent link="head_camera_link"/>
-      <child link="head_camera_optical_frame"/>
-      <origin xyz="0 0 0" rpy="-${pi / 2} 0 -${pi / 2}"/>
-    </joint>
+    <xacro:if value="${enabled}">
+      <!-- Simulation-only overhead bracket.  The real robot keeps the
+           calibrated head_camera_link transform below; Gazebo instead places
+           the same Gemini topic/frame contract above the work surface so the
+           complete RGB-D grasp pipeline is deterministic.  Gazebo cameras
+           look along +X, and +pi/2 about Y maps +X to world -Z. -->
+      <link name="head_camera_sim_mount"/>
+      <joint name="head_camera_sim_mount_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="head_camera_sim_mount"/>
+        <origin xyz="0.62 0 1.75" rpy="0 ${pi / 2} 0"/>
+      </joint>
+      <joint name="head_camera_optical_joint" type="fixed">
+        <parent link="head_camera_sim_mount"/>
+        <child link="head_camera_optical_frame"/>
+        <origin xyz="0 0 0" rpy="-${pi / 2} 0 -${pi / 2}"/>
+      </joint>
+    </xacro:if>
+    <xacro:unless value="${enabled}">
+      <joint name="head_camera_optical_joint" type="fixed">
+        <parent link="head_camera_link"/>
+        <child link="head_camera_optical_frame"/>
+        <origin xyz="0 0 0" rpy="-${pi / 2} 0 -${pi / 2}"/>
+      </joint>
+    </xacro:unless>
 
     <!-- Keep a coincident, read-only simulation truth frame.  The MoveIt
          HandEye RViz panel intentionally publishes its current camera-pose
          guess on head_camera_optical_frame, so that public calibration frame
          cannot also be used as an independent ground-truth reference. -->
     <link name="head_camera_optical_truth"/>
-    <joint name="head_camera_optical_truth_joint" type="fixed">
-      <parent link="head_camera_link"/>
-      <child link="head_camera_optical_truth"/>
-      <origin xyz="0 0 0" rpy="-${pi / 2} 0 -${pi / 2}"/>
-    </joint>
+    <xacro:if value="${enabled}">
+      <joint name="head_camera_optical_truth_joint" type="fixed">
+        <parent link="head_camera_sim_mount"/>
+        <child link="head_camera_optical_truth"/>
+        <origin xyz="0 0 0" rpy="-${pi / 2} 0 -${pi / 2}"/>
+      </joint>
+    </xacro:if>
+    <xacro:unless value="${enabled}">
+      <joint name="head_camera_optical_truth_joint" type="fixed">
+        <parent link="head_camera_link"/>
+        <child link="head_camera_optical_truth"/>
+        <origin xyz="0 0 0" rpy="-${pi / 2} 0 -${pi / 2}"/>
+      </joint>
+    </xacro:unless>
 
     <xacro:if value="${enabled}">
-      <gazebo reference="head_camera_link">
-        <sensor name="head_handeye_camera" type="camera">
+      <gazebo reference="head_camera_sim_mount">
+        <sensor name="head_gemini_pro_rgbd" type="rgbd_camera">
           <always_on>true</always_on>
-          <update_rate>20</update_rate>
+          <update_rate>30</update_rate>
           <visualize>true</visualize>
-          <topic>/camera_head/color/image_raw</topic>
+          <!-- Gazebo appends /image, /depth_image, /points and /camera_info.
+               ros_gz_bridge remaps these onto the real Orbbec topic names. -->
+          <topic>/camera_head/rgbd</topic>
           <frame_id>head_camera_optical_frame</frame_id>
-          <camera name="head_handeye_camera">
-            <camera_info_topic>/camera_head/camera_info</camera_info_topic>
+          <camera name="head_gemini_pro_rgbd">
             <optical_frame_id>head_camera_optical_frame</optical_frame_id>
-            <horizontal_fov>1.0471975512</horizontal_fov>
+            <!-- Closely matches the calibrated 640x480 Gemini Pro RGB K. -->
+            <horizontal_fov>1.233</horizontal_fov>
             <image>
-              <!-- The real 22 mm markers are much smaller than the previous
-                   60 mm GridBoard markers.  Use enough pixels for reliable
-                   ChArUco corner interpolation in the headless renderer. -->
-              <width>1280</width>
-              <height>960</height>
+              <width>640</width>
+              <height>480</height>
               <format>R8G8B8</format>
             </image>
             <clip>
@@ -52,6 +81,12 @@
               <mean>0.0</mean>
               <stddev>0.0005</stddev>
             </noise>
+            <depth_camera>
+              <clip>
+                <near>0.10</near>
+                <far>4.0</far>
+              </clip>
+            </depth_camera>
           </camera>
         </sensor>
       </gazebo>

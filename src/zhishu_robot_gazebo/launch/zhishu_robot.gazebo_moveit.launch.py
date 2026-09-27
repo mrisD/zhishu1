@@ -20,6 +20,7 @@ def generate_launch_description():
     use_head_camera = LaunchConfiguration("use_head_camera")
     hide_head_pitch_visual = LaunchConfiguration("hide_head_pitch_visual")
     handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
+    bottle_grasp_sim_enabled = LaunchConfiguration("bottle_grasp_sim_enabled")
     initial_positions_file = LaunchConfiguration("initial_positions_file")
     managed_move_group_shutdown = LaunchConfiguration("managed_move_group_shutdown")
     managed_gazebo_shutdown = LaunchConfiguration("managed_gazebo_shutdown")
@@ -42,6 +43,7 @@ def generate_launch_description():
         .robot_description(
             mappings={
                 "handeye_target_enabled": handeye_target_enabled,
+                "bottle_grasp_sim_enabled": bottle_grasp_sim_enabled,
                 "use_head_camera": use_head_camera,
                 "hide_head_pitch_visual": hide_head_pitch_visual,
             }
@@ -66,6 +68,7 @@ def generate_launch_description():
             "use_head_camera": use_head_camera,
             "hide_head_pitch_visual": hide_head_pitch_visual,
             "handeye_target_enabled": handeye_target_enabled,
+            "bottle_grasp_sim_enabled": bottle_grasp_sim_enabled,
             "initial_positions_file": initial_positions_file,
             "managed_gazebo_shutdown": managed_gazebo_shutdown,
             "use_left_arm_controller": use_left_arm_controller,
@@ -167,6 +170,11 @@ def generate_launch_description():
                 "handeye_target_enabled",
                 default_value="false",
                 description="Replace the rendered left gripper with the flange-mounted hand-eye target",
+            ),
+            DeclareLaunchArgument(
+                "bottle_grasp_sim_enabled",
+                default_value="false",
+                description="Enable simulation-only bottle attach support",
             ),
             DeclareLaunchArgument(
                 "initial_positions_file",

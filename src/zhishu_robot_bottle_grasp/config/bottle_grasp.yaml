@@ -1,0 +1,25 @@
+bottle_perception:
+  ros__parameters:
+    use_sim_time: true
+    image_topic: /camera_head/color/image_raw
+    depth_topic: /camera_head/depth/image_raw
+    camera_info_topic: /camera_head/color/camera_info
+    target_frame: base_link
+    detector_backend: yolo
+    yolo_weights: yolo26n-seg.pt
+    yolo_device: cpu
+    confidence: 0.30
+    minimum_mask_area: 250
+    minimum_points: 80
+    point_stride: 2
+    minimum_depth: 0.10
+    maximum_depth: 4.0
+    mask_erode_pixels: 2
+    table_ring_pixels: 28
+    sync_queue_size: 8
+    sync_slop: 0.07
+    tracker_alpha: 0.65
+    tracker_beta: 0.12
+    tracker_max_gap: 0.8
+    prediction_horizon: 0.45
+    minimum_track_observations: 3

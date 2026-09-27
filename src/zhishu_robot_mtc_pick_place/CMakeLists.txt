@@ -23,6 +23,7 @@ find_package(moveit_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
@@ -105,7 +106,24 @@ ament_target_dependencies(dual_arm_crate_carry
   visualization_msgs
 )
 
-install(TARGETS alternative_path_costs mtc_task_node dual_arm_crate_carry
+add_executable(moving_bottle_grasp src/moving_bottle_grasp.cpp)
+target_include_directories(moving_bottle_grasp BEFORE PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/compat_include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(moving_bottle_grasp
+  rclcpp
+  moveit_ros_planning_interface
+  moveit_msgs
+  geometry_msgs
+  shape_msgs
+  std_msgs
+  std_srvs
+  tf2
+)
+
+install(TARGETS alternative_path_costs mtc_task_node dual_arm_crate_carry moving_bottle_grasp
   DESTINATION lib/${PROJECT_NAME}
 )
 install (

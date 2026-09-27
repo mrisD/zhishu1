@@ -12,6 +12,7 @@
     <xacro:arg name="use_head_camera" default="false" />
     <xacro:arg name="hide_head_pitch_visual" default="false" />
     <xacro:arg name="handeye_target_enabled" default="false" />
+    <xacro:arg name="bottle_grasp_sim_enabled" default="false" />
 
     <!-- Import zhishu_robot urdf file -->
     <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot.urdf.xacro" />
@@ -77,6 +78,19 @@
                 <hold_joints>true</hold_joints>
                 <position_proportional_gain>1.0</position_proportional_gain>
             </plugin>
+            <xacro:if value="$(arg bottle_grasp_sim_enabled)">
+                <!-- Contact determines closure timing; this simulation-only
+                     joint prevents numerical slip during the lift. -->
+                <plugin filename="gz-sim-detachable-joint-system"
+                        name="gz::sim::systems::DetachableJoint">
+                    <parent_link>gripper_base_link</parent_link>
+                    <child_model>bottle</child_model>
+                    <child_link>bottle_link</child_link>
+                    <detach_topic>/bottle_grasp/detach</detach_topic>
+                    <attach_topic>/bottle_grasp/attach</attach_topic>
+                    <output_topic>/bottle_grasp/attached</output_topic>
+                </plugin>
+            </xacro:if>
         </gazebo>
     </xacro:if>
 </robot>

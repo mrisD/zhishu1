@@ -75,6 +75,7 @@ def generate_launch_description():
     use_head_camera = LaunchConfiguration('use_head_camera')
     hide_head_pitch_visual = LaunchConfiguration('hide_head_pitch_visual')
     handeye_target_enabled = LaunchConfiguration('handeye_target_enabled')
+    bottle_grasp_sim_enabled = LaunchConfiguration('bottle_grasp_sim_enabled')
     managed_gazebo_shutdown = LaunchConfiguration('managed_gazebo_shutdown')
     robot_description = ParameterValue(
         Command([
@@ -84,6 +85,7 @@ def generate_launch_description():
             ' use_head_camera:=', use_head_camera,
             ' hide_head_pitch_visual:=', hide_head_pitch_visual,
             ' handeye_target_enabled:=', handeye_target_enabled,
+            ' bottle_grasp_sim_enabled:=', bottle_grasp_sim_enabled,
         ]),
         value_type=str,
     )
@@ -190,6 +192,11 @@ def generate_launch_description():
         name='handeye_target_enabled',
         default_value='false',
         description='Replace the rendered left gripper with the flange-mounted ChArUco target')
+
+    declare_bottle_grasp_sim_enabled_cmd = DeclareLaunchArgument(
+        name='bottle_grasp_sim_enabled',
+        default_value='false',
+        description='Enable the detachable joint used by bottle grasp simulation')
 
     declare_managed_gazebo_shutdown_cmd = DeclareLaunchArgument(
         name='managed_gazebo_shutdown',
@@ -455,6 +462,7 @@ def generate_launch_description():
     ld.add_action(declare_use_head_camera_cmd)
     ld.add_action(declare_hide_head_pitch_visual_cmd)
     ld.add_action(declare_handeye_target_enabled_cmd)
+    ld.add_action(declare_bottle_grasp_sim_enabled_cmd)
     ld.add_action(declare_managed_gazebo_shutdown_cmd)
     ld.add_action(declare_use_gazebo_cmd)
     ld.add_action(declare_use_rviz_cmd)
