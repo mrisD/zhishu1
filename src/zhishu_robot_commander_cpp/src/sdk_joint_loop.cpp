@@ -323,21 +323,28 @@ int main(int argc, char ** argv)
   int exit_code = 0;
   constexpr std::int64_t default_loop_count = 0;
   constexpr const char * sequence_description =
-    "prepare_all_zero(unrecorded)->[configured_joint_pose->all_zero_return]";
-  const std::vector<double> all_zero(14, 0.0);
+    "prepare_return_pose(unrecorded)->[configured_joint_pose->return_pose]";
   const auto left_pose_degrees = getOrDeclareParameter<std::vector<double>>(
     node, "left_target_joints",
     {-15.0, -13.0, -24.0, 20.0, 32.0, -27.0, 19.0});
   const auto right_pose_degrees = getOrDeclareParameter<std::vector<double>>(
     node, "right_target_joints",
     {15.0, 13.0, 24.0, 20.0, -32.0, 0.0, 19.0});
+  const auto right_return_degrees = getOrDeclareParameter<std::vector<double>>(
+    node, "right_return_joints", {30.0, 15.0, 0.0, 0.0, 0.0, 0.0, 0.0});
   std::vector<double> both_pose = degreesToRadians(left_pose_degrees);
   const auto right_pose_radians = degreesToRadians(right_pose_degrees);
   both_pose.insert(both_pose.end(), right_pose_radians.begin(), right_pose_radians.end());
-  const MotionTarget preparation_target{"prepare_all_zero", all_zero};
+  // Both-arm ordering is left 7 axes followed by right 7 axes. Keep the
+  // left arm at zero while the right arm uses its configured return pose.
+  std::vector<double> return_pose(7, 0.0);
+  const auto right_return_radians = degreesToRadians(right_return_degrees);
+  return_pose.insert(
+    return_pose.end(), right_return_radians.begin(), right_return_radians.end());
+  const MotionTarget preparation_target{"prepare_return_pose", return_pose};
   const std::array<MotionTarget, 2> targets{{
     {"configured_joint_pose", both_pose},
-    {"all_zero_return", all_zero},
+    {"return_pose", return_pose},
   }};
   TestStatistics statistics;
   std::unique_ptr<zhishu_robot_commander_cpp::StabilityPdoRecording> pdo_recording;
@@ -377,11 +384,15 @@ int main(int argc, char ** argv)
         static_cast<long>(pdo_record_cycles), pdo_service_timeout_sec);
       statistics.stop_reason = "invalid_parameter";
       exit_code = 2;
-    } else if (left_pose_degrees.size() != 7U || right_pose_degrees.size() != 7U) {
+    } else if (
+      left_pose_degrees.size() != 7U || right_pose_degrees.size() != 7U ||
+      right_return_degrees.size() != 7U)
+    {
       RCLCPP_ERROR(
         node->get_logger(),
-        "left_target_joints and right_target_joints must each contain 7 values; got %zu and %zu",
-        left_pose_degrees.size(), right_pose_degrees.size());
+        "left_target_joints, right_target_joints, and right_return_joints must each "
+        "contain 7 values; got %zu, %zu, and %zu",
+        left_pose_degrees.size(), right_pose_degrees.size(), right_return_degrees.size());
       statistics.stop_reason = "invalid_parameter";
       exit_code = 2;
     } else {
@@ -398,7 +409,7 @@ int main(int argc, char ** argv)
       } else {
         RCLCPP_INFO(
           node->get_logger(),
-          "[STABILITY][PREP_START] moving both arms to all-zero before PDO recording");
+          "[STABILITY][PREP_START] moving both arms to return pose before PDO recording");
         const auto preparation = executeMotion(
           node, robot, preparation_target, 0, 1);
         bool preparation_ok = false;
@@ -415,11 +426,11 @@ int main(int argc, char ** argv)
           exit_code = 1;
           RCLCPP_ERROR(
             node->get_logger(),
-            "[STABILITY][PREP_FAIL] all-zero preparation failed; PDO recording will not start");
+            "[STABILITY][PREP_FAIL] return-pose preparation failed; PDO recording will not start");
         } else {
           RCLCPP_INFO(
             node->get_logger(),
-            "[STABILITY][PREP_OK] both arms are at all-zero; settling for %.3f s before "
+            "[STABILITY][PREP_OK] both arms are at return pose; settling for %.3f s before "
             "PDO recording",
             interval_sec);
           preparation_ok = interruptibleSleep(interval_sec);

@@ -78,7 +78,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "loop_count",
                 default_value="0",
-                description="Number of all-zero -> configured pose -> all-zero cycles; 0 loops forever",
+                description="Number of return pose -> configured pose -> return pose cycles; 0 loops forever",
             ),
             DeclareLaunchArgument(
                 "interval_sec",

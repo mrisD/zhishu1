@@ -388,7 +388,9 @@ ros2 launch zhishu_robot_commander_cpp sdk_named_pose_loop.launch.py \
 ```
 
 Joint/EtherCAT 循环直接发送 14 轴 joint target，默认目标位于
-`config/joint_ethercat_loop.yaml`：
+`config/joint_ethercat_loop.yaml`。其中 `right_return_joints` 是右臂的
+预备位和循环返回位，按右臂 7 轴顺序以角度配置，默认
+`[30, 15, 0, 0, 0, 0, 0]`；左臂预备位和返回位仍为全零：
 
 ```bash
 ros2 launch zhishu_robot_commander_cpp sdk_joint_ethercat_loop.launch.py \
@@ -399,9 +401,10 @@ ros2 launch zhishu_robot_commander_cpp sdk_joint_ethercat_loop.launch.py \
 任一动作失败立即停止。Ctrl+C 会请求取消当前 MoveIt 动作后退出。真机运行前必须先核对
 目标关节角、碰撞环境和急停/STO 状态。
 
-真机模式先在不记录 PDO 的情况下将双臂移动到全零位并等待 `interval_sec`，随后同步开启
-左右臂 PDO 记录。正式循环的每一轮只包含“全零位 → 配置目标 → 全零位”，默认在第二轮
-完整结束后停止，因此 CSV 严格覆盖两个完整往返，不包含启动时当前位置回零的半周期。
+真机模式先在不记录 PDO 的情况下移动到返回位（左臂全零，右臂第 1 轴 30°、第 2 轴 15°）
+并等待 `interval_sec`，随后同步开启左右臂 PDO 记录。正式循环的每一轮包含
+“返回位 → 配置目标 → 返回位”，默认在第二轮完整结束后停止，因此 CSV 严格覆盖
+两个完整往返，不包含启动时当前位置到返回位的预备运动。
 可用 `pdo_record_cycles` 增加记录轮数，或显式关闭记录：
 
 ```bash
@@ -412,8 +415,11 @@ ros2 launch zhishu_robot_commander_cpp sdk_joint_ethercat_loop.launch.py \
   loop_count:=10 record_pdo_diagnostics:=false
 ```
 
-当任一臂记录服务无法启动时，真机稳定性程序不会发送运动目标；若只有一侧启动成功，
-程序会自动回滚，避免左右 CSV 对应不同的运动时间窗。仿真模式会自动跳过 PDO 服务。
+当任一臂记录服务无法启动时，程序不会进入正式循环，但启动预备运动已经执行；
+若只有一侧启动成功，程序会自动回滚，避免左右 CSV 对应不同的运动时间窗。
+当前左右臂混合 mock/真机时只存在真机侧的 PDO 服务，不能开启双臂同步 PDO
+记录；`record_pdo_diagnostics:=false` 仅关闭录制，不会禁止预备和循环运动。
+两臂均为 mock 且设置 `use_fake_hardware:=true` 时会自动跳过 PDO 服务。
 记录完成后可运行：
 
 ```bash
