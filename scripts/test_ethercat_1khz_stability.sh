@@ -42,7 +42,9 @@ echo "Starting communication-only mode; motors remain Operation Disabled and no 
 set +e
 timeout --signal=INT --kill-after=10 "${duration_s}s" \
   ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
-  use_fake_hardware:=false use_rviz:=false enable_motors_on_activate:=false \
+  left_arm_use_fake_hardware:=false right_arm_use_fake_hardware:=false \
+  torso_head_use_fake_hardware:=false use_rviz:=false \
+  enable_motors_on_activate:=false \
   2>&1 | tee "${run_log}"
 launch_rc=${PIPESTATUS[0]}
 set -e

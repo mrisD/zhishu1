@@ -69,7 +69,9 @@ def _configure_native_log_directory(context):
 
 def generate_launch_description():
     session_started_at = datetime.now().strftime("%H-%M-%S")
-    use_fake_hardware = LaunchConfiguration("use_fake_hardware")
+    left_arm_use_fake_hardware = LaunchConfiguration("left_arm_use_fake_hardware")
+    right_arm_use_fake_hardware = LaunchConfiguration("right_arm_use_fake_hardware")
+    torso_head_use_fake_hardware = LaunchConfiguration("torso_head_use_fake_hardware")
     enable_left_arm_hardware = LaunchConfiguration("enable_left_arm_hardware")
     enable_right_arm_hardware = LaunchConfiguration("enable_right_arm_hardware")
     enable_torso_head_hardware = LaunchConfiguration("enable_torso_head_hardware")
@@ -139,7 +141,9 @@ def generate_launch_description():
             file_path="config/zhishu_robot.urdf.xacro",
             mappings={
                 "use_gazebo": "false",
-                "use_fake_hardware": use_fake_hardware,
+                "left_arm_use_fake_hardware": left_arm_use_fake_hardware,
+                "right_arm_use_fake_hardware": right_arm_use_fake_hardware,
+                "torso_head_use_fake_hardware": torso_head_use_fake_hardware,
                 "enable_left_arm_hardware": enable_left_arm_hardware,
                 "enable_right_arm_hardware": enable_right_arm_hardware,
                 "enable_torso_head_hardware": enable_torso_head_hardware,
@@ -368,9 +372,19 @@ def generate_launch_description():
     return LaunchDescription([
         # Hardware mode and components
         DeclareLaunchArgument(
-            "use_fake_hardware",
+            "left_arm_use_fake_hardware",
             default_value="true",
-            description="Use mock joints instead of EtherCAT hardware",
+            description="Left arm mode: true=mock, false=EtherCAT",
+        ),
+        DeclareLaunchArgument(
+            "right_arm_use_fake_hardware",
+            default_value="true",
+            description="Right arm mode: true=mock, false=EtherCAT",
+        ),
+        DeclareLaunchArgument(
+            "torso_head_use_fake_hardware",
+            default_value="true",
+            description="Torso/head mode: true=mock, false=EtherCAT",
         ),
         DeclareLaunchArgument(
             "enable_left_arm_hardware",

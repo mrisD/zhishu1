@@ -64,7 +64,7 @@ MotionHandle moveTorsoHeadJointsAsync(std::vector<double> joints);
 
 ```bash
 ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
-  use_fake_hardware:=true enable_torso_head_hardware:=true \
+  torso_head_use_fake_hardware:=true enable_torso_head_hardware:=true \
   enable_left_arm_hardware:=false enable_right_arm_hardware:=false \
   enable_commander:=true use_rviz:=false
 ```
@@ -122,12 +122,14 @@ source install/setup.bash
 
 ```bash
 ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
-  use_fake_hardware:=true use_rviz:=true \
+  use_rviz:=true \
   enable_kernel_ethercat_log:=false
 ```
 
-再启动 Commander。`use_fake_hardware` 和 `enable_motors_on_activate` 必须与
-bringup 保持一致：
+再启动 Commander。独立 Commander 启动文件仍有自己的
+`use_fake_hardware` 参数；它和 `enable_motors_on_activate` 必须与
+bringup 的机器人描述保持一致。混合 mock/真机模式建议直接在主 bringup 中
+设置 `enable_commander:=true`，以复用相同的机器人描述：
 
 ```bash
 ros2 launch zhishu_robot_commander_cpp commander.launch.py \

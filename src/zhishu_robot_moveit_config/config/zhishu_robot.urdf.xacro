@@ -3,6 +3,9 @@
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
     <xacro:arg name="use_gazebo" default="false" />
     <xacro:arg name="use_fake_hardware" default="true" />
+    <xacro:arg name="left_arm_use_fake_hardware" default="$(arg use_fake_hardware)" />
+    <xacro:arg name="right_arm_use_fake_hardware" default="$(arg use_fake_hardware)" />
+    <xacro:arg name="torso_head_use_fake_hardware" default="$(arg use_fake_hardware)" />
     <xacro:arg name="enable_left_arm_hardware" default="true" />
     <xacro:arg name="enable_right_arm_hardware" default="true" />
     <xacro:arg name="enable_torso_head_hardware" default="false" />
@@ -31,7 +34,7 @@
                 <xacro:zhishu_robot_left_arm_ros2_control
                     name="LeftArmSystem"
                     initial_positions_file="$(arg initial_positions_file)"
-                    use_fake_hardware="$(arg use_fake_hardware)"
+                    use_fake_hardware="$(arg left_arm_use_fake_hardware)"
                     enable_motors_on_activate="$(arg enable_motors_on_activate)"
                     pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"
                     include_torso_head_state_joints="false"/>
@@ -40,7 +43,7 @@
                 <xacro:zhishu_robot_left_arm_ros2_control
                     name="LeftArmSystem"
                     initial_positions_file="$(arg initial_positions_file)"
-                    use_fake_hardware="$(arg use_fake_hardware)"
+                    use_fake_hardware="$(arg left_arm_use_fake_hardware)"
                     enable_motors_on_activate="$(arg enable_motors_on_activate)"
                     pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"
                     include_torso_head_state_joints="true"/>
@@ -51,7 +54,7 @@
             <xacro:zhishu_robot_right_arm_ros2_control
                 name="RightArmSystem"
                 initial_positions_file="$(arg initial_positions_file)"
-                use_fake_hardware="$(arg use_fake_hardware)"
+                use_fake_hardware="$(arg right_arm_use_fake_hardware)"
                 enable_motors_on_activate="$(arg enable_motors_on_activate)"
                 pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
         </xacro:if>
@@ -60,7 +63,7 @@
             <xacro:zhishu_robot_torso_head_ros2_control
                 name="TorsoHeadSystem"
                 initial_positions_file="$(arg initial_positions_file)"
-                use_fake_hardware="$(arg use_fake_hardware)"
+                use_fake_hardware="$(arg torso_head_use_fake_hardware)"
                 enable_motors_on_activate="$(arg torso_head_enable_motors_on_activate)"
                 pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
         </xacro:if>

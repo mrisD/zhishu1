@@ -21,7 +21,9 @@ def generate_launch_description():
     handeye_share = get_package_share_directory("zhishu_robot_handeye_calibration")
     camera_share = handeye_share
 
-    use_fake_hardware = LaunchConfiguration("use_fake_hardware")
+    left_arm_use_fake_hardware = LaunchConfiguration("left_arm_use_fake_hardware")
+    right_arm_use_fake_hardware = LaunchConfiguration("right_arm_use_fake_hardware")
+    torso_head_use_fake_hardware = LaunchConfiguration("torso_head_use_fake_hardware")
     enable_left_arm_hardware = LaunchConfiguration("enable_left_arm_hardware")
     enable_right_arm_hardware = LaunchConfiguration("enable_right_arm_hardware")
     enable_torso_head_hardware = LaunchConfiguration("enable_torso_head_hardware")
@@ -41,7 +43,9 @@ def generate_launch_description():
             os.path.join(bringup_share, "launch", "zhishu_robot.moveit.launch.py")
         ),
         launch_arguments={
-            "use_fake_hardware": use_fake_hardware,
+            "left_arm_use_fake_hardware": left_arm_use_fake_hardware,
+            "right_arm_use_fake_hardware": right_arm_use_fake_hardware,
+            "torso_head_use_fake_hardware": torso_head_use_fake_hardware,
             "enable_left_arm_hardware": enable_left_arm_hardware,
             "enable_right_arm_hardware": enable_right_arm_hardware,
             "enable_torso_head_hardware": enable_torso_head_hardware,
@@ -106,9 +110,19 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument(
-                "use_fake_hardware",
+                "left_arm_use_fake_hardware",
                 default_value="false",
-                description="Use mock hardware; set false only for a verified real robot",
+                description="Left arm mode: true=mock, false=EtherCAT",
+            ),
+            DeclareLaunchArgument(
+                "right_arm_use_fake_hardware",
+                default_value="false",
+                description="Right arm mode: true=mock, false=EtherCAT",
+            ),
+            DeclareLaunchArgument(
+                "torso_head_use_fake_hardware",
+                default_value="false",
+                description="Torso/head mode: true=mock, false=EtherCAT",
             ),
             DeclareLaunchArgument("enable_left_arm_hardware", default_value="true"),
             DeclareLaunchArgument("enable_right_arm_hardware", default_value="false"),
@@ -117,8 +131,8 @@ def generate_launch_description():
                 "enable_motors_on_activate",
                 default_value="true",
                 description=(
-                    "Keep arm drives disabled by default; explicitly set true only "
-                    "after the real robot pose and collision checks pass"
+                    "Enable real arm drives on activation; set false for "
+                    "communication-only checks before motion is verified"
                 ),
             ),
             DeclareLaunchArgument(

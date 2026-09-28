@@ -22,8 +22,9 @@ MoveIt Task Constructor、EtherCAT 真机控制，以及 Meta Quest 3S 双手柄
 - 不要同时启动会争用相同关节的控制器。
 - Quest 手柄按键不是实体急停，不能替代硬件安全回路。
 
-以下命令中，`use_fake_hardware:=true` 只用于安全测试；真机使用
-`use_fake_hardware:=false`。
+主 MoveIt 启动用 `left_arm_use_fake_hardware`、`right_arm_use_fake_hardware`
+和 `torso_head_use_fake_hardware` 分别选择 mock 或真机；其他独立启动文件的
+`use_fake_hardware` 参数仍按各自文档使用。
 
 ## 2. 安装依赖
 
@@ -240,22 +241,42 @@ sudo usermod -aG realtime "$USER"
 
 ```bash
 ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
-  use_fake_hardware:=false use_rviz:=true
+  left_arm_use_fake_hardware:=false right_arm_use_fake_hardware:=false \
+  torso_head_use_fake_hardware:=false use_rviz:=true
 ```
 
 SSH/headless 环境：
 
 ```bash
 ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
-  use_fake_hardware:=false use_rviz:=false
+  left_arm_use_fake_hardware:=false right_arm_use_fake_hardware:=false \
+  torso_head_use_fake_hardware:=false use_rviz:=false
 ```
 
 在连接电机前，可先用 mock hardware 验证 launch：
 
 ```bash
 ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
-  use_fake_hardware:=true use_rviz:=false
+  use_rviz:=false
 ```
+
+左右臂与头腰部可以分别选择 ros2_control mock 或 EtherCAT 真机。
+三个 `*_use_fake_hardware` 参数在主 MoveIt 启动中默认均为 `true`（mock）。
+`enable_left_arm_hardware` / `enable_right_arm_hardware` 只决定是否加载该组件。
+例如左臂 mock、右臂真机（头腰部不加载）：
+
+```bash
+ros2 launch zhishu_robot_bringup zhishu_robot.moveit.launch.py \
+  left_arm_use_fake_hardware:=true right_arm_use_fake_hardware:=false \
+  enable_torso_head_hardware:=false enable_motors_on_activate:=false
+```
+
+反过来可设 `left_arm_use_fake_hardware:=false right_arm_use_fake_hardware:=true`。
+这里的 mock 只模拟关节状态和命令，不是 Gazebo 物理仿真。手眼标定启动文件
+`zhishu_robot.handeye.launch.py` 也接受这三个独立参数，默认均为 `false`
+（真机）；其右臂默认不加载，如需控制右臂需另设
+`enable_right_arm_hardware:=true`。真机首次验证建议保持
+`enable_motors_on_activate:=false`，确认硬件状态后再启用电机。
 
 真机启动后检查：
 
