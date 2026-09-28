@@ -1,0 +1,32 @@
+initial_positions:
+  # Repeatable 10 cm setup: box bottom and support top at z=0.10 m,
+  # box height 0.20 m, center x=0.42 m.
+  # At x=0.32 m, the box bottom would overlap the base collision box;
+  # shifting 0.10 m forward leaves 36 mm nominal clearance at the back edge.
+  # Waist pitch is at its URDF lower limit (forward/downward bend).
+  left_gripper_left_finger_joint: 0.0
+  gripper_left_finger_joint: 0.0
+  waist_up_down_joint: 0.0
+  waist_pitch_joint: -0.7854
+  head_yaw_joint: 0.0
+  head_pitch_joint: 0.0
+  left_wheel_joint: 0.0
+  right_wheel_joint: 0.0
+
+  # MoveIt IK solutions for the side-rim grasp TCPs, shifted 0.101012 m down
+  # from the settled low_box grasp, with the same end-effector orientations.
+  left_shoulder_pitch_joint: -1.07893399
+  left_shoulder_roll_joint: -0.18204842
+  left_shoulder_yaw_joint: 1.54936430
+  left_elbow_pitch_joint: 0.48305031
+  left_wrist_yaw_joint: 1.49997177
+  left_wrist_pitch_joint: -0.28908769
+  left_wrist_roll_joint: 0.31469355
+
+  right_shoulder_pitch_joint: 1.07899879
+  right_shoulder_roll_joint: 0.18198080
+  right_shoulder_yaw_joint: -1.55049903
+  right_elbow_pitch_joint: 0.48297035
+  right_wrist_yaw_joint: -1.49964341
+  right_wrist_pitch_joint: -0.29140959
+  right_wrist_roll_joint: -0.31415825

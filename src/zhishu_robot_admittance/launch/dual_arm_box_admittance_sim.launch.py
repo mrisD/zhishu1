@@ -60,11 +60,14 @@ def _build_launch_description(scenario):
     if scenario == "low_box":
         initial_positions_file = "box_low_admittance_initial_positions.yaml"
         world_file = "dual_arm_box_low_admittance.sdf"
+    elif scenario == "ground10":
+        initial_positions_file = "box_ground10_admittance_initial_positions.yaml"
+        world_file = "dual_arm_box_ground10_admittance.sdf"
     elif scenario == "reference":
         initial_positions_file = "box_admittance_initial_positions.yaml"
         world_file = "dual_arm_box_admittance.sdf"
     else:
-        raise ValueError("scenario must be 'reference' or 'low_box'")
+        raise ValueError("scenario must be 'reference', 'low_box', or 'ground10'")
     initial_positions = os.path.join(package_share, "config", initial_positions_file)
 
     moveit_config = (
@@ -390,8 +393,8 @@ def _build_launch_description(scenario):
             ),
             DeclareLaunchArgument(
                 "gripper_position",
-                default_value="0.055" if scenario == "low_box" else "0.050",
-                description="Finger joint target; low_box closes to the 10 mm wall",
+                default_value="0.055" if scenario in ("low_box", "ground10") else "0.050",
+                description="Finger joint target; low_box and ground10 close to the 10 mm wall",
             ),
             DeclareLaunchArgument(
                 "grasp_duration",
@@ -424,7 +427,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "scenario",
                 default_value="reference",
-                description="reference or low_box (box bottom 0.20 m, height 0.20 m)",
+                description="reference, low_box (bottom 0.20 m), or ground10 (bottom 0.10 m)",
             ),
             OpaqueFunction(function=_launch_for_scenario),
         ]

@@ -1,0 +1,119 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="admittance_box">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics">
+      <engine>
+        <filename>gz-physics-bullet-featherstone-plugin</filename>
+      </engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-forcetorque-system" name="gz::sim::systems::ForceTorque"/>
+
+    <gravity>0 0 -9.81</gravity>
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <scene>
+      <ambient>0.45 0.45 0.45 1</ambient>
+      <background>0.72 0.80 0.90 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <light type="directional" name="sun">
+      <pose>0 0 8 0 0 0</pose>
+      <direction>-0.4 0.2 -0.9</direction>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+          <material><ambient>0.62 0.62 0.62 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- The tabletop top is at z=0.10 m, supporting the box bottom at the same height. -->
+    <model name="box_support_table">
+      <static>true</static>
+      <pose>0.42 0 0.075 0 0 0</pose>
+      <link name="top">
+        <collision name="collision">
+          <geometry><box><size>0.10 0.20 0.05</size></box></geometry>
+          <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.10 0.20 0.05</size></box></geometry>
+          <material><ambient>0.30 0.32 0.35 1</ambient><diffuse>0.38 0.40 0.44 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="carry_box">
+      <!-- External dimensions: 0.30 x 0.40 x 0.20 m; bottom z=0.10 m, center z=0.20 m. -->
+      <pose>0.42 0 0.20 0 0 0</pose>
+      <allow_auto_disable>false</allow_auto_disable>
+      <link name="box_link">
+        <inertial>
+          <!-- 1.5 kg uniform-density composite of the five 10 mm shell primitives. -->
+          <pose>0 0 -0.0267125 0 0 0</pose>
+          <mass>1.5</mass>
+          <inertia>
+            <ixx>0.0367517</ixx><iyy>0.0253304</iyy><izz>0.0494145</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <!-- Five matching visual/collision primitives form an open-top 10 mm shell.
+             The bottom spans z=-0.100..-0.090 m; the walls span z=-0.090..0.100 m,
+             so their lower faces meet the bottom top face without a gap or overlap.
+             The side walls meet the front/rear walls at their vertical edges. -->
+        <collision name="bottom_collision">
+          <pose>0 0 -0.095 0 0 0</pose>
+          <geometry><box><size>0.30 0.40 0.01</size></box></geometry>
+          <surface>
+            <friction><ode><mu>1.5</mu><mu2>1.5</mu2></ode></friction>
+            <contact><ode><kp>50000</kp><kd>200</kd><max_vel>0.02</max_vel><min_depth>0.0005</min_depth></ode></contact>
+          </surface>
+        </collision>
+        <collision name="left_wall_collision">
+          <pose>0 0.195 0.005 0 0 0</pose>
+          <geometry><box><size>0.30 0.01 0.19</size></box></geometry>
+          <surface><friction><ode><mu>1.5</mu><mu2>1.5</mu2></ode></friction><contact><ode><kp>50000</kp><kd>200</kd><max_vel>0.02</max_vel><min_depth>0.0005</min_depth></ode></contact></surface>
+        </collision>
+        <collision name="right_wall_collision">
+          <pose>0 -0.195 0.005 0 0 0</pose>
+          <geometry><box><size>0.30 0.01 0.19</size></box></geometry>
+          <surface><friction><ode><mu>1.5</mu><mu2>1.5</mu2></ode></friction><contact><ode><kp>50000</kp><kd>200</kd><max_vel>0.02</max_vel><min_depth>0.0005</min_depth></ode></contact></surface>
+        </collision>
+        <collision name="front_wall_collision">
+          <pose>0.145 0 0.005 0 0 0</pose>
+          <geometry><box><size>0.01 0.38 0.19</size></box></geometry>
+          <surface><friction><ode><mu>1.5</mu><mu2>1.5</mu2></ode></friction><contact><ode><kp>50000</kp><kd>200</kd><max_vel>0.02</max_vel><min_depth>0.0005</min_depth></ode></contact></surface>
+        </collision>
+        <collision name="rear_wall_collision">
+          <pose>-0.145 0 0.005 0 0 0</pose>
+          <geometry><box><size>0.01 0.38 0.19</size></box></geometry>
+          <surface><friction><ode><mu>1.5</mu><mu2>1.5</mu2></ode></friction><contact><ode><kp>50000</kp><kd>200</kd><max_vel>0.02</max_vel><min_depth>0.0005</min_depth></ode></contact></surface>
+        </collision>
+
+        <visual name="bottom_visual"><pose>0 0 -0.095 0 0 0</pose><geometry><box><size>0.30 0.40 0.01</size></box></geometry><material><ambient>0.32 0.34 0.36 1</ambient><diffuse>0.55 0.58 0.60 1</diffuse></material></visual>
+        <visual name="left_wall_visual"><pose>0 0.195 0.005 0 0 0</pose><geometry><box><size>0.30 0.01 0.19</size></box></geometry><material><ambient>0.32 0.34 0.36 1</ambient><diffuse>0.55 0.58 0.60 1</diffuse></material></visual>
+        <visual name="right_wall_visual"><pose>0 -0.195 0.005 0 0 0</pose><geometry><box><size>0.30 0.01 0.19</size></box></geometry><material><ambient>0.32 0.34 0.36 1</ambient><diffuse>0.55 0.58 0.60 1</diffuse></material></visual>
+        <visual name="front_wall_visual"><pose>0.145 0 0.005 0 0 0</pose><geometry><box><size>0.01 0.38 0.19</size></box></geometry><material><ambient>0.32 0.34 0.36 1</ambient><diffuse>0.55 0.58 0.60 1</diffuse></material></visual>
+        <visual name="rear_wall_visual"><pose>-0.145 0 0.005 0 0 0</pose><geometry><box><size>0.01 0.38 0.19</size></box></geometry><material><ambient>0.32 0.34 0.36 1</ambient><diffuse>0.55 0.58 0.60 1</diffuse></material></visual>
+      </link>
+    </model>
+  </world>
+</sdf>
