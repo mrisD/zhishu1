@@ -76,6 +76,7 @@ def generate_launch_description():
     hide_head_pitch_visual = LaunchConfiguration('hide_head_pitch_visual')
     handeye_target_enabled = LaunchConfiguration('handeye_target_enabled')
     bottle_grasp_sim_enabled = LaunchConfiguration('bottle_grasp_sim_enabled')
+    mobile_base_sim_enabled = LaunchConfiguration('mobile_base_sim_enabled')
     managed_gazebo_shutdown = LaunchConfiguration('managed_gazebo_shutdown')
     robot_description = ParameterValue(
         Command([
@@ -86,6 +87,7 @@ def generate_launch_description():
             ' hide_head_pitch_visual:=', hide_head_pitch_visual,
             ' handeye_target_enabled:=', handeye_target_enabled,
             ' bottle_grasp_sim_enabled:=', bottle_grasp_sim_enabled,
+            ' mobile_base_sim_enabled:=', mobile_base_sim_enabled,
         ]),
         value_type=str,
     )
@@ -118,6 +120,7 @@ def generate_launch_description():
     roll = LaunchConfiguration('roll')
     pitch = LaunchConfiguration('pitch')
     yaw = LaunchConfiguration('yaw')
+    allow_renaming = LaunchConfiguration('allow_renaming')
 
     # Declare the launch arguments
     declare_robot_name_cmd = DeclareLaunchArgument(
@@ -198,6 +201,11 @@ def generate_launch_description():
         default_value='false',
         description='Enable the detachable joint used by bottle grasp simulation')
 
+    declare_mobile_base_sim_enabled_cmd = DeclareLaunchArgument(
+        name='mobile_base_sim_enabled',
+        default_value='false',
+        description='Enable the Gazebo DiffDrive plugin and /cmd_vel /odom /tf topics')
+
     declare_managed_gazebo_shutdown_cmd = DeclareLaunchArgument(
         name='managed_gazebo_shutdown',
         default_value='false',
@@ -258,6 +266,13 @@ def generate_launch_description():
         name='yaw',
         default_value='0.0',
         description='yaw angle of initial orientation, radians')
+
+    declare_allow_renaming_cmd = DeclareLaunchArgument(
+        name='allow_renaming',
+        default_value='true',
+        description=(
+            'Allow Gazebo to append a suffix when the model name already exists. '
+            'Transfer runs disable this so /cmd_vel always controls the intended robot.'))
 
     # Publish the same Jazzy/Gazebo-ready URDF that is spawned below.
     robot_state_publisher_cmd = Node(
@@ -435,7 +450,7 @@ def generate_launch_description():
         arguments=[
             '-topic', '/robot_description',
             '-name', robot_name,
-            '-allow_renaming', 'true',
+            '-allow_renaming', allow_renaming,
             '-x', x,
             '-y', y,
             '-z', z,
@@ -463,6 +478,7 @@ def generate_launch_description():
     ld.add_action(declare_hide_head_pitch_visual_cmd)
     ld.add_action(declare_handeye_target_enabled_cmd)
     ld.add_action(declare_bottle_grasp_sim_enabled_cmd)
+    ld.add_action(declare_mobile_base_sim_enabled_cmd)
     ld.add_action(declare_managed_gazebo_shutdown_cmd)
     ld.add_action(declare_use_gazebo_cmd)
     ld.add_action(declare_use_rviz_cmd)
@@ -478,6 +494,7 @@ def generate_launch_description():
     ld.add_action(declare_roll_cmd)
     ld.add_action(declare_pitch_cmd)
     ld.add_action(declare_yaw_cmd)
+    ld.add_action(declare_allow_renaming_cmd)
 
     # Add the actions to the launch description
     ld.add_action(set_env_vars_model_resources)

@@ -21,6 +21,8 @@ find_package(moveit_ros_planning REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
@@ -106,6 +108,34 @@ ament_target_dependencies(dual_arm_crate_carry
   visualization_msgs
 )
 
+
+add_executable(pallet_bin_15kg_transfer src/pallet_bin_15kg_transfer.cpp)
+target_include_directories(pallet_bin_15kg_transfer BEFORE PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/compat_include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(pallet_bin_15kg_transfer
+  rclcpp
+  rcpputils
+  moveit_task_constructor_core
+  moveit_task_constructor_msgs
+  moveit_ros_planning_interface
+  moveit_ros_planning
+  moveit_core
+  moveit_msgs
+  geometry_msgs
+  nav_msgs
+  trajectory_msgs
+  shape_msgs
+  std_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  tf2_eigen
+  visualization_msgs
+)
+
 add_executable(moving_bottle_grasp src/moving_bottle_grasp.cpp)
 target_include_directories(moving_bottle_grasp BEFORE PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/compat_include>
@@ -123,7 +153,7 @@ ament_target_dependencies(moving_bottle_grasp
   tf2
 )
 
-install(TARGETS alternative_path_costs mtc_task_node dual_arm_crate_carry moving_bottle_grasp
+install(TARGETS alternative_path_costs mtc_task_node dual_arm_crate_carry pallet_bin_15kg_transfer moving_bottle_grasp
   DESTINATION lib/${PROJECT_NAME}
 )
 install (

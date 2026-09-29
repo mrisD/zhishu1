@@ -21,10 +21,18 @@ def generate_launch_description():
     hide_head_pitch_visual = LaunchConfiguration("hide_head_pitch_visual")
     handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
     bottle_grasp_sim_enabled = LaunchConfiguration("bottle_grasp_sim_enabled")
+    mobile_base_sim_enabled = LaunchConfiguration("mobile_base_sim_enabled")
     initial_positions_file = LaunchConfiguration("initial_positions_file")
     managed_move_group_shutdown = LaunchConfiguration("managed_move_group_shutdown")
     managed_gazebo_shutdown = LaunchConfiguration("managed_gazebo_shutdown")
     use_left_arm_controller = LaunchConfiguration("use_left_arm_controller")
+    x = LaunchConfiguration("x")
+    y = LaunchConfiguration("y")
+    z = LaunchConfiguration("z")
+    roll = LaunchConfiguration("roll")
+    pitch = LaunchConfiguration("pitch")
+    yaw = LaunchConfiguration("yaw")
+    allow_renaming = LaunchConfiguration("allow_renaming")
 
     gazebo_share = FindPackageShare("zhishu_robot_gazebo").find(
         "zhishu_robot_gazebo"
@@ -44,6 +52,7 @@ def generate_launch_description():
             mappings={
                 "handeye_target_enabled": handeye_target_enabled,
                 "bottle_grasp_sim_enabled": bottle_grasp_sim_enabled,
+                "mobile_base_sim_enabled": mobile_base_sim_enabled,
                 "use_head_camera": use_head_camera,
                 "hide_head_pitch_visual": hide_head_pitch_visual,
             }
@@ -69,9 +78,17 @@ def generate_launch_description():
             "hide_head_pitch_visual": hide_head_pitch_visual,
             "handeye_target_enabled": handeye_target_enabled,
             "bottle_grasp_sim_enabled": bottle_grasp_sim_enabled,
+            "mobile_base_sim_enabled": mobile_base_sim_enabled,
             "initial_positions_file": initial_positions_file,
             "managed_gazebo_shutdown": managed_gazebo_shutdown,
             "use_left_arm_controller": use_left_arm_controller,
+            "x": x,
+            "y": y,
+            "z": z,
+            "roll": roll,
+            "pitch": pitch,
+            "yaw": yaw,
+            "allow_renaming": allow_renaming,
         }.items(),
     )
 
@@ -82,7 +99,13 @@ def generate_launch_description():
         parameters=[
             moveit_config.to_dict(),
             move_group_common_params,
-            {"use_sim_time": True},
+            {
+                "use_sim_time": True,
+                # Required by MoveIt Task Constructor task.execute().  Loading
+                # the capability is harmless for normal RViz planning and avoids
+                # starting a second move_group for pallet-transfer simulation.
+                "capabilities": "move_group/ExecuteTaskSolutionCapability",
+            },
         ],
         condition=UnlessCondition(managed_move_group_shutdown),
     )
@@ -102,7 +125,10 @@ def generate_launch_description():
         parameters=[
             moveit_config.to_dict(),
             move_group_common_params,
-            {"use_sim_time": True},
+            {
+                "use_sim_time": True,
+                "capabilities": "move_group/ExecuteTaskSolutionCapability",
+            },
         ],
         condition=IfCondition(managed_move_group_shutdown),
     )
@@ -177,6 +203,11 @@ def generate_launch_description():
                 description="Enable simulation-only bottle attach support",
             ),
             DeclareLaunchArgument(
+                "mobile_base_sim_enabled",
+                default_value="false",
+                description="Enable Gazebo DiffDrive for the robot base",
+            ),
+            DeclareLaunchArgument(
                 "initial_positions_file",
                 default_value=os.path.join(
                     moveit_share, "config", "initial_positions.yaml"
@@ -200,6 +231,17 @@ def generate_launch_description():
                     "Use left_arm_controller instead of dual_arm_controller "
                     "for left-arm-only execution"
                 ),
+            ),
+            DeclareLaunchArgument("x", default_value="0.0"),
+            DeclareLaunchArgument("y", default_value="0.0"),
+            DeclareLaunchArgument("z", default_value="0.0858"),
+            DeclareLaunchArgument("roll", default_value="0.0"),
+            DeclareLaunchArgument("pitch", default_value="0.0"),
+            DeclareLaunchArgument("yaw", default_value="0.0"),
+            DeclareLaunchArgument(
+                "allow_renaming",
+                default_value="true",
+                description="Pass model-name collision policy to Gazebo spawn",
             ),
             gazebo,
             start_visualization,

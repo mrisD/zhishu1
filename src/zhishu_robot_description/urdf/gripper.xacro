@@ -6,12 +6,14 @@
          corresponding ros2_control command interfaces are omitted from SDF. -->
     <xacro:macro name="gripper_finger_inertial">
         <inertial>
-            <origin xyz="0 0 0.10" rpy="0 0 0"/>
+            <!-- 275 mm fingers reach the lower edge of the tote handle when
+                 the TCP stays in the arm's reachable upper hook pose. -->
+            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
             <mass value="0.1"/>
             <inertia
-                ixx="0.000363333" ixy="0.0" ixz="0.0"
-                iyy="0.000336667" iyz="0.0"
-                izz="0.000033333"/>
+                ixx="0.000660208" ixy="0.0" ixz="0.0"
+                iyy="0.000631042" iyz="0.0"
+                izz="0.000036667"/>
         </inertial>
     </xacro:macro>
 
@@ -35,16 +37,16 @@
         <xacro:gripper_finger_inertial/>
         <visual>
             <geometry>
-                <box size="0.02 0.06 0.20"/>
+                <box size="0.02 0.06 0.275"/>
             </geometry>
-            <origin xyz="0 0 0.10" rpy="0 0 0"/>
+            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
             <material name="light_green"/>
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.06 0.20"/>
+                <box size="0.02 0.06 0.275"/>
             </geometry>
-            <origin xyz="0 0 0.10" rpy="0 0 0"/>
+            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
         </collision>
     </link>
 
@@ -52,16 +54,34 @@
         <xacro:gripper_finger_inertial/>
         <visual>
             <geometry>
-                <box size="0.02 0.06 0.20"/>
+                <box size="0.02 0.06 0.275"/>
             </geometry>
-            <origin xyz="0 0 0.10" rpy="0 0 0"/>
+            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
             <material name="light_green"/>
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.06 0.20"/>
+                <box size="0.02 0.06 0.275"/>
             </geometry>
-            <origin xyz="0 0 0.10" rpy="0 0 0"/>
+            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+        </collision>
+        <!-- Broad low hook pad on the inner/right finger.  The vertical finger
+             reaches the aperture's lower edge; this pad provides a positive
+             bearing surface behind the real handle rail during the pull. -->
+        <visual>
+            <geometry>
+                <box size="0.06 0.12 0.02"/>
+            </geometry>
+            <!-- Shift inward from the right finger's +X joint offset so the
+                 pad actually overlaps the tote's 120 mm handle rail. -->
+            <origin xyz="-0.115 -0.04 0.238" rpy="0 0 0"/>
+            <material name="light_green"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.06 0.12 0.02"/>
+            </geometry>
+            <origin xyz="-0.115 -0.04 0.238" rpy="0 0 0"/>
         </collision>
     </link>
 
@@ -70,7 +90,10 @@
         <child link="gripper_left_finger_link"/>
         <origin xyz="-0.07 0 0.02" rpy="0 0 0"/>
         <axis xyz="1 0 0"/>
-        <limit effort="1000.0" velocity="1.0" lower="0.0" upper="0.06"/>
+        <!-- Allow a small state-estimation/controller settling margin around
+             the physical 60 mm stroke; the close command still targets the
+             real 0..60 mm range. -->
+        <limit effort="1000.0" velocity="1.0" lower="-0.01" upper="0.07"/>
     </joint>
 
     <joint name="gripper_right_finger_joint" type="prismatic">
@@ -79,7 +102,7 @@
         <origin xyz="0.07 0 0.02" rpy="0 0 0"/>
         <axis xyz="1 0 0"/>
         <mimic joint="gripper_left_finger_joint" multiplier="-1.0"/>
-        <limit effort="1000.0" velocity="1.0" lower="-0.06" upper="0.0"/>
+        <limit effort="1000.0" velocity="1.0" lower="-0.07" upper="0.01"/>
     </joint>
 
     <link name="right_gripper_tcp"/>
@@ -116,16 +139,16 @@
         <xacro:unless value="$(arg handeye_target_enabled)">
             <visual>
                 <geometry>
-                    <box size="0.02 0.06 0.20"/>
+                    <box size="0.02 0.06 0.275"/>
                 </geometry>
-                <origin xyz="0 0 0.10" rpy="0 0 0"/>
+                <origin xyz="0 0 0.1375" rpy="0 0 0"/>
                 <material name="light_green"/>
             </visual>
             <collision>
                 <geometry>
-                    <box size="0.02 0.06 0.20"/>
+                    <box size="0.02 0.06 0.275"/>
                 </geometry>
-                <origin xyz="0 0 0.10" rpy="0 0 0"/>
+                <origin xyz="0 0 0.1375" rpy="0 0 0"/>
             </collision>
         </xacro:unless>
     </link>
@@ -135,16 +158,16 @@
         <xacro:unless value="$(arg handeye_target_enabled)">
             <visual>
                 <geometry>
-                    <box size="0.02 0.06 0.20"/>
+                    <box size="0.02 0.06 0.275"/>
                 </geometry>
-                <origin xyz="0 0 0.10" rpy="0 0 0"/>
+                <origin xyz="0 0 0.1375" rpy="0 0 0"/>
                 <material name="light_green"/>
             </visual>
             <collision>
                 <geometry>
-                    <box size="0.02 0.06 0.20"/>
+                    <box size="0.02 0.06 0.275"/>
                 </geometry>
-                <origin xyz="0 0 0.10" rpy="0 0 0"/>
+                <origin xyz="0 0 0.1375" rpy="0 0 0"/>
             </collision>
         </xacro:unless>
     </link>
@@ -154,7 +177,7 @@
         <child link="left_gripper_left_finger_link"/>
         <origin xyz="-0.07 0 0.02" rpy="0 0 0"/>
         <axis xyz="1 0 0"/>
-        <limit effort="1000.0" velocity="1.0" lower="0.0" upper="0.06"/>
+        <limit effort="1000.0" velocity="1.0" lower="-0.01" upper="0.07"/>
     </joint>
 
     <joint name="left_gripper_right_finger_joint" type="prismatic">
@@ -163,7 +186,7 @@
         <origin xyz="0.07 0 0.02" rpy="0 0 0"/>
         <axis xyz="1 0 0"/>
         <mimic joint="left_gripper_left_finger_joint" multiplier="-1.0"/>
-        <limit effort="1000.0" velocity="1.0" lower="-0.06" upper="0.0"/>
+        <limit effort="1000.0" velocity="1.0" lower="-0.07" upper="0.01"/>
     </joint>
 
     <link name="left_gripper_tcp"/>

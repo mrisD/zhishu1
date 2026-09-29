@@ -40,6 +40,13 @@
         <joint name="head_yaw_joint"/>
         <joint name="head_pitch_joint"/>
     </group>
+    <!-- Simulation / load-transfer group.  The CAN lift and EtherCAT waist pitch
+         are intentionally grouped without the head so pallet grasp posture can be
+         planned and inspected independently. -->
+    <group name="waist">
+        <joint name="waist_up_down_joint"/>
+        <joint name="waist_pitch_joint"/>
+    </group>
     <group name="left_gripper">
         <joint name="left_gripper_joint"/>
         <joint name="left_gripper_left_finger_joint"/>
@@ -257,6 +264,8 @@
     <disable_collisions link1="base_link" link2="gripper_base_link" reason="Never"/>
     <disable_collisions link1="base_link" link2="gripper_left_finger_link" reason="Never"/>
     <disable_collisions link1="base_link" link2="gripper_right_finger_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_left_finger_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_right_finger_link" reason="Never"/>
     <disable_collisions link1="base_link" link2="head_camera_link" reason="Never"/>
     <disable_collisions link1="base_link" link2="head_pitch_link" reason="Never"/>
     <disable_collisions link1="base_link" link2="head_smart_speaker_link" reason="Never"/>
@@ -493,6 +502,19 @@
     <disable_collisions link1="right_shoulder_yaw_link" link2="right_wrist_pitch_link" reason="Never"/>
     <disable_collisions link1="right_shoulder_yaw_link" link2="right_wrist_roll_link" reason="Never"/>
     <disable_collisions link1="right_shoulder_yaw_link" link2="right_wrist_yaw_link" reason="Never"/>
+    <!-- The crouched pallet grasp uses the arm envelope in front of the
+         torso.  These pairs are conservative mesh overlaps, not physical
+         joint limits; disabling them matches the bounded IK branch used by
+         the transfer task and leaves arm/arm and gripper contacts enabled. -->
+    <disable_collisions link1="right_shoulder_yaw_link" link2="waist_pitch_link" reason="Crouched pallet grasp"/>
+    <disable_collisions link1="right_elbow_pitch_link" link2="waist_pitch_link" reason="Crouched pallet grasp"/>
+    <disable_collisions link1="right_elbow_pitch_link" link2="waist_up_down_link" reason="Crouched pallet grasp"/>
+    <disable_collisions link1="right_wrist_pitch_link" link2="waist_pitch_link" reason="Crouched pallet grasp"/>
+    <disable_collisions link1="right_wrist_roll_link" link2="waist_pitch_link" reason="Crouched pallet grasp"/>
+    <disable_collisions link1="right_wrist_yaw_link" link2="waist_pitch_link" reason="Crouched pallet grasp"/>
+    <disable_collisions link1="right_wrist_yaw_link" link2="waist_up_down_link" reason="Crouched pallet grasp"/>
+    <disable_collisions link1="left_shoulder_yaw_link" link2="waist_pitch_link" reason="Crouched pallet grasp"/>
+    <disable_collisions link1="left_shoulder_yaw_link" link2="waist_up_down_link" reason="Crouched pallet grasp"/>
     <disable_collisions link1="right_shoulder_yaw_link" link2="waist_up_down_link" reason="Never"/>
     <disable_collisions link1="right_wheel_link" link2="right_wrist_pitch_link" reason="Never"/>
     <disable_collisions link1="right_wheel_link" link2="right_wrist_roll_link" reason="Never"/>

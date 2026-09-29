@@ -16,6 +16,7 @@
     <xacro:arg name="hide_head_pitch_visual" default="false" />
     <xacro:arg name="handeye_target_enabled" default="false" />
     <xacro:arg name="bottle_grasp_sim_enabled" default="false" />
+    <xacro:arg name="mobile_base_sim_enabled" default="false" />
 
     <!-- Import zhishu_robot urdf file -->
     <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot.urdf.xacro" />
@@ -81,6 +82,38 @@
                 <hold_joints>true</hold_joints>
                 <position_proportional_gain>1.0</position_proportional_gain>
             </plugin>
+            <xacro:if value="$(arg mobile_base_sim_enabled)">
+                <!-- Simulation-only mobile base. The wheel joints are state-only in
+                     gz_ros2_control, so DiffDrive is the sole wheel command writer. -->
+                <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+                    <left_joint>left_wheel_joint</left_joint>
+                    <right_joint>right_wheel_joint</right_joint>
+                    <wheel_separation>0.35</wheel_separation>
+                    <wheel_radius>0.0858</wheel_radius>
+                    <topic>/cmd_vel</topic>
+                    <odom_topic>/odom</odom_topic>
+                    <tf_topic>/tf</tf_topic>
+                    <frame_id>odom</frame_id>
+                    <child_frame_id>base_footprint</child_frame_id>
+                    <odom_publish_frequency>50</odom_publish_frequency>
+                </plugin>
+            </xacro:if>
+            <!-- Extraction runs start already aligned with r0_c0.  Add
+                 wheel damping/contact friction so arm reaction forces do not
+                 roll the chassis away from the 20 cm station while the hook
+                 trajectory is executing. -->
+            <gazebo reference="left_wheel_link">
+                <mu1>8.0</mu1>
+                <mu2>8.0</mu2>
+                <kp>1000000.0</kp>
+                <kd>100.0</kd>
+            </gazebo>
+            <gazebo reference="right_wheel_link">
+                <mu1>8.0</mu1>
+                <mu2>8.0</mu2>
+                <kp>1000000.0</kp>
+                <kd>100.0</kd>
+            </gazebo>
             <xacro:if value="$(arg bottle_grasp_sim_enabled)">
                 <!-- Contact determines closure timing; this simulation-only
                      joint prevents numerical slip during the lift. -->

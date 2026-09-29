@@ -4,9 +4,14 @@ moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControll
 
 moveit_simple_controller_manager:
   controller_names:
-    - left_arm_controller
+    # Gazebo pallet-transfer launches the single 14-DOF controller.  Do not
+    # advertise the optional standalone arm controller here: MoveIt would
+    # select it for a left-arm subset trajectory even though it is inactive,
+    # aborting an otherwise valid dual-arm execution.
+    # - left_arm_controller
     # - right_arm_controller
     - dual_arm_controller
+    - body_posture_controller
     - torso_head_controller
     - left_gripper_controller
     - right_gripper_controller
@@ -54,6 +59,16 @@ moveit_simple_controller_manager:
       - right_wrist_yaw_joint
       - right_wrist_pitch_joint
       - right_wrist_roll_joint
+
+  body_posture_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: false
+    joints:
+      - waist_up_down_joint
+      - waist_pitch_joint
+      - head_yaw_joint
+      - head_pitch_joint
 
   torso_head_controller:
     type: FollowJointTrajectory
