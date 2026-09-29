@@ -154,7 +154,7 @@ body_posture_controller:
       - position
     state_interfaces:
       - position
-    # Allows MoveIt to execute the two-joint `waist` group while preserving
+    # Allows MoveIt to execute the single-joint `waist` group while preserving
     # the current head joints.  The pallet-transfer node still sends all four
     # joints explicitly for deterministic simulation behaviour.
     allow_partial_joints_goal: true

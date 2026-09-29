@@ -40,12 +40,10 @@
         <joint name="head_yaw_joint"/>
         <joint name="head_pitch_joint"/>
     </group>
-    <!-- Simulation / load-transfer group.  The CAN lift and EtherCAT waist pitch
-         are intentionally grouped without the head so pallet grasp posture can be
-         planned and inspected independently. -->
+    <!-- Simulation / load-transfer group. Keep this group limited to the CAN lift;
+         waist_pitch_joint remains available through the torso_head group. -->
     <group name="waist">
         <joint name="waist_up_down_joint"/>
-        <joint name="waist_pitch_joint"/>
     </group>
     <group name="left_gripper">
         <joint name="left_gripper_joint"/>
