@@ -430,6 +430,33 @@ ros2 launch zhishu_robot_receiving_sim receiving_demo.launch.py
 手动启动、故障注入参数及限制见 `src/zhishu_robot_receiving_sim/README.md`。完成编译后
 也可以运行 `bash scripts/test_receiving_workflow_sim.sh` 做一键黑盒验收。
 
+### 7.9 15 kg 小料箱预抽出与双臂转运验证
+
+`zhishu_robot_mtc_pick_place` 已支持在托盘前约 0.20 m、箱体相邻间隙约 2–4 mm
+的条件下，先从外围箱真实提手孔斜向钩拉预抽出，再重新定位并双臂抓取 15 kg
+小料箱，最后放入桌面高度 0.55 m 的大料箱。完整验证方案、参数、日志证据和限制见：
+
+[`docs/pallet_bin_15kg_transfer_validation_20260929.md`](docs/pallet_bin_15kg_transfer_validation_20260929.md)
+
+无界面完整验证命令：
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ROS_DOMAIN_ID=225 GZ_PARTITION=codex_pallet_final225 \
+ros2 launch zhishu_robot_mtc_pick_place pallet_bin_15kg_transfer.launch.py \
+  headless:=true use_rviz:=false execute:=true \
+  full_transfer_box_index:=0 pre_extract_enabled:=true \
+  skip_pre_extract_stage:=false pre_extract_distance:=0.12 \
+  handle_z_offset:=0.22 pregrasp_clearance:=0.04 \
+  source_grasp_x:=0.45 source_grasp_y:=-0.68 \
+  grasp_waist_pitch:=-0.70
+```
+
+2026-09-29 的 headless 回归已通过：预抽出、双臂抓取、桌下停靠、放入大料箱、
+夹爪释放和回零均执行成功。若 `/pallet_bin/target_pose` 没有视觉消息，仿真会使用
+按预抽出距离计算的 Gazebo 位移作为回退；真实部署前仍需接入 RGB-D 重定位节点。
+
 ## 8. Meta Quest 3S 双臂遥操作
 
 Quest 遥操作使用左右独立控制器：
