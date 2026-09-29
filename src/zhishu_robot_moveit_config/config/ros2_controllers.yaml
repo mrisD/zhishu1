@@ -52,7 +52,20 @@ left_arm_controller:
       - position
     state_interfaces:
       - position
+      - velocity
     interpolate_from_desired_state: false
+    set_last_command_interface_value_as_state_on_activation: false
+    action_monitor_rate: 50.0
+    constraints:
+      goal_time: 1.0
+      stopped_velocity_tolerance: 0.05
+      left_shoulder_pitch_joint: {trajectory: 0.10, goal: 0.04}
+      left_shoulder_roll_joint:  {trajectory: 0.10, goal: 0.04}
+      left_shoulder_yaw_joint:   {trajectory: 0.08, goal: 0.03}
+      left_elbow_pitch_joint:    {trajectory: 0.08, goal: 0.03}
+      left_wrist_yaw_joint:      {trajectory: 0.08, goal: 0.03}
+      left_wrist_pitch_joint:    {trajectory: 0.08, goal: 0.03}
+      left_wrist_roll_joint:     {trajectory: 0.08, goal: 0.03}
 
 right_arm_controller:
   ros__parameters:
@@ -68,7 +81,20 @@ right_arm_controller:
       - position
     state_interfaces:
       - position
+      - velocity
     interpolate_from_desired_state: false
+    set_last_command_interface_value_as_state_on_activation: false
+    action_monitor_rate: 50.0
+    constraints:
+      goal_time: 1.0
+      stopped_velocity_tolerance: 0.05
+      right_shoulder_pitch_joint: {trajectory: 0.10, goal: 0.04}
+      right_shoulder_roll_joint:  {trajectory: 0.10, goal: 0.04}
+      right_shoulder_yaw_joint:   {trajectory: 0.08, goal: 0.03}
+      right_elbow_pitch_joint:    {trajectory: 0.08, goal: 0.03}
+      right_wrist_yaw_joint:      {trajectory: 0.08, goal: 0.03}
+      right_wrist_pitch_joint:    {trajectory: 0.08, goal: 0.03}
+      right_wrist_roll_joint:     {trajectory: 0.08, goal: 0.03}
 
 
 dual_arm_controller:
@@ -92,9 +118,30 @@ dual_arm_controller:
       - position
     state_interfaces:
       - position
+      - velocity
     allow_partial_joints_goal: true
     interpolate_from_desired_state: false
     set_last_command_interface_value_as_state_on_activation: false
+    action_monitor_rate: 50.0
+    constraints:
+      # A zero/default trajectory tolerance disables checking. Explicit values
+      # are required so a stalled joint aborts instead of reporting SUCCESS.
+      goal_time: 1.0
+      stopped_velocity_tolerance: 0.05
+      left_shoulder_pitch_joint:  {trajectory: 0.10, goal: 0.04}
+      left_shoulder_roll_joint:   {trajectory: 0.10, goal: 0.04}
+      left_shoulder_yaw_joint:    {trajectory: 0.08, goal: 0.03}
+      left_elbow_pitch_joint:     {trajectory: 0.08, goal: 0.03}
+      left_wrist_yaw_joint:       {trajectory: 0.08, goal: 0.03}
+      left_wrist_pitch_joint:     {trajectory: 0.08, goal: 0.03}
+      left_wrist_roll_joint:      {trajectory: 0.08, goal: 0.03}
+      right_shoulder_pitch_joint: {trajectory: 0.10, goal: 0.04}
+      right_shoulder_roll_joint:  {trajectory: 0.10, goal: 0.04}
+      right_shoulder_yaw_joint:   {trajectory: 0.08, goal: 0.03}
+      right_elbow_pitch_joint:    {trajectory: 0.08, goal: 0.03}
+      right_wrist_yaw_joint:      {trajectory: 0.08, goal: 0.03}
+      right_wrist_pitch_joint:    {trajectory: 0.08, goal: 0.03}
+      right_wrist_roll_joint:     {trajectory: 0.08, goal: 0.03}
 
 body_posture_controller:
   ros__parameters:

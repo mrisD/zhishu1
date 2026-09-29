@@ -32,6 +32,14 @@
                 <!-- In CSP mode the 1 kHz ros2_control target is already limited;
                      forward it directly instead of applying a second software profile. -->
                 <param name="csp_direct_position_commands">true</param>
+                <!-- Prevent a stalled/heavily-loaded joint from accumulating a large
+                     CSP position error and then violently catching up. A tracking
+                     violation holds measured position while keeping servo power on. -->
+                <param name="tracking_error_hold_enabled">true</param>
+                <param name="tracking_error_threshold_rad">0.12</param>
+                <param name="tracking_error_hard_limit_rad">0.25</param>
+                <param name="tracking_error_timeout_ms">150.0</param>
+                <param name="tracking_error_rearm_threshold_rad">0.04</param>
                 <!-- On-demand 1 kHz PDO capture uses a lock-free ring and a
                      non-realtime CSV writer. 16384 cycles tolerate a 16 s disk stall. -->
                 <param name="pdo_diagnostics_buffer_cycles">16384</param>

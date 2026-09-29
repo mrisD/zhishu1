@@ -201,6 +201,8 @@ struct MotorContext
   std::atomic<int32_t> actual_counts{0};
   std::atomic<int32_t> actual_velocity_raw{0};
   std::atomic<int16_t> actual_torque_raw{0};
+  std::atomic<int16_t> actual_current_raw{0};
+  std::atomic<int32_t> following_error_actual_counts{0};
   std::atomic<int32_t> command_counts{0};
   std::atomic<uint16_t> statusword{0};
   std::atomic<uint16_t> error_code{0};
@@ -843,6 +845,8 @@ private:
     state.actual_counts = motor.actual_counts.load();
     state.actual_velocity_raw = motor.actual_velocity_raw.load();
     state.actual_torque_raw = motor.actual_torque_raw.load();
+    state.actual_current_raw = motor.actual_current_raw.load();
+    state.following_error_actual_counts = motor.following_error_actual_counts.load();
     state.command_counts = motor.command_counts.load();
     state.goal_counts = motor.goal_counts.load();
     state.goal_update_sequence =
@@ -1506,6 +1510,8 @@ private:
         motor->actual_counts.store(actual);
         motor->actual_velocity_raw.store(actual_velocity);
         motor->actual_torque_raw.store(actual_torque);
+        motor->actual_current_raw.store(actual_current);
+        motor->following_error_actual_counts.store(following_error_actual);
         motor->statusword.store(sw);
         motor->cia402_state.store(static_cast<int>(state));
         motor->operation_enabled.store(op_enabled);

@@ -192,6 +192,7 @@ hardware_interface::CallbackReturn LeftEsMotorHardwareInterface::
   velocity_raw_cache_.assign(info_.joints.size(), 0.0);
   torque_raw_cache_.assign(info_.joints.size(), 0.0);
   command_cache_.assign(info_.joints.size(), 0.0);
+  tracking_error_elapsed_s_.assign(info_.joints.size(), 0.0);
   position_state_handles_.assign(info_.joints.size(), nullptr);
   velocity_state_handles_.assign(info_.joints.size(), nullptr);
   effort_state_handles_.assign(info_.joints.size(), nullptr);
@@ -345,6 +346,38 @@ bool LeftEsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
       "joint_limit_snap_tolerance_rad");
     if (joint_limit_snap_tolerance_rad_ < 0.0) {
       RCLCPP_ERROR(logger(), "joint_limit_snap_tolerance_rad must be >= 0, got %.9f.", joint_limit_snap_tolerance_rad_);
+      return false;
+    }
+
+    tracking_error_hold_enabled_ = parse_bool(
+      get_string_param(info_.hardware_parameters, "tracking_error_hold_enabled", "false"),
+      "tracking_error_hold_enabled");
+    tracking_error_threshold_rad_ = parse_double(
+      get_string_param(info_.hardware_parameters, "tracking_error_threshold_rad", "0.12"),
+      "tracking_error_threshold_rad");
+    tracking_error_hard_limit_rad_ = parse_double(
+      get_string_param(info_.hardware_parameters, "tracking_error_hard_limit_rad", "0.25"),
+      "tracking_error_hard_limit_rad");
+    const double tracking_error_timeout_ms = parse_double(
+      get_string_param(info_.hardware_parameters, "tracking_error_timeout_ms", "150.0"),
+      "tracking_error_timeout_ms");
+    tracking_error_rearm_threshold_rad_ = parse_double(
+      get_string_param(info_.hardware_parameters, "tracking_error_rearm_threshold_rad", "0.04"),
+      "tracking_error_rearm_threshold_rad");
+    tracking_error_timeout_s_ = tracking_error_timeout_ms * 1e-3;
+    if (!std::isfinite(tracking_error_threshold_rad_) || tracking_error_threshold_rad_ <= 0.0 ||
+      !std::isfinite(tracking_error_hard_limit_rad_) ||
+      tracking_error_hard_limit_rad_ < tracking_error_threshold_rad_ ||
+      !std::isfinite(tracking_error_timeout_s_) || tracking_error_timeout_s_ <= 0.0 ||
+      !std::isfinite(tracking_error_rearm_threshold_rad_) ||
+      tracking_error_rearm_threshold_rad_ < 0.0 ||
+      tracking_error_rearm_threshold_rad_ >= tracking_error_threshold_rad_)
+    {
+      RCLCPP_ERROR(
+        logger(),
+        "Invalid tracking-error hold parameters: soft=%.6f hard=%.6f timeout=%.3f s rearm=%.6f rad.",
+        tracking_error_threshold_rad_, tracking_error_hard_limit_rad_,
+        tracking_error_timeout_s_, tracking_error_rearm_threshold_rad_);
       return false;
     }
 
@@ -768,6 +801,8 @@ hardware_interface::CallbackReturn LeftEsMotorHardwareInterface::
   safety_stop_reported_.assign(driver_config_.motors.size(), false);
   last_fault_error_code_valid_.assign(driver_config_.motors.size(), false);
   last_fault_error_code_.assign(driver_config_.motors.size(), 0);
+  std::fill(tracking_error_elapsed_s_.begin(), tracking_error_elapsed_s_.end(), 0.0);
+  tracking_hold_latched_.store(false);
   manual_motion_enabled_.store(enable_on_this_activation);
   hardware_fault_latched_.store(false);
   // Publish the active state last so service callbacks cannot observe partially
@@ -1179,6 +1214,36 @@ bool LeftEsMotorHardwareInterface::set_motors_enabled_manually(bool enable, std:
     }
   }
 
+  if (tracking_hold_latched_.load()) {
+    for (size_t joint_index = 0; joint_index < info_.joints.size(); ++joint_index) {
+      const int motor_index = joint_to_motor_index_[joint_index];
+      if (motor_index == kNoMotor) {
+        continue;
+      }
+      refresh_position_command(joint_index);
+      const auto & motor = driver_config_.motors[static_cast<size_t>(motor_index)];
+      const auto & state = states[static_cast<size_t>(motor_index)];
+      const double actual_rad = counts_to_radians(state.actual_counts, motor, joint_index);
+      const double command_rad = command_cache_[joint_index];
+      const double error_rad = std::isfinite(command_rad) ? command_rad - actual_rad :
+        std::numeric_limits<double>::infinity();
+      if (!std::isfinite(error_rad) ||
+        std::abs(error_rad) > tracking_error_rearm_threshold_rad_)
+      {
+        std::ostringstream oss;
+        oss << "tracking hold remains latched: joint " << info_.joints[joint_index].name
+            << " command/actual error=" << error_rad << " rad exceeds rearm threshold="
+            << tracking_error_rearm_threshold_rad_
+            << " rad; wait for the trajectory controller to abort/hold current position, then retry enable";
+        message = oss.str();
+        return false;
+      }
+    }
+    tracking_hold_latched_.store(false);
+    std::fill(tracking_error_elapsed_s_.begin(), tracking_error_elapsed_s_.end(), 0.0);
+    RCLCPP_WARN(logger(), "Tracking-error hold cleared after command/state resynchronization.");
+  }
+
   manual_motion_enabled_.store(false);
   // write() is still running while the motion latch is false. It continuously
   // keeps each CSP target at the measured counts without rewriting the
@@ -1334,7 +1399,7 @@ hardware_interface::return_type LeftEsMotorHardwareInterface::
     write(const rclcpp::Time & time, const rclcpp::Duration & period)
 {
   (void)time;
-  (void)period;
+  const double period_s = std::max(0.0, period.seconds());
 
   if (!activated_.load() || !driver_ || driver_config_.motors.empty()) {
     return hardware_interface::return_type::OK;
@@ -1432,6 +1497,16 @@ hardware_interface::return_type LeftEsMotorHardwareInterface::
       return hardware_interface::return_type::ERROR;
     }
 
+    if (tracking_hold_latched_.load()) {
+      driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
+      RCLCPP_ERROR_THROTTLE(
+        logger(), throttle_clock, 2000,
+        "Tracking-error hold active. Joint '%s' is held at %.6f rad; call /left_arm/enable "
+        "with data=true only after the trajectory action has aborted and command/state have resynchronized.",
+        info_.joints[joint_index].name.c_str(), hold_rad);
+      continue;
+    }
+
     // 未真正进入 OperationEnabled 前，持续锁当前真实位置，不接受控制器默认 0。
     if (!motion_enabled || !enable_status_ok || !command_enable || !state.operation_enabled ||
       !std::isfinite(command_cache_[joint_index]))
@@ -1449,6 +1524,39 @@ hardware_interface::return_type LeftEsMotorHardwareInterface::
         state.operation_enabled,
         state.status_word);
       continue;
+    }
+
+    if (tracking_error_hold_enabled_) {
+      const double error_rad = command_cache_[joint_index] - hold_rad;
+      const double abs_error_rad = std::abs(error_rad);
+      if (abs_error_rad > tracking_error_threshold_rad_) {
+        tracking_error_elapsed_s_[joint_index] += period_s;
+      } else {
+        tracking_error_elapsed_s_[joint_index] = 0.0;
+      }
+
+      const bool hard_limit_exceeded = abs_error_rad >= tracking_error_hard_limit_rad_;
+      const bool timed_limit_exceeded =
+        tracking_error_elapsed_s_[joint_index] >= tracking_error_timeout_s_;
+      if (hard_limit_exceeded || timed_limit_exceeded) {
+        tracking_hold_latched_.store(true);
+        manual_motion_enabled_.store(false);
+        driver_->setAbsoluteTargetCounts(motor.address, state.actual_counts);
+        RCLCPP_ERROR(
+          logger(),
+          "Tracking-error hold LATCHED for joint '%s': command=%.6f rad actual=%.6f rad "
+          "error=%+.6f rad soft_limit=%.6f hard_limit=%.6f elapsed=%.3f/%.3f s "
+          "velocity=%.6f rad/s effort=%.3f Nm current_raw=%d 0x60F4=%d counts status_word=0x%04X. "
+          "Servo power is intentionally kept ON; after the JTC action aborts/holds current state, "
+          "call /left_arm/enable with data=true to re-arm.",
+          info_.joints[joint_index].name.c_str(), command_cache_[joint_index], hold_rad,
+          error_rad, tracking_error_threshold_rad_, tracking_error_hard_limit_rad_,
+          tracking_error_elapsed_s_[joint_index], tracking_error_timeout_s_,
+          velocity_cache_[joint_index], effort_cache_[joint_index],
+          static_cast<int>(state.actual_current_raw), state.following_error_actual_counts,
+          state.status_word);
+        continue;
+      }
     }
 
     const int32_t target_counts =

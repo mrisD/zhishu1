@@ -104,6 +104,16 @@ private:
     std::vector<double> joint_snap_upper_limit_rad_;
     double joint_limit_snap_tolerance_rad_ = 0.005;
 
+    // Load-induced following-error protection. Keep the drive energized and
+    // hold measured position rather than dropping a heavy payload on stall.
+    bool tracking_error_hold_enabled_ = false;
+    double tracking_error_threshold_rad_ = 0.12;
+    double tracking_error_hard_limit_rad_ = 0.25;
+    double tracking_error_timeout_s_ = 0.15;
+    double tracking_error_rearm_threshold_rad_ = 0.04;
+    std::vector<double> tracking_error_elapsed_s_;
+    std::atomic<bool> tracking_hold_latched_{false};
+
     bool enable_motors_on_activate_ = true;
     std::atomic<bool> activated_{false};
     // Set before returning ERROR from read()/write(). controller_manager then

@@ -119,6 +119,8 @@ struct MotorState
   // physical scaling for these objects.
   int32_t actual_velocity_raw = 0;  // 0x606C:00, DINT
   int16_t actual_torque_raw = 0;    // 0x6077:00, INT
+  int16_t actual_current_raw = 0;   // 0x6078:00, INT
+  int32_t following_error_actual_counts = 0;  // 0x60F4:00, DINT
   int32_t command_counts = 0;
   int64_t goal_counts = 0;
   uint64_t goal_update_sequence = 0;
