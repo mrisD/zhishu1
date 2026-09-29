@@ -37,8 +37,8 @@
                 <param name="pdo_diagnostics_max_cycles">20000</param>
                 <param name="enable_motors_on_activate">${enable_motors_on_activate}</param>
 
-                <!-- Real-hardware test topology: torso/head drives are on IgH master 1. -->
-                <param name="master_index">1</param>
+                <!-- Final topology: torso/head share IgH master0 with the left arm. -->
+                <param name="master_index">0</param>
                 <param name="alias">0</param>
                 <param name="vendor_id">0x00206688</param>
                 <param name="product_code">0x26483052</param>
@@ -55,13 +55,14 @@
                 <param name="joint_limit_snap_tolerance_rad">0.005</param>
             </hardware>
 
-            <!-- Reconstructed from real-hardware single-axis tests:
-                 slave 2 drives waist pitch, slave 1 drives head pitch, and the
-                 remaining slave 0 drives head yaw. -->
+            <!-- The original 3-axis order was head_yaw=0, head_pitch=1,
+                 waist_pitch=2. On the final master0 chain these are shifted by
+                 eight physical slaves because left-arm GH1 drives occupy 0..6
+                 and FCE1353 occupies position 7. -->
             <joint name="waist_pitch_joint">
                 <param name="use_ethercat">true</param>
                 <param name="motor_name">torso_head_motor_2</param>
-                <param name="slave_position">2</param>
+                <param name="slave_position">10</param>
                 <param name="reduction_ratio">101.0</param>
                 <param name="position_wrap_reference_rad">-0.2618</param>
                 <command_interface name="position"/>
@@ -73,7 +74,7 @@
             <joint name="head_yaw_joint">
                 <param name="use_ethercat">true</param>
                 <param name="motor_name">torso_head_motor_0</param>
-                <param name="slave_position">0</param>
+                <param name="slave_position">8</param>
                 <param name="reduction_ratio">101.0</param>
                 <param name="position_wrap_reference_rad">0.0</param>
                 <command_interface name="position"/>
@@ -85,7 +86,7 @@
             <joint name="head_pitch_joint">
                 <param name="use_ethercat">true</param>
                 <param name="motor_name">torso_head_motor_1</param>
-                <param name="slave_position">1</param>
+                <param name="slave_position">9</param>
                 <param name="reduction_ratio">101.0</param>
                 <param name="position_wrap_reference_rad">-0.0435</param>
                 <command_interface name="position"/>

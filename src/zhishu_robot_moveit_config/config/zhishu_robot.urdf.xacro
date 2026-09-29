@@ -29,8 +29,10 @@
 
     <xacro:unless value="$(arg use_gazebo)">
         <xacro:if value="$(arg enable_left_arm_hardware)">
-            <!-- If TorsoHeadSystem is present it owns waist_pitch/head_yaw/head_pitch;
-                 do not export the legacy passive copies from LeftArmSystem. -->
+            <!-- master0 is owned by exactly one EthercatDriver. When torso/head
+                 hardware is enabled, merge those three GH1 axes into LeftArmSystem
+                 instead of creating a second ros2_control hardware component that
+                 would try to ecrt_request_master(0) again. -->
             <xacro:if value="$(arg enable_torso_head_hardware)">
                 <xacro:zhishu_robot_left_arm_ros2_control
                     name="LeftArmSystem"
@@ -38,7 +40,8 @@
                     use_fake_hardware="$(arg left_arm_use_fake_hardware)"
                     enable_motors_on_activate="$(arg enable_motors_on_activate)"
                     pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"
-                    include_torso_head_state_joints="false"/>
+                    include_torso_head_state_joints="false"
+                    include_torso_head_ethercat_joints="true"/>
             </xacro:if>
             <xacro:unless value="$(arg enable_torso_head_hardware)">
                 <xacro:zhishu_robot_left_arm_ros2_control
@@ -47,7 +50,8 @@
                     use_fake_hardware="$(arg left_arm_use_fake_hardware)"
                     enable_motors_on_activate="$(arg enable_motors_on_activate)"
                     pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"
-                    include_torso_head_state_joints="true"/>
+                    include_torso_head_state_joints="true"
+                    include_torso_head_ethercat_joints="false"/>
             </xacro:unless>
         </xacro:if>
 
@@ -60,13 +64,18 @@
                 pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
         </xacro:if>
 
+        <!-- Standalone torso/head mode is still available when the left-arm
+             hardware component is disabled. In the normal combined topology,
+             LeftArmSystem already owns these three joints on master0. -->
         <xacro:if value="$(arg enable_torso_head_hardware)">
-            <xacro:zhishu_robot_torso_head_ros2_control
-                name="TorsoHeadSystem"
-                initial_positions_file="$(arg initial_positions_file)"
-                use_fake_hardware="$(arg torso_head_use_fake_hardware)"
-                enable_motors_on_activate="$(arg torso_head_enable_motors_on_activate)"
-                pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
+            <xacro:unless value="$(arg enable_left_arm_hardware)">
+                <xacro:zhishu_robot_torso_head_ros2_control
+                    name="TorsoHeadSystem"
+                    initial_positions_file="$(arg initial_positions_file)"
+                    use_fake_hardware="$(arg torso_head_use_fake_hardware)"
+                    enable_motors_on_activate="$(arg torso_head_enable_motors_on_activate)"
+                    pdo_diagnostics_auto_start="$(arg pdo_diagnostics_auto_start)"/>
+            </xacro:unless>
         </xacro:if>
     </xacro:unless>
 

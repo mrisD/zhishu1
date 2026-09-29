@@ -144,14 +144,20 @@ bool left_arm_default_slave_position(const std::string & joint_name, uint16_t & 
   return false;
 }
 
-bool has_position_state_interface(const hardware_interface::ComponentInfo & joint)
+bool has_state_interface(
+  const hardware_interface::ComponentInfo & joint, const std::string & interface_name)
 {
   for (const auto & interface : joint.state_interfaces) {
-    if (interface.name == hardware_interface::HW_IF_POSITION) {
+    if (interface.name == interface_name) {
       return true;
     }
   }
   return false;
+}
+
+bool has_position_state_interface(const hardware_interface::ComponentInfo & joint)
+{
+  return has_state_interface(joint, hardware_interface::HW_IF_POSITION);
 }
 
 bool has_position_command_interface(const hardware_interface::ComponentInfo & joint)
@@ -453,27 +459,44 @@ bool LeftEsMotorHardwareInterface::build_driver_config_from_ros2_control_info()
           joint.parameters, info_.hardware_parameters, "rated_torque_nm", "nan"),
         joint.name + ".rated_torque_nm");
 
-      if (driver_config_.enable_velocity_torque_feedback &&
+      const bool exports_velocity =
+        has_state_interface(joint, hardware_interface::HW_IF_VELOCITY);
+      const bool exports_effort =
+        has_state_interface(joint, hardware_interface::HW_IF_EFFORT);
+
+      if (driver_config_.enable_velocity_torque_feedback && exports_velocity &&
         (!std::isfinite(joint_reduction_ratio_[joint_index]) ||
-        joint_reduction_ratio_[joint_index] <= 0.0 ||
-        !std::isfinite(joint_rated_torque_nm_[joint_index]) ||
+        joint_reduction_ratio_[joint_index] <= 0.0))
+      {
+        RCLCPP_ERROR(
+          logger(),
+          "Joint '%s' exports velocity and therefore requires a finite positive "
+          "reduction_ratio when velocity/torque feedback is enabled (got %.6f).",
+          joint.name.c_str(), joint_reduction_ratio_[joint_index]);
+        return false;
+      }
+      if (driver_config_.enable_velocity_torque_feedback && exports_effort &&
+        (!std::isfinite(joint_rated_torque_nm_[joint_index]) ||
         joint_rated_torque_nm_[joint_index] <= 0.0))
       {
         RCLCPP_ERROR(
           logger(),
-          "Joint '%s' requires finite positive reduction_ratio and rated_torque_nm "
-          "when velocity/torque feedback is enabled (got %.6f, %.6f).",
-          joint.name.c_str(), joint_reduction_ratio_[joint_index],
-          joint_rated_torque_nm_[joint_index]);
+          "Joint '%s' exports effort and therefore requires a finite positive "
+          "rated_torque_nm when velocity/torque feedback is enabled (got %.6f).",
+          joint.name.c_str(), joint_rated_torque_nm_[joint_index]);
         return false;
       }
 
       joint_velocity_scale_rad_s_per_raw_[joint_index] =
+        std::isfinite(joint_reduction_ratio_[joint_index]) &&
+        joint_reduction_ratio_[joint_index] > 0.0 ?
         joint_sign_[joint_index] * velocity_raw_rpm_per_count_ * kTwoPi /
-        (60.0 * joint_reduction_ratio_[joint_index]);
+        (60.0 * joint_reduction_ratio_[joint_index]) : 0.0;
       joint_effort_scale_nm_per_raw_[joint_index] =
+        std::isfinite(joint_rated_torque_nm_[joint_index]) &&
+        joint_rated_torque_nm_[joint_index] > 0.0 ?
         joint_sign_[joint_index] * joint_rated_torque_nm_[joint_index] /
-        torque_raw_full_scale_;
+        torque_raw_full_scale_ : 0.0;
       driver_config_.motors[motor_index].velocity_scale_rad_s_per_raw =
         joint_velocity_scale_rad_s_per_raw_[joint_index];
       driver_config_.motors[motor_index].effort_scale_nm_per_raw =
@@ -571,8 +594,8 @@ bool LeftEsMotorHardwareInterface::wait_for_all_motors_ready(std::vector<etherca
 {
   states.assign(driver_config_.motors.size(), ethercat_driver::MotorState{});
 
-  // IgH 的 slave/domain 状态在底层线程里按 1 Hz 节流打印和刷新；7 个从站从 PREOP/SAFEOP
-  // 全部切到 OP 有时会接近 10 s。这里等待更久，并要求 full working counter 稳定，避免
+  // IgH 的 slave/domain 状态在底层线程里按 1 Hz 节流打印和刷新；配置的 GH1 从站从
+  // PREOP/SAFEOP 全部切到 OP 有时会接近 10 s。这里等待更久，并要求 full working counter 稳定，避免
   // on_activate() 在最后两个从站刚切 OP 时误判失败。
   const int expected_domain_wc = static_cast<int>(driver_config_.motors.size() * 3U);
   int stable_ready_cycles = 0;
@@ -651,7 +674,7 @@ hardware_interface::CallbackReturn LeftEsMotorHardwareInterface::
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  // 关键：启动后先用 7 个电机的真实当前位置初始化 ros2_control 命令，
+  // 关键：启动后先用所有已配置 GH1 电机的真实当前位置初始化 ros2_control 命令，
   // 再把底层目标写成当前 counts，最后才 setEnable(true)。这样控制器默认 0 不会把电机拉回零点。
   // 每次激活都重新学习本次上电的整圈分支，因为无电池绝对编码器断电后只保留单圈角度。
   std::fill(joint_turn_offset_rad_.begin(), joint_turn_offset_rad_.end(), 0.0);
@@ -1346,15 +1369,24 @@ hardware_interface::return_type LeftEsMotorHardwareInterface::
       if (driver_config_.enable_velocity_torque_feedback) {
         const double velocity_raw = static_cast<double>(state.actual_velocity_raw);
         const double torque_raw = static_cast<double>(state.actual_torque_raw);
-        set_velocity_raw_state(joint_index, velocity_raw);
-        set_torque_raw_state(joint_index, torque_raw);
+        if (velocity_raw_state_handles_[joint_index]) {
+          set_velocity_raw_state(joint_index, velocity_raw);
+        }
+        if (torque_raw_state_handles_[joint_index]) {
+          set_torque_raw_state(joint_index, torque_raw);
+        }
         // GH1 manual: 0x606C is 0.1 motor RPM/count and 0x6077 is
-        // 1/10000 rated current/count. The module data sheets provide the
-        // 101:1 reduction and rated output torque used for ROS SI units.
-        set_velocity_state(
-          joint_index, velocity_raw * joint_velocity_scale_rad_s_per_raw_[joint_index]);
-        set_effort_state(
-          joint_index, torque_raw * joint_effort_scale_nm_per_raw_[joint_index]);
+        // 1/10000 rated current/count. Position-only merged axes intentionally
+        // omit the converted velocity/effort interfaces until their mechanical
+        // torque constants are validated.
+        if (velocity_state_handles_[joint_index]) {
+          set_velocity_state(
+            joint_index, velocity_raw * joint_velocity_scale_rad_s_per_raw_[joint_index]);
+        }
+        if (effort_state_handles_[joint_index]) {
+          set_effort_state(
+            joint_index, torque_raw * joint_effort_scale_nm_per_raw_[joint_index]);
+        }
       }
     }
 
@@ -1407,7 +1439,7 @@ hardware_interface::return_type LeftEsMotorHardwareInterface::
 
   const bool motion_enabled = manual_motion_enabled_.load();
 
-  // 7 个电机、每个从站当前 PDO 工作计数为 3，所以满 WC 应为 21。
+  // 每个已配置 GH1 从站当前 PDO 工作计数为 3；满 WC 按电机数量动态计算。
   // EtherCAT 出现 WC 不满、SAFEOP、同步错误时，禁止继续追 MoveIt 下发的轨迹点，
   // 先锁住真实当前位置，避免电机抖动、掉使能后恢复时突然跳动。
   const int expected_domain_wc = static_cast<int>(driver_config_.motors.size() * 3U);

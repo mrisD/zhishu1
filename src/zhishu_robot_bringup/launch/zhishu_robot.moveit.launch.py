@@ -384,7 +384,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "torso_head_use_fake_hardware",
             default_value="true",
-            description="Torso/head mode: true=mock, false=EtherCAT",
+            description=(
+                "Torso/head mode for standalone torso/head-only operation; when "
+                "the left arm is enabled the three axes are merged into LeftArmSystem"
+            ),
         ),
         DeclareLaunchArgument(
             "enable_left_arm_hardware",
@@ -400,8 +403,9 @@ def generate_launch_description():
             "enable_torso_head_hardware",
             default_value="true",
             description=(
-                "Enable TorsoHeadSystem. When combined with arm hardware, "
-                "EtherCAT master/slave ownership must be verified separately."
+                "Enable torso/head control. With left-arm hardware enabled, the "
+                "three GH1 axes are owned by LeftArmSystem on master0; otherwise "
+                "a standalone TorsoHeadSystem is instantiated."
             ),
         ),
 
@@ -418,9 +422,9 @@ def generate_launch_description():
             "torso_head_enable_motors_on_activate",
             default_value="false",
             description=(
-                "Enable torso/head drives during hardware activation. Keep false "
-                "for initial feedback/direction checks and enable explicitly by "
-                "service."
+                "Enable drives during standalone TorsoHeadSystem activation. In the "
+                "merged master0 topology, enable_motors_on_activate controls all "
+                "left-arm + torso/head GH1 drives together."
             ),
         ),
 
