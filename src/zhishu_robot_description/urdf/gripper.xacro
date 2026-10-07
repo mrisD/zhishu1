@@ -1,18 +1,19 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:property name="tote_finger_length" value="0.200"/>
 
     <!-- Gazebo Sim only creates dynamic links that have valid inertial data.
          Without this block the finger links, their prismatic joints, and the
          corresponding ros2_control command interfaces are omitted from SDF. -->
     <xacro:macro name="gripper_finger_inertial">
         <inertial>
-            <!-- 275 mm fingers reach the lower edge of the tote handle when
-                 the TCP stays in the arm's reachable upper hook pose. -->
-            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+            <!-- Candidate 200 mm fingers; TCP is 80 mm behind the tip.
+                 The tote grasp target limits insertion to about 50 mm. -->
+            <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
             <mass value="0.1"/>
             <inertia
-                ixx="0.000660208" ixy="0.0" ixz="0.0"
-                iyy="0.000631042" iyz="0.0"
+                ixx="${0.1 * (0.06**2 + tote_finger_length**2) / 12}" ixy="0.0" ixz="0.0"
+                iyy="${0.1 * (0.02**2 + tote_finger_length**2) / 12}" iyz="0.0"
                 izz="0.000036667"/>
         </inertial>
     </xacro:macro>
@@ -37,16 +38,16 @@
         <xacro:gripper_finger_inertial/>
         <visual>
             <geometry>
-                <box size="0.02 0.06 0.275"/>
+                <box size="0.02 0.06 ${tote_finger_length}"/>
             </geometry>
-            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+            <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
             <material name="light_green"/>
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.06 0.275"/>
+                <box size="0.02 0.06 ${tote_finger_length}"/>
             </geometry>
-            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+            <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
         </collision>
     </link>
 
@@ -54,35 +55,20 @@
         <xacro:gripper_finger_inertial/>
         <visual>
             <geometry>
-                <box size="0.02 0.06 0.275"/>
+                <box size="0.02 0.06 ${tote_finger_length}"/>
             </geometry>
-            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+            <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
             <material name="light_green"/>
         </visual>
         <collision>
             <geometry>
-                <box size="0.02 0.06 0.275"/>
+                <box size="0.02 0.06 ${tote_finger_length}"/>
             </geometry>
-            <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+            <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
         </collision>
-        <!-- Broad low hook pad on the inner/right finger.  The vertical finger
-             reaches the aperture's lower edge; this pad provides a positive
-             bearing surface behind the real handle rail during the pull. -->
-        <visual>
-            <geometry>
-                <box size="0.06 0.12 0.02"/>
-            </geometry>
-            <!-- Shift inward from the right finger's +X joint offset so the
-                 pad actually overlaps the tote's 120 mm handle rail. -->
-            <origin xyz="-0.115 -0.04 0.238" rpy="0 0 0"/>
-            <material name="light_green"/>
-        </visual>
-        <collision>
-            <geometry>
-                <box size="0.06 0.12 0.02"/>
-            </geometry>
-            <origin xyz="-0.115 -0.04 0.238" rpy="0 0 0"/>
-        </collision>
+        <!-- No auxiliary crossbar/pad: the two long fingers clamp the
+             continuous tote wall directly.  The former 60x120x20 mm pad
+             could overlap the mobile-base shell at the 20 cm dock. -->
     </link>
 
     <joint name="gripper_left_finger_joint" type="prismatic">
@@ -110,7 +96,7 @@
     <joint name="right_gripper_tcp_joint" type="fixed">
         <parent link="gripper_base_link"/>
         <child link="right_gripper_tcp"/>
-        <origin xyz="0 0 0.18" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0.14" rpy="1.5708 0 0"/>
     </joint>
     <!-- Left gripper: same geometry and kinematics as the right gripper, but with left_* names. -->
     <link name="left_gripper_base_link">
@@ -139,16 +125,16 @@
         <xacro:unless value="$(arg handeye_target_enabled)">
             <visual>
                 <geometry>
-                    <box size="0.02 0.06 0.275"/>
+                    <box size="0.02 0.06 ${tote_finger_length}"/>
                 </geometry>
-                <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+                <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
                 <material name="light_green"/>
             </visual>
             <collision>
                 <geometry>
-                    <box size="0.02 0.06 0.275"/>
+                    <box size="0.02 0.06 ${tote_finger_length}"/>
                 </geometry>
-                <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+                <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
             </collision>
         </xacro:unless>
     </link>
@@ -158,16 +144,16 @@
         <xacro:unless value="$(arg handeye_target_enabled)">
             <visual>
                 <geometry>
-                    <box size="0.02 0.06 0.275"/>
+                    <box size="0.02 0.06 ${tote_finger_length}"/>
                 </geometry>
-                <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+                <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
                 <material name="light_green"/>
             </visual>
             <collision>
                 <geometry>
-                    <box size="0.02 0.06 0.275"/>
+                    <box size="0.02 0.06 ${tote_finger_length}"/>
                 </geometry>
-                <origin xyz="0 0 0.1375" rpy="0 0 0"/>
+                <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
             </collision>
         </xacro:unless>
     </link>
@@ -193,6 +179,6 @@
     <joint name="left_gripper_tcp_joint" type="fixed">
         <parent link="left_gripper_base_link"/>
         <child link="left_gripper_tcp"/>
-        <origin xyz="0 0 0.18" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0.14" rpy="1.5708 0 0"/>
     </joint>
 </robot>

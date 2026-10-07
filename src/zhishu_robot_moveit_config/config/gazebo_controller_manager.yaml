@@ -1,0 +1,5 @@
+# Gazebo-only overlay; retain the 1 kHz EtherCAT hardware configuration.
+controller_manager:
+  ros__parameters:
+    update_rate: 200
+    lock_memory: false

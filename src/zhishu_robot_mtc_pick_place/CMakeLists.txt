@@ -22,6 +22,7 @@ find_package(moveit_core REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -116,6 +117,7 @@ target_include_directories(pallet_bin_15kg_transfer BEFORE PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(pallet_bin_15kg_transfer
+  sensor_msgs
   rclcpp
   rcpputils
   moveit_task_constructor_core

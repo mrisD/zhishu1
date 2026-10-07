@@ -10,7 +10,14 @@ default_acceleration_scaling_factor: 0.2
 # Ruckig uses the jerk limits below to smooth acceleration transitions. The
 # initial 1.0 rad/s^3 limit is intentionally conservative for hardware testing.
 joint_limits:
+  waist_up_down_joint:
+    has_velocity_limits: true
+    max_velocity: 0.2
+    has_acceleration_limits: true
+    max_acceleration: 0.3
   waist_pitch_joint:
+    min_position: -1.57079632679
+    max_position: 0.2618
     has_velocity_limits: true
     max_velocity: 0.25
     has_acceleration_limits: true

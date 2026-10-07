@@ -86,12 +86,21 @@
         <gazebo>
             <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
                 <parameters>$(find zhishu_robot_moveit_config)/config/ros2_controllers.yaml</parameters>
+                <parameters>$(find zhishu_robot_moveit_config)/config/gazebo_controller_manager.yaml</parameters>
                 <!-- Hold all joints at their configured initial positions while
                      the admittance launch loads and atomically activates controllers. -->
                 <hold_joints>true</hold_joints>
-                <position_proportional_gain>1.0</position_proportional_gain>
+                <!-- gz_ros2_control scales position error by update_rate;
+                     a sub-unit gain damps discrete contact tracking. -->
+                <position_proportional_gain>0.2</position_proportional_gain>
             </plugin>
             <xacro:if value="$(arg mobile_base_sim_enabled)">
+                <plugin filename="gz-sim-pose-publisher-system" name="gz::sim::systems::PosePublisher">
+                    <publish_model_pose>true</publish_model_pose>
+                    <publish_link_pose>false</publish_link_pose>
+                    <use_pose_vector_msg>false</use_pose_vector_msg>
+                    <update_frequency>20</update_frequency>
+                </plugin>
                 <!-- Simulation-only mobile base. The wheel joints are state-only in
                      gz_ros2_control, so DiffDrive is the sole wheel command writer. -->
                 <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
@@ -107,22 +116,6 @@
                     <odom_publish_frequency>50</odom_publish_frequency>
                 </plugin>
             </xacro:if>
-            <!-- Extraction runs start already aligned with r0_c0.  Add
-                 wheel damping/contact friction so arm reaction forces do not
-                 roll the chassis away from the 20 cm station while the hook
-                 trajectory is executing. -->
-            <gazebo reference="left_wheel_link">
-                <mu1>8.0</mu1>
-                <mu2>8.0</mu2>
-                <kp>1000000.0</kp>
-                <kd>100.0</kd>
-            </gazebo>
-            <gazebo reference="right_wheel_link">
-                <mu1>8.0</mu1>
-                <mu2>8.0</mu2>
-                <kp>1000000.0</kp>
-                <kd>100.0</kd>
-            </gazebo>
             <xacro:if value="$(arg bottle_grasp_sim_enabled)">
                 <!-- Contact determines closure timing; this simulation-only
                      joint prevents numerical slip during the lift. -->
@@ -137,5 +130,30 @@
                 </plugin>
             </xacro:if>
         </gazebo>
+        <!-- Link-specific extensions must be robot-level siblings, not nested
+             in the model-level plugin gazebo tag: sdformat otherwise ignores
+             these friction values and copies them as unsupported children. -->
+        <xacro:if value="$(arg mobile_base_sim_enabled)">
+            <gazebo reference="left_wheel_link"><mu1>8.0</mu1><mu2>8.0</mu2><kp>1000000.0</kp><kd>100.0</kd></gazebo>
+            <gazebo reference="right_wheel_link"><mu1>8.0</mu1><mu2>8.0</mu2><kp>1000000.0</kp><kd>100.0</kd></gazebo>
+            <!-- Candidate rubber pads: still require physical calibration. -->
+            <gazebo reference="gripper_left_finger_link"><mu1>3.0</mu1><mu2>3.0</mu2></gazebo>
+            <gazebo reference="gripper_right_finger_link"><mu1>3.0</mu1><mu2>3.0</mu2></gazebo>
+            <gazebo reference="left_gripper_left_finger_link"><mu1>3.0</mu1><mu2>3.0</mu2></gazebo>
+            <gazebo reference="left_gripper_right_finger_link"><mu1>3.0</mu1><mu2>3.0</mu2></gazebo>
+            <xacro:macro name="pallet_contact_sensor" params="link">
+                <gazebo reference="${link}">
+                    <sensor name="${link}_contact" type="contact">
+                        <always_on>true</always_on><update_rate>50</update_rate>
+                        <topic>/pallet_contacts/${link}</topic>
+                        <contact><collision>${link}_collision</collision></contact>
+                    </sensor>
+                </gazebo>
+            </xacro:macro>
+            <xacro:pallet_contact_sensor link="right_shoulder_pitch_link"/>
+            <xacro:pallet_contact_sensor link="right_elbow_pitch_link"/>
+            <xacro:pallet_contact_sensor link="gripper_left_finger_link"/>
+            <xacro:pallet_contact_sensor link="gripper_right_finger_link"/>
+        </xacro:if>
     </xacro:if>
 </robot>

@@ -5,7 +5,8 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -14,6 +15,7 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 
 def generate_launch_description():
+    moveit_share = get_package_share_directory("zhishu_robot_moveit_config")
     headless = LaunchConfiguration("headless")
     use_rviz = LaunchConfiguration("use_rviz")
     execute = LaunchConfiguration("execute")
@@ -63,6 +65,7 @@ def generate_launch_description():
                 "use_gazebo": "true",
                 "use_fake_hardware": "false",
                 "mobile_base_sim_enabled": "true",
+                "mobile_base_sim_mass": "71.53",
             },
         )
         .robot_description_semantic(file_path="config/zhishu_robot.srdf")
@@ -81,17 +84,21 @@ def generate_launch_description():
                 gazebo_share, "launch", "zhishu_robot.gazebo_moveit.launch.py"
             )
         ),
+        condition=UnlessCondition(LaunchConfiguration("reuse_gazebo")),
         launch_arguments={
             "headless": headless,
             "use_rviz": use_rviz,
-            "world_file": "pallet_bin_15kg.sdf",
+            "world_file": LaunchConfiguration("world_file"),
             "use_left_arm_controller": "false",
             "mobile_base_sim_enabled": "true",
-            # Start at the calibrated arm work station.  The first tote is
-            # initially presented at the 20 cm front station in the world;
-            # this x offset is the short final dock needed for the oblique
-            # hook pose to remain inside the right-arm IK workspace.
-            "x": "0.190",
+            "mobile_base_sim_mass": "71.53",
+            "initial_positions_file": os.path.join(
+                moveit_share, "config", "pallet_bin_initial_positions.yaml"
+            ),
+            # The base collision front is +0.234 m in base coordinates and
+            # the pallet near edge is x=0.434 m.  Spawn at x=0 so the
+            # chassis-to-pallet edge gap is exactly 0.200 m.
+            "x": "0.000",
             "y": "-0.400617",
             # The wheel joint centres are already 82.5 mm above base_footprint
             # and the wheel radius is 85.8 mm.  The base collision bottom is
@@ -108,12 +115,14 @@ def generate_launch_description():
         package="zhishu_robot_mtc_pick_place",
         executable="pallet_bin_15kg_transfer",
         name="pallet_bin_15kg_transfer",
+        condition=IfCondition(LaunchConfiguration("start_transfer")),
         output="screen",
         parameters=[
             moveit_config.to_dict(),
             {
                 "use_sim_time": True,
                 "execute": ParameterValue(execute, value_type=bool),
+                "resume_after_pick": ParameterValue(LaunchConfiguration("resume_after_pick"), value_type=bool),
                 "validate_all_nine": ParameterValue(
                     validate_all_nine, value_type=bool
                 ),
@@ -194,8 +203,11 @@ def generate_launch_description():
                 "right_tcp_yaw": ParameterValue(right_tcp_yaw, value_type=float),
                 # Conservative 15 kg settings. Increase only after the 50 mm
                 # load test is stable and wrist F/T feedback is reasonable.
+                # The Gazebo velocity-state feedback is discrete under the
+                # 15 kg contact pull; slower time-parameterisation prevents a
+                # transient path-tolerance hit without relaxing goal error.
                 "velocity_scaling": 0.12,
-                "acceleration_scaling": 0.10,
+                "acceleration_scaling": 0.08,
                 "grasp_waist_lift": ParameterValue(
                     grasp_waist_lift, value_type=float
                 ),
@@ -204,15 +216,17 @@ def generate_launch_description():
                 ),
                 "carry_waist_lift": 0.18,
                 "carry_waist_pitch": -0.10,
-                "place_waist_lift": 0.20,
-                "place_waist_pitch": -0.05,
+                # Half-sized table posture change preserves shallow grip
+                # stability while leaving the arms enough insertion reach.
+                "place_waist_lift": 0.14,
+                "place_waist_pitch": -0.20,
                 "load_test_lift": 0.05,
-                "carry_lift": 0.10,
+                "carry_lift": ParameterValue(LaunchConfiguration("carry_lift"), value_type=float),
                 "hold_seconds": 3.0,
                 "base_max_linear": 0.18,
                 "base_max_angular": 0.45,
                 "state_wait_timeout": 60.0,
-                "physical_base_offset_x": 0.190,
+                "physical_base_offset_x": 0.0,
                 "physical_base_offset_y": -0.400617,
             },
         ],
@@ -220,8 +234,14 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            DeclareLaunchArgument("headless", default_value="false"),
-            DeclareLaunchArgument("use_rviz", default_value="true"),
+            DeclareLaunchArgument("headless", default_value="true"),
+            DeclareLaunchArgument("world_file", default_value="pallet_bin_15kg.sdf"),
+            DeclareLaunchArgument("start_transfer", default_value="true"),
+            DeclareLaunchArgument("transfer_start_delay", default_value="30.0"),
+            DeclareLaunchArgument("use_rviz", default_value="false"),
+            DeclareLaunchArgument("reuse_gazebo", default_value="false"),
+            DeclareLaunchArgument("resume_after_pick", default_value="false"),
+            DeclareLaunchArgument("carry_lift", default_value="0.20"),
             DeclareLaunchArgument(
                 "execute",
                 default_value="true",
@@ -229,7 +249,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "validate_all_nine",
-                default_value="true",
+                default_value="false",
                 description=(
                     "Visit all 9 pallet cells and perform a 50 mm / 3 s 15 kg "
                     "pick-hold-return test before the full transfer"
@@ -237,7 +257,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "full_transfer_box_index",
-                default_value="4",
+                default_value="0",
                 description=(
                     "0..8 selects the tote used for the final pallet-to-bin transfer; "
                     "4 is the centre tote and therefore the hardest reach"
@@ -268,18 +288,18 @@ def generate_launch_description():
                 description="Initial perimeter pull distance in metres",
             ),
             DeclareLaunchArgument("pre_extract_waist_lift", default_value="0.04"),
-            DeclareLaunchArgument("pre_extract_waist_pitch", default_value="-0.70"),
+            DeclareLaunchArgument("pre_extract_waist_pitch", default_value="-1.0"),
             DeclareLaunchArgument("stop_on_failure", default_value="true"),
             DeclareLaunchArgument("hook_hole_z_offset", default_value="0.053"),
-            DeclareLaunchArgument("hook_hole_inset", default_value="0.015"),
-            DeclareLaunchArgument("hook_tcp_hole_clearance", default_value="0.100"),
-            DeclareLaunchArgument("hook_approach_height", default_value="0.11"),
+            DeclareLaunchArgument("hook_hole_inset", default_value="0.0"),
+            DeclareLaunchArgument("hook_tcp_hole_clearance", default_value="0.060"),
+            DeclareLaunchArgument("hook_approach_height", default_value="0.22"),
             DeclareLaunchArgument("hook_approach_outset", default_value="0.055"),
             DeclareLaunchArgument("hook_seat_drop", default_value="0.0"),
             DeclareLaunchArgument("handle_half_span", default_value="0.195"),
             DeclareLaunchArgument("grasp_half_span", default_value="0.195"),
-            DeclareLaunchArgument("handle_z_offset", default_value="0.035"),
-            DeclareLaunchArgument("grasp_waist_pitch", default_value="-0.70"),
+            DeclareLaunchArgument("handle_z_offset", default_value="0.108"),
+            DeclareLaunchArgument("grasp_waist_pitch", default_value="-1.10"),
             DeclareLaunchArgument("grasp_waist_lift", default_value="0.04"),
             DeclareLaunchArgument("left_tcp_roll", default_value="-1.57079632679"),
             DeclareLaunchArgument("left_tcp_pitch", default_value="0.0"),
@@ -287,14 +307,30 @@ def generate_launch_description():
             DeclareLaunchArgument("right_tcp_roll", default_value="-1.57079632679"),
             DeclareLaunchArgument("right_tcp_pitch", default_value="0.0"),
             DeclareLaunchArgument("right_tcp_yaw", default_value="-1.57079632679"),
-            DeclareLaunchArgument("grasp_x_offset", default_value="0.05"),
+            DeclareLaunchArgument("grasp_x_offset", default_value="0.0"),
             DeclareLaunchArgument("dual_ik_attempts", default_value="100"),
-            DeclareLaunchArgument("dual_ik_timeout", default_value="0.50"),
-            DeclareLaunchArgument("pregrasp_clearance", default_value="0.12"),
-            DeclareLaunchArgument("source_grasp_x", default_value="0.45"),
-            DeclareLaunchArgument("source_grasp_y", default_value="-0.76"),
+            DeclareLaunchArgument("dual_ik_timeout", default_value="0.05"),
+            DeclareLaunchArgument("pregrasp_clearance", default_value="0.16"),
+            DeclareLaunchArgument("source_grasp_x", default_value="0.0"),
+            DeclareLaunchArgument("source_grasp_y", default_value="-0.400617"),
             DeclareLaunchArgument("swap_arm_grasps", default_value="false"),
             gazebo_moveit,
-            transfer,
+            Node(
+                package="ros_gz_bridge", executable="parameter_bridge",
+            arguments=[
+                "/model/pallet_box_r0_c0/pose@geometry_msgs/msg/PoseStamped[gz.msgs.Pose",
+                "/model/zhishu_robot/pose@geometry_msgs/msg/PoseStamped[gz.msgs.Pose",
+            ],
+            remappings=[
+                ("/model/pallet_box_r0_c0/pose", "/pallet_bin/measured_box_pose"),
+                ("/model/zhishu_robot/pose", "/pallet_bin/measured_base_pose"),
+            ],
+                output="screen",
+            ),
+            # The Gazebo controller spawners are intentionally delayed to let
+            # gz_ros_control finish registering all interfaces.  Start the
+            # transfer node after that settling window so its initial waist
+            # trajectory is not published before body_posture_controller exists.
+            TimerAction(period=LaunchConfiguration("transfer_start_delay"), actions=[transfer]),
         ]
     )

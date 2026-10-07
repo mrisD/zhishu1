@@ -19,6 +19,7 @@ from launch.actions import (
     ExecuteProcess,
     IncludeLaunchDescription,
     SetEnvironmentVariable,
+    TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -88,6 +89,7 @@ def generate_launch_description():
             ' handeye_target_enabled:=', handeye_target_enabled,
             ' bottle_grasp_sim_enabled:=', bottle_grasp_sim_enabled,
             ' mobile_base_sim_enabled:=', mobile_base_sim_enabled,
+            ' mobile_base_sim_mass:=', LaunchConfiguration('mobile_base_sim_mass'),
         ]),
         value_type=str,
     )
@@ -479,6 +481,7 @@ def generate_launch_description():
     ld.add_action(declare_handeye_target_enabled_cmd)
     ld.add_action(declare_bottle_grasp_sim_enabled_cmd)
     ld.add_action(declare_mobile_base_sim_enabled_cmd)
+    ld.add_action(DeclareLaunchArgument('mobile_base_sim_mass', default_value='11.9793854739169'))
     ld.add_action(declare_managed_gazebo_shutdown_cmd)
     ld.add_action(declare_use_gazebo_cmd)
     ld.add_action(declare_use_rviz_cmd)
@@ -509,7 +512,12 @@ def generate_launch_description():
     ld.add_action(start_gazebo_ros_bridge_cmd)
     ld.add_action(start_gazebo_ros_image_bridge_cmd)
     ld.add_action(start_gazebo_ros_spawner_cmd)
-    ld.add_action(gazebo_controller_spawner_dual_cmd)
-    ld.add_action(gazebo_controller_spawner_left_cmd)
+    # gz_ros_control creates /controller_manager only after the robot entity
+    # has been inserted into Gazebo.  Starting the spawner in the same launch
+    # tick races that initialization and can leave joint_state_broadcaster
+    # absent, which makes MoveIt consume an invalid/stale joint state.  Give
+    # Gazebo a short deterministic settling window before loading controllers.
+    ld.add_action(TimerAction(period=20.0, actions=[gazebo_controller_spawner_dual_cmd]))
+    ld.add_action(TimerAction(period=20.0, actions=[gazebo_controller_spawner_left_cmd]))
 
     return ld

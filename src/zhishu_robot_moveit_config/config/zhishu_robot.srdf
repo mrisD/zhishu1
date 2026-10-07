@@ -35,6 +35,12 @@
         <group name="left_arm"/>
         <group name="right_arm"/>
     </group>
+    <!-- Explicit torso/arm coordination for level tote carrying. -->
+    <group name="pallet_upper_body">
+        <group name="both_arms"/>
+        <joint name="waist_up_down_joint"/>
+        <joint name="waist_pitch_joint"/>
+    </group>
     <group name="torso_head">
         <joint name="waist_pitch_joint"/>
         <joint name="head_yaw_joint"/>
@@ -259,11 +265,8 @@
     <disable_collisions link1="L_hand_link" link2="left_wrist_yaw_link" reason="Never"/>
     <disable_collisions link1="L_hand_link" link2="right_wheel_link" reason="Never"/>
     <disable_collisions link1="base_link" link2="camera_link" reason="Never"/>
-    <disable_collisions link1="base_link" link2="gripper_base_link" reason="Never"/>
-    <disable_collisions link1="base_link" link2="gripper_left_finger_link" reason="Never"/>
-    <disable_collisions link1="base_link" link2="gripper_right_finger_link" reason="Never"/>
-    <disable_collisions link1="base_link" link2="left_gripper_left_finger_link" reason="Never"/>
-    <disable_collisions link1="base_link" link2="left_gripper_right_finger_link" reason="Never"/>
+    <!-- Extended gripper fingers can reach the chassis in crouched poses.
+         Keep base/tool collisions enabled during IK and trajectory checking. -->
     <disable_collisions link1="base_link" link2="head_camera_link" reason="Never"/>
     <disable_collisions link1="base_link" link2="head_pitch_link" reason="Never"/>
     <disable_collisions link1="base_link" link2="head_smart_speaker_link" reason="Never"/>
@@ -535,4 +538,9 @@
     <disable_collisions link1="left_gripper_left_finger_link" link2="left_gripper_right_finger_link" reason="Never"/>
     <disable_collisions link1="left_gripper_left_finger_link" link2="left_wrist_roll_link" reason="Never"/>
     <disable_collisions link1="left_gripper_right_finger_link" link2="left_wrist_roll_link" reason="Never"/>
+    <!-- Fixed support mounts intentionally overlap the chassis shell only. -->
+    <disable_collisions link1="base_link" link2="sim_front_left_support" reason="Adjacent"/>
+    <disable_collisions link1="base_link" link2="sim_front_right_support" reason="Adjacent"/>
+    <disable_collisions link1="base_link" link2="sim_rear_left_support" reason="Adjacent"/>
+    <disable_collisions link1="base_link" link2="sim_rear_right_support" reason="Adjacent"/>
 </robot>

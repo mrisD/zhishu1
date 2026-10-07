@@ -1,5 +1,9 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <robot name="zhishu_robot_description" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="mobile_base_sim_enabled" default="false"/>
+  <xacro:arg name="mobile_base_sim_mass" default="11.9793854739169"/>
+  <xacro:arg name="mobile_base_sim_waist_effort" default="250.0"/>
+  <xacro:property name="chassis_mass_scale" value="${float('$(arg mobile_base_sim_mass)') / 11.9793854739169 if '$(arg mobile_base_sim_enabled)' == 'true' else 1.0}"/>
   <link name="base_footprint"/>
   <joint name="base_footprint_joint" type="fixed">
     <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -9,8 +13,8 @@
   <link name="base_link">
     <inertial>
       <origin xyz="0.0105840663604119 -2.11178960268536E-05 0.171968380691249" rpy="0 0 0"/>
-      <mass value="11.9793854739169"/>
-      <inertia ixx="0.267920451400325" ixy="-0.000314932674231556" ixz="0.0034331217858401" iyy="0.200761728773841" iyz="-5.74641985699417E-05" izz="0.319752835778639"/>
+      <mass value="${11.9793854739169 * chassis_mass_scale}"/>
+      <inertia ixx="${0.267920451400325 * chassis_mass_scale}" ixy="${-0.000314932674231556 * chassis_mass_scale}" ixz="${0.0034331217858401 * chassis_mass_scale}" iyy="${0.200761728773841 * chassis_mass_scale}" iyz="${-5.74641985699417E-05 * chassis_mass_scale}" izz="${0.319752835778639 * chassis_mass_scale}"/>
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -28,6 +32,34 @@
       </geometry>
     </collision>
   </link>
+  <!-- Mobile simulation support proxy, not a measured caster installation.
+       Four low-friction ball contacts restore a finite support polygon without
+       fixing the base or changing chassis mass. Keep inside the chassis edge. -->
+  <xacro:macro name="sim_support_ball" params="name x y">
+    <link name="${name}">
+      <inertial>
+        <mass value="0.05"/>
+        <inertia ixx="0.000032" ixy="0" ixz="0" iyy="0.000032" iyz="0" izz="0.000032"/>
+      </inertial>
+      <visual><geometry><sphere radius="0.04"/></geometry></visual>
+      <collision><geometry><sphere radius="0.04"/></geometry></collision>
+    </link>
+    <joint name="${name}_mount" type="fixed">
+      <parent link="base_link"/><child link="${name}"/>
+      <!-- Wheel lowest point is -3.3 mm: supports at -3.0 mm must not
+           suspend the driven wheels in the nominal level posture. -->
+      <origin xyz="${x} ${y} 0.037"/>
+    </joint>
+    <gazebo reference="${name}">
+      <mu1>0.02</mu1><mu2>0.02</mu2>
+    </gazebo>
+  </xacro:macro>
+  <xacro:if value="$(arg mobile_base_sim_enabled)">
+    <xacro:sim_support_ball name="sim_front_left_support" x="0.185" y="0.130"/>
+    <xacro:sim_support_ball name="sim_front_right_support" x="0.185" y="-0.130"/>
+    <xacro:sim_support_ball name="sim_rear_left_support" x="-0.165" y="0.130"/>
+    <xacro:sim_support_ball name="sim_rear_right_support" x="-0.165" y="-0.130"/>
+  </xacro:if>
   <link name="waist_up_down_link">
     <inertial>
       <origin xyz="0.0014882 0.00079476 0.29807" rpy="0 0 0"/>
@@ -44,9 +76,11 @@
       </material>
     </visual>
     <collision>
-      <origin xyz="-0.000002 0 0.268826" rpy="0 0 0"/>
+      <!-- Tight planning proxy: keep the lift column floor-to-top envelope while
+           leaving clearance for the arms at the -90 deg waist-pitch limit. -->
+      <origin xyz="-0.000002 0 0.250000" rpy="0 0 0"/>
       <geometry>
-        <box size="0.240 0.240 0.560"/>
+        <box size="0.220 0.220 0.500"/>
       </geometry>
     </collision>
   </link>
@@ -73,9 +107,10 @@
       </material>
     </visual>
     <collision>
-      <origin xyz="0.01741 -0.000342 0.271365" rpy="0 0 0"/>
+      <!-- Reduced torso proxy; the visual mesh and inertial model are unchanged. -->
+      <origin xyz="0.015000 -0.000342 0.250000" rpy="0 0 0"/>
       <geometry>
-        <box size="0.30 0.31 0.560"/>
+        <box size="0.270 0.280 0.500"/>
       </geometry>
     </collision>
   </link>
@@ -84,7 +119,8 @@
     <parent link="waist_up_down_link"/>
     <child link="waist_pitch_link"/>
     <axis xyz="0 -1 0"/>
-    <limit lower="-0.7854" upper="0.2618" effort="100.0" velocity="1.0"/>
+    <!-- Allow the crouched pickup posture requested by the pallet transfer test. -->
+    <limit lower="-1.57079632679" upper="0.2618" effort="${float('$(arg mobile_base_sim_waist_effort)') if '$(arg mobile_base_sim_enabled)' == 'true' else 100.0}" velocity="1.0"/>
   </joint>
   <link name="head_yaw_link">
     <inertial>
@@ -765,7 +801,14 @@
     <origin xyz="0.015077 -0.175 0.0825" rpy="0 0 0"/>
     <parent link="base_link"/>
     <child link="right_wheel_link"/>
-    <axis xyz="0 -1 0"/>
+    <!-- DiffDrive expects equal wheel-axis signs; preserve hardware's
+         mirrored encoder convention outside mobile-base simulation. -->
+    <xacro:if value="$(arg mobile_base_sim_enabled)">
+      <axis xyz="0 1 0"/>
+    </xacro:if>
+    <xacro:unless value="$(arg mobile_base_sim_enabled)">
+      <axis xyz="0 -1 0"/>
+    </xacro:unless>
     <limit lower="0" upper="0" effort="100.0" velocity="10.0"/>
   </joint>
   <link name="laser_link">

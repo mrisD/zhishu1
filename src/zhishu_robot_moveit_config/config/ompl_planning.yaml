@@ -1,5 +1,8 @@
 planning_plugins:
   - ompl_interface/OMPLPlanner
+totg:
+  path_tolerance: 0.001
+  resample_dt: 0.02
 request_adapters:
   - default_planning_request_adapters/ResolveConstraintFrames
   - default_planning_request_adapters/ValidateWorkspaceBounds
@@ -27,7 +30,7 @@ left_arm:
   planner_configs:
     - RRTConnect
     - RRTstar
-  longest_valid_segment_fraction: 0.005
+  longest_valid_segment_fraction: 0.001
   enforce_joint_model_state_space: true
 
 right_arm:
@@ -35,7 +38,7 @@ right_arm:
   planner_configs:
     - RRTConnect
     - RRTstar
-  longest_valid_segment_fraction: 0.005
+  longest_valid_segment_fraction: 0.001
   enforce_joint_model_state_space: true
 
 torso_head:
@@ -60,5 +63,5 @@ both_arms:
   planner_configs:
     - RRTConnect
     - RRTstar
-  longest_valid_segment_fraction: 0.003
+  longest_valid_segment_fraction: 0.001
   enforce_joint_model_state_space: true
