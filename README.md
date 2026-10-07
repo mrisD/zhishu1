@@ -432,13 +432,38 @@ ros2 launch zhishu_robot_receiving_sim receiving_demo.launch.py
 
 ### 7.9 15 kg 小料箱预抽出与双臂转运验证
 
-`zhishu_robot_mtc_pick_place` 已支持在托盘前约 0.20 m、箱体相邻间隙约 2–4 mm
-的条件下，先从外围箱真实提手孔斜向钩拉预抽出，再重新定位并双臂抓取 15 kg
-小料箱，最后放入桌面高度 0.55 m 的大料箱。完整验证方案、参数、日志证据和限制见：
+2026-10-07 当前方案已改为 **200 mm 夹爪、140 mm TCP、约 50 mm 浅夹取**，
+第二步保留预抽出底盘站位，取消原有 12 cm 横向调位导致的转向再回正。
+独立初始场景首箱完整搬运已通过；旧录像箱壁实际为 142 mm，
+闭爪插入修正为约 48 mm（此前按名义箱口误报 54 mm）。现已补齐到 148 mm，详见
+[`200 mm 夹爪验证及新视频`](docs/pallet_bin_200mm_validation_20261007.md)。
+以下 320 mm 数据为历史方案，不是当前夹爪尺寸。
 
-[`docs/pallet_bin_15kg_transfer_validation_20260929.md`](docs/pallet_bin_15kg_transfer_validation_20260929.md)
+148 mm 模型经进一步优化已从独立初始场景连续完成整轮：桌边腰部采用
+0.14 m / -0.20 rad，大箱内落点 x=0.98 m，箱内释放间隙 50 mm。
+实际浅夹取约 48.5 mm，最大采样倾角约 0.27°，详见
+[`148 mm 最终完整录像验证`](docs/pallet_bin_final148_video_20261007.md)。
+原失稳失败保留在 [`148 mm 修正与失败回归记录`](docs/pallet_bin_148mm_retest_20261007.md)。
 
-无界面完整验证命令：
+当前模型已补平小料箱缺口，并移除右夹爪附加横块；底盘与托盘边沿名义间距
+为 0.20 m，首箱放在托盘近侧边沿。流程为夹住外围箱壁预抽出、读取物理位姿
+重新定位、双臂抓取，再转运至 0.55 m 桌面上的大料箱。
+
+2026-10-03/04 升级版候选验证中，首个外围箱 `r0_c0` 已从初始场景连续完成
+约 120 mm 物理预抽出、双臂抓取、约 0.962 m 协调携带、绕行、入箱释放及回位。
+释放后中心约 `(1.0310, -1.5500, 0.6360) m`；1 Hz 记录的最大箱体倾角约 0.10°，
+入箱阶段约 0.04°。长指启动/停车改为升降 0.10 m、腰部 -0.30 rad，取消回位后
+独立归零造成的底盘干涉。2026-10-04 三视角录像复测已包含上述端点修正，
+从初始场景连续完成整轮首箱搬运，最终中心约 `(1.0325, -1.5500, 0.6360) m`；
+本轮 1 Hz 采样最大倾角约 0.42°。录像和复现方式见
+[`录像验证记录`](docs/pallet_bin_video_validation_20261004.md)。
+当前仿真采用候选质量分布、支撑轮代理、250 N·m 腰部力矩、320 mm 长指和
+摩擦参数，均需实机核对，不能作为硬件能力认证。详见
+[`升级版候选验证`](docs/pallet_bin_upgraded_validation_20261003.md)。
+原轻质量模型约 37° 前倾的失败保留在
+[`动态复核历史`](docs/pallet_bin_dynamic_retest_20261003.md)。
+
+无界面首箱全流程复测命令（候选参数，不是实机认证）：
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -446,16 +471,15 @@ source install/setup.bash
 ROS_DOMAIN_ID=225 GZ_PARTITION=codex_pallet_final225 \
 ros2 launch zhishu_robot_mtc_pick_place pallet_bin_15kg_transfer.launch.py \
   headless:=true use_rviz:=false execute:=true \
-  full_transfer_box_index:=0 pre_extract_enabled:=true \
-  skip_pre_extract_stage:=false pre_extract_distance:=0.12 \
-  handle_z_offset:=0.22 pregrasp_clearance:=0.04 \
-  source_grasp_x:=0.45 source_grasp_y:=-0.68 \
-  grasp_waist_pitch:=-0.70
+  validate_all_nine:=false full_transfer_box_index:=0 \
+  pre_extract_enabled:=true
 ```
 
-2026-09-29 的 headless 回归已通过：预抽出、双臂抓取、桌下停靠、放入大料箱、
-夹爪释放和回零均执行成功。若 `/pallet_bin/target_pose` 没有视觉消息，仿真会使用
-按预抽出距离计算的 Gazebo 位移作为回退；真实部署前仍需接入 RGB-D 重定位节点。
+执行模式要求新鲜的 Gazebo 物理位姿，不能用指令位移代替实际预抽出结果；
+抬升、底盘倾角和最终入箱位置均有物理结果检查。真实部署仍需接入视觉重定位。
+本轮未验证九箱完整清理及中心箱搬运。
+[`2026-09-29 历史记录`](docs/pallet_bin_15kg_transfer_validation_20260929.md)
+保留供参考，其轨迹完成记录不代表当前模型通过了 15 kg 动态搬运验收。
 
 ## 8. Meta Quest 3S 双臂遥操作
 
