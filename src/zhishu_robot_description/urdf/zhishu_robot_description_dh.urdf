@@ -1,6 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <robot name="zhishu_robot_description" xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:arg name="mobile_base_sim_enabled" default="false"/>
+  <xacro:arg name="waist_pitch_min" default="-1.57079632679"/>
   <xacro:arg name="mobile_base_sim_mass" default="11.9793854739169"/>
   <xacro:arg name="mobile_base_sim_waist_effort" default="250.0"/>
   <xacro:property name="chassis_mass_scale" value="${float('$(arg mobile_base_sim_mass)') / 11.9793854739169 if '$(arg mobile_base_sim_enabled)' == 'true' else 1.0}"/>
@@ -120,7 +121,7 @@
     <child link="waist_pitch_link"/>
     <axis xyz="0 -1 0"/>
     <!-- Allow the crouched pickup posture requested by the pallet transfer test. -->
-    <limit lower="-1.57079632679" upper="0.2618" effort="${float('$(arg mobile_base_sim_waist_effort)') if '$(arg mobile_base_sim_enabled)' == 'true' else 100.0}" velocity="1.0"/>
+    <limit lower="$(arg waist_pitch_min)" upper="0.2618" effort="${float('$(arg mobile_base_sim_waist_effort)') if '$(arg mobile_base_sim_enabled)' == 'true' else 100.0}" velocity="1.0"/>
   </joint>
   <link name="head_yaw_link">
     <inertial>

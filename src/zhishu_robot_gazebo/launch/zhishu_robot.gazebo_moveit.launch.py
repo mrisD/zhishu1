@@ -8,6 +8,7 @@ from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 from moveit_configs_utils import MoveItConfigsBuilder
 
@@ -54,6 +55,8 @@ def generate_launch_description():
                 "bottle_grasp_sim_enabled": bottle_grasp_sim_enabled,
                 "mobile_base_sim_enabled": mobile_base_sim_enabled,
                 "mobile_base_sim_mass": LaunchConfiguration("mobile_base_sim_mass"),
+                "waist_pitch_min": LaunchConfiguration("waist_pitch_min"),
+                "tote_finger_length": LaunchConfiguration("tote_finger_length"),
                 "use_head_camera": use_head_camera,
                 "hide_head_pitch_visual": hide_head_pitch_visual,
             }
@@ -81,6 +84,8 @@ def generate_launch_description():
             "bottle_grasp_sim_enabled": bottle_grasp_sim_enabled,
             "mobile_base_sim_enabled": mobile_base_sim_enabled,
             "mobile_base_sim_mass": LaunchConfiguration("mobile_base_sim_mass"),
+            "waist_pitch_min": LaunchConfiguration("waist_pitch_min"),
+            "tote_finger_length": LaunchConfiguration("tote_finger_length"),
             "initial_positions_file": initial_positions_file,
             "managed_gazebo_shutdown": managed_gazebo_shutdown,
             "use_left_arm_controller": use_left_arm_controller,
@@ -105,6 +110,7 @@ def generate_launch_description():
                 "use_sim_time": True,
                 "trajectory_execution.allowed_execution_duration_scaling": 3.0,
                 "trajectory_execution.allowed_goal_duration_margin": 10.0,
+                "robot_description_planning.joint_limits.waist_pitch_joint.min_position": ParameterValue(LaunchConfiguration("waist_pitch_min"), value_type=float),
                 # Required by MoveIt Task Constructor task.execute().  Loading
                 # the capability is harmless for normal RViz planning and avoids
                 # starting a second move_group for pallet-transfer simulation.
@@ -133,6 +139,7 @@ def generate_launch_description():
                 "use_sim_time": True,
                 "trajectory_execution.allowed_execution_duration_scaling": 3.0,
                 "trajectory_execution.allowed_goal_duration_margin": 10.0,
+                "robot_description_planning.joint_limits.waist_pitch_joint.min_position": ParameterValue(LaunchConfiguration("waist_pitch_min"), value_type=float),
                 "capabilities": "move_group/ExecuteTaskSolutionCapability",
             },
         ],
@@ -214,6 +221,8 @@ def generate_launch_description():
                 description="Enable Gazebo DiffDrive for the robot base",
             ),
             DeclareLaunchArgument("mobile_base_sim_mass", default_value="11.9793854739169"),
+            DeclareLaunchArgument("waist_pitch_min", default_value="-1.57079632679"),
+            DeclareLaunchArgument("tote_finger_length", default_value="0.200"),
             DeclareLaunchArgument(
                 "initial_positions_file",
                 default_value=os.path.join(

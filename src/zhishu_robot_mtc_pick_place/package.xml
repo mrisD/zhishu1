@@ -20,6 +20,7 @@
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>ros_gz_interfaces</depend>
   <depend>trajectory_msgs</depend>
   <depend>shape_msgs</depend>
   <depend>std_msgs</depend>

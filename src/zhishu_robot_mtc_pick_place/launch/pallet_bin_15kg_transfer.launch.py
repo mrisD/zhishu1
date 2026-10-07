@@ -66,6 +66,8 @@ def generate_launch_description():
                 "use_fake_hardware": "false",
                 "mobile_base_sim_enabled": "true",
                 "mobile_base_sim_mass": "71.53",
+                "waist_pitch_min": LaunchConfiguration("waist_pitch_min"),
+                "tote_finger_length": LaunchConfiguration("tote_finger_length"),
             },
         )
         .robot_description_semantic(file_path="config/zhishu_robot.srdf")
@@ -92,6 +94,8 @@ def generate_launch_description():
             "use_left_arm_controller": "false",
             "mobile_base_sim_enabled": "true",
             "mobile_base_sim_mass": "71.53",
+            "waist_pitch_min": LaunchConfiguration("waist_pitch_min"),
+            "tote_finger_length": LaunchConfiguration("tote_finger_length"),
             "initial_positions_file": os.path.join(
                 moveit_share, "config", "pallet_bin_initial_positions.yaml"
             ),
@@ -121,8 +125,12 @@ def generate_launch_description():
             moveit_config.to_dict(),
             {
                 "use_sim_time": True,
+                "robot_description_planning.joint_limits.waist_pitch_joint.min_position": ParameterValue(LaunchConfiguration("waist_pitch_min"), value_type=float),
                 "execute": ParameterValue(execute, value_type=bool),
                 "resume_after_pick": ParameterValue(LaunchConfiguration("resume_after_pick"), value_type=bool),
+                "resume_floor_seating": ParameterValue(LaunchConfiguration("resume_floor_seating"), value_type=bool),
+                "place_on_floor_before_release": ParameterValue(LaunchConfiguration("place_on_floor_before_release"), value_type=bool),
+                "place_center_height": ParameterValue(LaunchConfiguration("place_center_height"), value_type=float),
                 "validate_all_nine": ParameterValue(
                     validate_all_nine, value_type=bool
                 ),
@@ -214,17 +222,20 @@ def generate_launch_description():
                 "grasp_waist_pitch": ParameterValue(
                     grasp_waist_pitch, value_type=float
                 ),
-                "carry_waist_lift": 0.18,
-                "carry_waist_pitch": -0.10,
+                "carry_waist_lift": ParameterValue(LaunchConfiguration("carry_waist_lift"), value_type=float),
+                "carry_waist_pitch": ParameterValue(LaunchConfiguration("carry_waist_pitch"), value_type=float),
+                "carry_center_height": ParameterValue(LaunchConfiguration("carry_center_height"), value_type=float),
                 # Half-sized table posture change preserves shallow grip
                 # stability while leaving the arms enough insertion reach.
-                "place_waist_lift": 0.14,
-                "place_waist_pitch": -0.20,
+                "place_waist_lift": ParameterValue(LaunchConfiguration("place_waist_lift"), value_type=float),
+                "place_waist_pitch": ParameterValue(LaunchConfiguration("place_waist_pitch"), value_type=float),
                 "load_test_lift": 0.05,
                 "carry_lift": ParameterValue(LaunchConfiguration("carry_lift"), value_type=float),
                 "hold_seconds": 3.0,
-                "base_max_linear": 0.18,
-                "base_max_angular": 0.45,
+                "base_max_linear": ParameterValue(LaunchConfiguration("base_max_linear"), value_type=float),
+                "base_max_angular": ParameterValue(LaunchConfiguration("base_max_angular"), value_type=float),
+                "base_linear_acceleration": ParameterValue(LaunchConfiguration("base_linear_acceleration"), value_type=float),
+                "base_angular_acceleration": ParameterValue(LaunchConfiguration("base_angular_acceleration"), value_type=float),
                 "state_wait_timeout": 60.0,
                 "physical_base_offset_x": 0.0,
                 "physical_base_offset_y": -0.400617,
@@ -241,6 +252,20 @@ def generate_launch_description():
             DeclareLaunchArgument("use_rviz", default_value="false"),
             DeclareLaunchArgument("reuse_gazebo", default_value="false"),
             DeclareLaunchArgument("resume_after_pick", default_value="false"),
+            DeclareLaunchArgument("resume_floor_seating", default_value="false"),
+            DeclareLaunchArgument("place_on_floor_before_release", default_value="false"),
+            DeclareLaunchArgument("place_center_height", default_value="0.96"),
+            DeclareLaunchArgument("waist_pitch_min", default_value="-1.57079632679"),
+            DeclareLaunchArgument("tote_finger_length", default_value="0.200"),
+            DeclareLaunchArgument("carry_waist_lift", default_value="0.18"),
+            DeclareLaunchArgument("carry_waist_pitch", default_value="-0.10"),
+            DeclareLaunchArgument("carry_center_height", default_value="0.96"),
+            DeclareLaunchArgument("base_max_linear", default_value="0.18"),
+            DeclareLaunchArgument("base_max_angular", default_value="0.45"),
+            DeclareLaunchArgument("base_linear_acceleration", default_value="0.30"),
+            DeclareLaunchArgument("base_angular_acceleration", default_value="0.60"),
+            DeclareLaunchArgument("place_waist_lift", default_value="0.14"),
+            DeclareLaunchArgument("place_waist_pitch", default_value="-0.20"),
             DeclareLaunchArgument("carry_lift", default_value="0.20"),
             DeclareLaunchArgument(
                 "execute",
@@ -320,10 +345,12 @@ def generate_launch_description():
             arguments=[
                 "/model/pallet_box_r0_c0/pose@geometry_msgs/msg/PoseStamped[gz.msgs.Pose",
                 "/model/zhishu_robot/pose@geometry_msgs/msg/PoseStamped[gz.msgs.Pose",
+                "/world/pallet_bin_15kg/model/pallet_box_r0_c0/link/box_link/sensor/tote_bottom_contact/contact@ros_gz_interfaces/msg/Contacts[gz.msgs.Contacts",
             ],
             remappings=[
                 ("/model/pallet_box_r0_c0/pose", "/pallet_bin/measured_box_pose"),
                 ("/model/zhishu_robot/pose", "/pallet_bin/measured_base_pose"),
+                ("/world/pallet_bin_15kg/model/pallet_box_r0_c0/link/box_link/sensor/tote_bottom_contact/contact", "/pallet_bin/tote_bottom_contacts"),
             ],
                 output="screen",
             ),

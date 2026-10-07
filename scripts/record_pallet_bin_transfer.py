@@ -33,6 +33,8 @@ STAGES = {
     6: "6/6 料箱稳定落底，机械臂回位",
     7: "验证完成：Gazebo 真实接触搬运",
     9: "本轮未完成：请查看验证日志",
+    8: "5/6 低速落底：保持闭爪，确认箱底接触",
+    10: "5/6 落底已确认，再松爪并竖直撤离",
 }
 
 
@@ -170,6 +172,7 @@ def record(args):
     from rclpy.qos import qos_profile_sensor_data
     from sensor_msgs.msg import JointState
     from geometry_msgs.msg import PoseStamped
+    from ros_gz_interfaces.msg import Contacts
     from PIL import Image, ImageDraw, ImageFont
     args.output_dir.mkdir(parents=True, exist_ok=True)
     receiver = CameraReceiver()
@@ -183,6 +186,17 @@ def record(args):
             data["waist_lift"] = positions.get("waist_up_down_joint")
             pitch = positions.get("waist_pitch_joint")
             data["waist_pitch_deg"] = None if pitch is None else math.degrees(pitch)
+            data["left_gripper_q"] = positions.get("left_gripper_left_finger_joint")
+            data["right_gripper_q"] = positions.get("gripper_left_finger_joint")
+
+    def contacts(message):
+        matching = [c for c in message.contacts if
+                    "large_bin" in (c.collision1.name + c.collision2.name) and
+                    "pallet_box_r0_c0" in (c.collision1.name + c.collision2.name) and
+                    "bottom" in c.collision1.name and "bottom" in c.collision2.name]
+        with data_lock:
+            data["floor_contact"] = bool(matching)
+            data["floor_reaction_n"] = sum(abs(w.body_1_wrench.force.z) for c in matching for w in c.wrenches)
 
     def box(message):
         p, q = message.pose.position, message.pose.orientation
@@ -200,6 +214,7 @@ def record(args):
     node.create_subscription(JointState, "/joint_states", joints, qos_profile_sensor_data)
     node.create_subscription(PoseStamped, "/pallet_bin/measured_box_pose", box, 10)
     node.create_subscription(PoseStamped, "/pallet_bin/measured_base_pose", base, 10)
+    node.create_subscription(Contacts, "/pallet_bin/tote_bottom_contacts", contacts, 10)
     executor = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
     executor.start()
     font_path = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
@@ -231,6 +246,12 @@ def record(args):
                         stage = 4
                     elif "large-bin insertion" in line and "planning succeeded" in line:
                         stage = 5
+                    elif "Floor seating step" in line:
+                        stage = 8
+                    elif "Floor support verified BEFORE opening" in line:
+                        stage = 10
+                        with data_lock:
+                            data["floor_verified_before_open"] = True
                     elif "Physical large-bin placement verified" in line:
                         stage = 6
                     elif "Complete transfer finished" in line:
@@ -243,7 +264,7 @@ def record(args):
                 stage = 3
             camera = "pick" if stage in (1, 2) else "overview"
             at_bin = state.get("base", [0, 0, 0])[0] > 0.45 and state.get("base", [0, 0, 0])[1] < -1.4
-            if stage in (5, 7) or (stage == 4 and at_bin):
+            if stage in (5, 7, 8, 10) or (stage == 4 and at_bin):
                 camera = "place"
             frame = receiver.get(camera)
             if frame is None:
@@ -254,24 +275,29 @@ def record(args):
             if started is None:
                 started = now
                 writers = [WebMWriter(args.output_dir / "full_process.webm", args.fps),
-                           WebMWriter(args.output_dir / "overview_4x.webm", args.fps)]
+                           WebMWriter(args.output_dir / f"overview_{args.speedup}x.webm", args.fps)]
                 print("Recording actual rendered images; both video encoders ready", flush=True)
             elapsed = now - started
             canvas = Image.new("RGB", (WIDTH, HEIGHT + 80), (14, 22, 31))
             canvas.paste(Image.fromarray(frame[0]), (0, 48))
             draw = ImageDraw.Draw(canvas)
-            draw.text((12, 6), STAGES[stage], font=title_font, fill=(240, 246, 251))
+            title = STAGES[stage] if stage != 0 else (
+                f"初始场景：{args.finger_length_mm} mm 手指，最大弯腰 {args.waist_limit_deg:g}°")
+            if stage == 5 and args.floor_seated:
+                title = "5/6 入箱：先低速落底，接触确认后才松爪"
+            draw.text((12, 6), title, font=title_font, fill=(240, 246, 251))
             draw.text((12, HEIGHT + 52),
-                      f"15 kg | 200 mm 夹爪 / 入箱口 50 mm | 边沿间距 20 cm | 桌面 0.55 m",
+                      f"15 kg | 手指 {args.finger_length_mm} / TCP {args.tcp_offset_mm} mm | " +
+                      (f"箱心 {state.get('box', [0, 0, 0])[2]:.3f} m / 箱底反力 {state.get('floor_reaction_n', 0):.0f} N" if args.floor_seated else "浅夹取约 50 mm | 桌面 0.55 m"),
                       font=small_font, fill=(211, 224, 234))
             draw.text((WIDTH - 140, 12), f"{int(elapsed)//60:02d}:{int(elapsed)%60:02d} / 原速",
                       font=small_font, fill=(240, 220, 145))
             if now - frame[1] > 3:
                 draw.text((12, 64), "图像更新暂停", font=title_font, fill=(255, 150, 80))
             writers[0].write(canvas)
-            if index % 4 == 0:
+            if index % args.speedup == 0:
                 draw.rectangle((WIDTH - 145, 5, WIDTH, 42), fill=(14, 22, 31))
-                draw.text((WIDTH - 140, 12), f"{int(elapsed)//60:02d}:{int(elapsed)%60:02d} / 4倍速",
+                draw.text((WIDTH - 140, 12), f"{int(elapsed)//60:02d}:{int(elapsed)%60:02d} / {args.speedup}倍速",
                           font=small_font, fill=(240, 220, 145))
                 writers[1].write(canvas)
             if stage != last_stage:
@@ -287,7 +313,7 @@ def record(args):
             index += 1
             if stop_at is not None and now >= stop_at:
                 break
-            # Wall-time recording. The quick version retains every fourth frame
+            # Wall-time recording. The quick version uniformly subsamples frames
             # at the same playback FPS, and is explicitly labelled accelerated.
             target_tick = started + index / args.fps
             time.sleep(max(0, target_tick - time.monotonic()))
@@ -301,7 +327,13 @@ def record(args):
         summary = {"passed": passed, "frames": index, "fps": args.fps,
                    "full_duration": index / args.fps, "views": CAMERAS,
                    "log": str(args.log), "final_telemetry": final_data,
-                   "note": "Real Gazebo rendered images, wall-time original and explicitly labelled 4x version"}
+                   "speedup": args.speedup,
+                   "quick_frames": writers[1].index if writers else 0,
+                   "finger_length_mm": args.finger_length_mm,
+                   "tcp_offset_mm": args.tcp_offset_mm,
+                   "waist_limit_deg": args.waist_limit_deg,
+                   "floor_seated": args.floor_seated,
+                   "note": f"Real Gazebo rendered images, wall-time original and explicitly labelled {args.speedup}x version"}
         (args.output_dir / "recording_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     if not passed:
         raise SystemExit("Recording ended without a complete-transfer success log")
@@ -324,6 +356,11 @@ def main():
     rec.add_argument("--log", type=Path, required=True)
     rec.add_argument("--fps", type=int, default=10)
     rec.add_argument("--max-seconds", type=float, default=2400)
+    rec.add_argument("--speedup", type=int, choices=(2, 4, 8), default=4)
+    rec.add_argument("--finger-length-mm", type=int, default=200)
+    rec.add_argument("--tcp-offset-mm", type=int, default=140)
+    rec.add_argument("--waist-limit-deg", type=float, default=-90)
+    rec.add_argument("--floor-seated", action="store_true")
     rec.set_defaults(action=record)
     args = parser.parse_args()
     args.action(args)

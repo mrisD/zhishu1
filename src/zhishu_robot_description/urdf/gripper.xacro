@@ -1,13 +1,14 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:property name="tote_finger_length" value="0.200"/>
+    <xacro:arg name="tote_finger_length" default="0.200"/>
+    <xacro:property name="tote_finger_length" value="${float('$(arg tote_finger_length)')}"/>
 
     <!-- Gazebo Sim only creates dynamic links that have valid inertial data.
          Without this block the finger links, their prismatic joints, and the
          corresponding ros2_control command interfaces are omitted from SDF. -->
     <xacro:macro name="gripper_finger_inertial">
         <inertial>
-            <!-- Candidate 200 mm fingers; TCP is 80 mm behind the tip.
+            <!-- Configurable fingers; TCP is 80 mm behind the tip.
                  The tote grasp target limits insertion to about 50 mm. -->
             <origin xyz="0 0 ${tote_finger_length / 2}" rpy="0 0 0"/>
             <mass value="0.1"/>
@@ -96,7 +97,7 @@
     <joint name="right_gripper_tcp_joint" type="fixed">
         <parent link="gripper_base_link"/>
         <child link="right_gripper_tcp"/>
-        <origin xyz="0 0 0.14" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 ${tote_finger_length - 0.060}" rpy="1.5708 0 0"/>
     </joint>
     <!-- Left gripper: same geometry and kinematics as the right gripper, but with left_* names. -->
     <link name="left_gripper_base_link">
@@ -179,6 +180,6 @@
     <joint name="left_gripper_tcp_joint" type="fixed">
         <parent link="left_gripper_base_link"/>
         <child link="left_gripper_tcp"/>
-        <origin xyz="0 0 0.14" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 ${tote_finger_length - 0.060}" rpy="1.5708 0 0"/>
     </joint>
 </robot>
