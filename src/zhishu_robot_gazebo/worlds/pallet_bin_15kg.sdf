@@ -69,9 +69,8 @@
         <use_pose_vector_msg>false</use_pose_vector_msg>
         <update_frequency>20</update_frequency>
       </plugin>
-      <!-- Move the first tote flush to the pallet near edge: 0.434 + 0.150
-           = 0.584 m centre in world X. -->
-      <pose>0.584355 -0.400617 0.224000 0 0 0</pose>
+      <!-- Restore the first tote to its default CAD centre, inset from the pallet edge. -->
+      <pose>0.704355 -0.400617 0.224000 0 0 0</pose>
       <link name="box_link">
         <sensor name="tote_bottom_contact" type="contact">
           <always_on>true</always_on><update_rate>50</update_rate>

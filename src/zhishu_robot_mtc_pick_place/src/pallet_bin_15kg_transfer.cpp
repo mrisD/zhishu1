@@ -108,6 +108,7 @@ public:
     declare_if_missing("resume_floor_seating", false);
     declare_if_missing("validate_all_nine", false);
     declare_if_missing("full_transfer_box_index", 0);
+    declare_if_missing("cleared_first_row_count", 0);
     declare_if_missing("pre_extract_enabled", false);
     declare_if_missing("skip_pre_extract_stage", false);
     declare_if_missing("pre_extract_box_index", 0);
@@ -281,11 +282,11 @@ public:
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(data_mutex_);
         const auto& p = msg->pose.position;
-        measured_boxes_["pallet_box_r0_c0"] = {p.x, p.y, p.z};
+        measured_boxes_["pallet_box_r" + std::to_string(get_parameter("full_transfer_box_index").as_int() / 3) + "_c" + std::to_string(get_parameter("full_transfer_box_index").as_int() % 3)] = {p.x, p.y, p.z};
         const auto& q = msg->pose.orientation;
         const auto rotation = Eigen::Quaterniond(q.w, q.x, q.y, q.z).normalized().toRotationMatrix();
         measured_box_tilt_ = std::acos(std::clamp(rotation(2, 2), -1.0, 1.0));
-        measured_boxes_received_["pallet_box_r0_c0"] = std::chrono::steady_clock::now();
+        measured_boxes_received_["pallet_box_r" + std::to_string(get_parameter("full_transfer_box_index").as_int() / 3) + "_c" + std::to_string(get_parameter("full_transfer_box_index").as_int() % 3)] = std::chrono::steady_clock::now();
       });
 
     floor_contacts_sub_ = create_subscription<ros_gz_interfaces::msg::Contacts>(
@@ -296,8 +297,8 @@ public:
         for (const auto& contact : msg->contacts) {
           const auto& a = contact.collision1.name;
           const auto& b = contact.collision2.name;
-          const auto tote_bottom = [](const std::string& name) {
-            return name.find("pallet_box_r0_c0") != std::string::npos &&
+          const auto tote_bottom = [this](const std::string& name) {
+            return name.find("pallet_box_r" + std::to_string(get_parameter("full_transfer_box_index").as_int() / 3) + "_c" + std::to_string(get_parameter("full_transfer_box_index").as_int() % 3)) != std::string::npos &&
                    name.find("bottom") != std::string::npos;
           };
           const auto bin_bottom = [](const std::string& name) {
@@ -318,15 +319,14 @@ public:
 
     // Coordinates are derived from baifang.stp using:
     //   world X <- STEP Y, world Y <- STEP Z, world Z <- 150 mm - STEP X.
-    // r0_c0 is flush with the pallet near edge; the remaining rows retain
-    // their CAD centres for the later coverage test.
+    // All totes retain their default CAD centres, including r0_c0.
     const std::array<double, 3> xs{0.704355, 1.028284, 1.351011};
     const std::array<double, 3> ys{-0.400617, 0.002017, 0.406220};
     for (int row = 0; row < 3; ++row) {
       for (int col = 0; col < 3; ++col) {
         boxes_.push_back(BoxSpec{
           "pallet_box_r" + std::to_string(row) + "_c" + std::to_string(col),
-          row == 0 && col == 0 ? 0.584355 : xs[row], ys[col], 0.224, row, col});
+          xs[row], ys[col], 0.224, row, col});
       }
     }
   }
@@ -376,9 +376,14 @@ public:
         // Planning-only geometry probe: use the measured post-pull pose while
         // bypassing the one-arm hook task.  The normal execution path keeps
         // this false and always performs the real pre-extraction.
-        box.x = 0.584355;
-        box.y = -0.520617;
-        box.z = 0.224;
+        if (execute) throw std::runtime_error("skip_pre_extract_stage is planning-only");
+        {
+          std::lock_guard<std::mutex> lock(data_mutex_);
+          if (!measured_boxes_.count(box.id) || std::chrono::steady_clock::now() - measured_boxes_received_.at(box.id) > std::chrono::seconds(1))
+            throw std::runtime_error("Planning probe requires fresh actual extracted tote pose");
+          const auto& p = measured_boxes_.at(box.id);
+          box.x = p[0]; box.y = p[1]; box.z = p[2];
+        }
         RCLCPP_WARN(
           get_logger(), "Skipping pre-extraction motion; probing relocated tote at (%.3f, %.3f, %.3f)",
           box.x, box.y, box.z);
@@ -420,7 +425,7 @@ public:
         get_logger(), "Relocalized %s world center=(%.3f, %.3f, %.3f)",
         box.id.c_str(), box.x, box.y, box.z);
       addEnvironmentToPlanningScene();
-      setWaist(0.0, 0.0);
+      // Keep the extracted posture until a collision-checked arm/waist transition.
       }
     }
 
@@ -511,14 +516,14 @@ public:
       "Starting complete pallet -> large-bin transfer with %s (index %d)",
       box.id.c_str(), full_index);
 
-    if (execute && !resume_after_pick) setWaist(0.0, 0.0);
+    // Do not swing long fingers with an independent waist reset before pick.
     if (!resume_after_pick && !goToSourceWorkPose(box)) {
       throw std::runtime_error("Failed to dock for full transfer source");
     }
     addEnvironmentToPlanningScene();
-    if (!resume_after_pick) setWaist(
+    if (!resume_after_pick) prepareEmptyGrasp(box,
       get_parameter("grasp_waist_lift").as_double(),
-      get_parameter("grasp_waist_pitch").as_double());
+      get_parameter("grasp_waist_pitch").as_double(), execute);
     auto base = currentOdom();
     const auto source = worldPointInBase(box.x, box.y, box.z, base);
     if (!resume_after_pick && !runPickTask(
@@ -1150,6 +1155,7 @@ private:
     objects.push_back(bin);
 
     for (const auto& box : boxes_) {
+      if (box.row == 0 && box.col < get_parameter("cleared_first_row_count").as_int()) continue;
       // While an MTC pick is physically being carried, this id is attached to
       // left_gripper_tcp in the planning scene. Do not also recreate it in the
       // world when the base reaches the next dock.
@@ -2659,7 +2665,7 @@ private:
 
   void seatToteOnBinFloor(const std::string& object_id, double target_x, double settled_z)
   {
-    if (object_id != "pallet_box_r0_c0")
+    if (object_id != "pallet_box_r" + std::to_string(get_parameter("full_transfer_box_index").as_int() / 3) + "_c" + std::to_string(get_parameter("full_transfer_box_index").as_int() % 3))
       throw std::runtime_error("Floor contact sensor is configured only for the first tote");
     if (carried_handle_offset_ < 0.0) {
       mtc::Task model_task;
@@ -2768,6 +2774,45 @@ private:
   }
 
   double carried_handle_offset_{-1.0};
+
+  void prepareEmptyGrasp(const BoxSpec& box, double lift, double pitch, bool execute)
+  {
+    mtc::Task task;
+    task.stages()->setName("empty long-finger torso-arm approach");
+    task.loadRobotModel(shared_from_this());
+    task.add(std::make_unique<mtc::stages::CurrentState>("current extracted state"));
+    addGroundContactStage(task);
+    auto seed = currentSeed(task.getRobotModel());
+    const auto center = worldPointInBase(box.x, box.y, box.z, currentOdom());
+    geometry_msgs::msg::Pose left, right;
+    // Keep tips well above the rim throughout waist motion, then let the
+    // existing strict pick plan descend to its pregrasp and shallow grasp.
+    graspTargets(center, 0.26, left, right);
+    auto goal = solveDualArmGoal(left, right, seed, task.getRobotModel());
+    auto rise = std::make_unique<mtc::stages::MoveTo>("raise both long fingers above tote", makePipeline());
+    rise->setGroup("both_arms"); rise->setGoal(goal);
+    rise->setTimeout(get_parameter("stage_timeout").as_double());
+    task.add(std::move(rise));
+    for (const auto& item : goal) seed.setVariablePosition(item.first, item.second);
+    const double start_lift = seed.getVariablePosition("waist_up_down_joint");
+    const double start_pitch = seed.getVariablePosition("waist_pitch_joint");
+    for (int i = 1; i <= 8; ++i) {
+      const double t = i / 8.0;
+      seed.setVariablePosition("waist_up_down_joint", start_lift + t * (lift-start_lift));
+      seed.setVariablePosition("waist_pitch_joint", start_pitch + t * (pitch-start_pitch));
+      seed.update();
+      goal = solveDualArmGoal(left, right, seed, task.getRobotModel());
+      goal["waist_up_down_joint"] = seed.getVariablePosition("waist_up_down_joint");
+      goal["waist_pitch_joint"] = seed.getVariablePosition("waist_pitch_joint");
+      for (const auto& item : goal) seed.setVariablePosition(item.first,item.second);
+      auto move = std::make_unique<mtc::stages::MoveTo>("keep raised fingers while bending " + std::to_string(i), makePipeline());
+      move->setGroup("pallet_upper_body"); move->setGoal(goal);
+      move->setTimeout(get_parameter("stage_timeout").as_double());
+      task.add(std::move(move));
+    }
+    if (!planAndMaybeExecute(task, execute, "empty long-finger coordinated approach"))
+      throw std::runtime_error("Collision-checked empty torso-arm approach failed");
+  }
 
   void moveArmsHome()
   {

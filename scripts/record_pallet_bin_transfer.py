@@ -286,6 +286,10 @@ def record(args):
             if stage == 5 and args.floor_seated:
                 title = "5/6 入箱：先低速落底，接触确认后才松爪"
             draw.text((12, 6), title, font=title_font, fill=(240, 246, 251))
+            waist = state.get("waist_pitch_deg")
+            angle_text = "实测弯腰：等待关节数据" if waist is None else f"实测弯腰：{waist:.2f}° | 允许下限 {args.waist_limit_deg:g}°"
+            draw.rectangle((8, 52, 405, 80), fill=(14, 22, 31))
+            draw.text((14, 56), angle_text, font=small_font, fill=(255, 226, 130))
             draw.text((12, HEIGHT + 52),
                       f"15 kg | 手指 {args.finger_length_mm} / TCP {args.tcp_offset_mm} mm | " +
                       (f"箱心 {state.get('box', [0, 0, 0])[2]:.3f} m / 箱底反力 {state.get('floor_reaction_n', 0):.0f} N" if args.floor_seated else "浅夹取约 50 mm | 桌面 0.55 m"),

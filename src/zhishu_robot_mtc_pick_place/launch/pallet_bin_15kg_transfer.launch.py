@@ -54,6 +54,7 @@ def generate_launch_description():
     source_grasp_y = LaunchConfiguration("source_grasp_y")
     swap_arm_grasps = LaunchConfiguration("swap_arm_grasps")
 
+    target_model = LaunchConfiguration("target_model")
     gazebo_share = get_package_share_directory("zhishu_robot_gazebo")
     moveit_config_package = "zhishu_robot_moveit_config"
 
@@ -127,6 +128,7 @@ def generate_launch_description():
                 "use_sim_time": True,
                 "robot_description_planning.joint_limits.waist_pitch_joint.min_position": ParameterValue(LaunchConfiguration("waist_pitch_min"), value_type=float),
                 "execute": ParameterValue(execute, value_type=bool),
+                "cleared_first_row_count": ParameterValue(LaunchConfiguration("cleared_first_row_count"), value_type=int),
                 "resume_after_pick": ParameterValue(LaunchConfiguration("resume_after_pick"), value_type=bool),
                 "resume_floor_seating": ParameterValue(LaunchConfiguration("resume_floor_seating"), value_type=bool),
                 "place_on_floor_before_release": ParameterValue(LaunchConfiguration("place_on_floor_before_release"), value_type=bool),
@@ -214,8 +216,8 @@ def generate_launch_description():
                 # The Gazebo velocity-state feedback is discrete under the
                 # 15 kg contact pull; slower time-parameterisation prevents a
                 # transient path-tolerance hit without relaxing goal error.
-                "velocity_scaling": 0.12,
-                "acceleration_scaling": 0.08,
+                "velocity_scaling": ParameterValue(LaunchConfiguration("velocity_scaling"), value_type=float),
+                "acceleration_scaling": ParameterValue(LaunchConfiguration("acceleration_scaling"), value_type=float),
                 "grasp_waist_lift": ParameterValue(
                     grasp_waist_lift, value_type=float
                 ),
@@ -233,6 +235,7 @@ def generate_launch_description():
                 "carry_lift": ParameterValue(LaunchConfiguration("carry_lift"), value_type=float),
                 "hold_seconds": 3.0,
                 "base_max_linear": ParameterValue(LaunchConfiguration("base_max_linear"), value_type=float),
+                "base_motion_timeout": ParameterValue(LaunchConfiguration("base_motion_timeout"), value_type=float),
                 "base_max_angular": ParameterValue(LaunchConfiguration("base_max_angular"), value_type=float),
                 "base_linear_acceleration": ParameterValue(LaunchConfiguration("base_linear_acceleration"), value_type=float),
                 "base_angular_acceleration": ParameterValue(LaunchConfiguration("base_angular_acceleration"), value_type=float),
@@ -245,7 +248,12 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument("cleared_first_row_count", default_value="0"),
+            DeclareLaunchArgument("target_model", default_value="pallet_box_r0_c0"),
             DeclareLaunchArgument("headless", default_value="true"),
+            DeclareLaunchArgument("velocity_scaling", default_value="0.12"),
+            DeclareLaunchArgument("acceleration_scaling", default_value="0.08"),
+            DeclareLaunchArgument("base_motion_timeout", default_value="90.0"),
             DeclareLaunchArgument("world_file", default_value="pallet_bin_15kg.sdf"),
             DeclareLaunchArgument("start_transfer", default_value="true"),
             DeclareLaunchArgument("transfer_start_delay", default_value="30.0"),
@@ -343,14 +351,14 @@ def generate_launch_description():
             Node(
                 package="ros_gz_bridge", executable="parameter_bridge",
             arguments=[
-                "/model/pallet_box_r0_c0/pose@geometry_msgs/msg/PoseStamped[gz.msgs.Pose",
+                ["/model/", target_model, "/pose@geometry_msgs/msg/PoseStamped[gz.msgs.Pose"],
                 "/model/zhishu_robot/pose@geometry_msgs/msg/PoseStamped[gz.msgs.Pose",
-                "/world/pallet_bin_15kg/model/pallet_box_r0_c0/link/box_link/sensor/tote_bottom_contact/contact@ros_gz_interfaces/msg/Contacts[gz.msgs.Contacts",
+                ["/world/pallet_bin_15kg/model/", target_model, "/link/box_link/sensor/tote_bottom_contact/contact@ros_gz_interfaces/msg/Contacts[gz.msgs.Contacts"],
             ],
             remappings=[
-                ("/model/pallet_box_r0_c0/pose", "/pallet_bin/measured_box_pose"),
+                (["/model/", target_model, "/pose"], "/pallet_bin/measured_box_pose"),
                 ("/model/zhishu_robot/pose", "/pallet_bin/measured_base_pose"),
-                ("/world/pallet_bin_15kg/model/pallet_box_r0_c0/link/box_link/sensor/tote_bottom_contact/contact", "/pallet_bin/tote_bottom_contacts"),
+                (["/world/pallet_bin_15kg/model/", target_model, "/link/box_link/sensor/tote_bottom_contact/contact"], "/pallet_bin/tote_bottom_contacts"),
             ],
                 output="screen",
             ),
