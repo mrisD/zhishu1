@@ -18,14 +18,15 @@ from pathlib import Path
 
 
 CAMERAS = {
-    "pick": ((0.10, -2.10, 1.90), (0.48, -0.50, 0.68), 1.05),
+    "pick": ((-1.35, 1.95, 2.10), (0.65, 0.05, 0.60), 1.05),
     "overview": ((-2.60, -3.80, 3.10), (0.66, -0.75, 0.63), 1.05),
     "place": ((1.95, -2.90, 2.10), (0.92, -1.55, 0.73), 1.05),
 }
 WIDTH, HEIGHT = 960, 540
+FOOTER_HEIGHT = 110
 STAGES = {
     0: "初始场景：200 mm 夹爪，浅夹取 50 mm",
-    1: "1/6 夹住外围箱壁，真实预抽出约 120 mm",
+    1: "1/6 真实接触预移位：侧推或夹拉约 324 mm",
     2: "2/6 重新定位，双臂下探闭合与抬升",
     3: "3/6 腰臂协调直腰，保持料箱水平",
     4: "4/6 绕过接料台，转运至 0.55 m 桌面",
@@ -35,6 +36,8 @@ STAGES = {
     9: "本轮未完成：请查看验证日志",
     8: "5/6 低速落底：保持闭爪，确认箱底接触",
     10: "5/6 落底已确认，再松爪并竖直撤离",
+    11: "返程：空车返回托盘，暂不清除已放置箱",
+    12: "仿真场景操作：已返托盘，清除大箱内上一箱",
 }
 
 
@@ -135,7 +138,7 @@ class WebMWriter:
         self.fps = fps
         self.pipeline = Gst.parse_launch(
             f'appsrc name=frames format=time block=true '
-            f'caps="video/x-raw,format=RGB,width={WIDTH},height={HEIGHT + 80},framerate={fps}/1" '
+            f'caps="video/x-raw,format=RGB,width={WIDTH},height={HEIGHT + FOOTER_HEIGHT},framerate={fps}/1" '
             f'! queue max-size-buffers=4 ! videoconvert '
             f'! vp8enc deadline=1 cpu-used=6 target-bitrate=1500000 keyframe-max-dist={fps * 5} '
             f'! webmmux ! filesink location="{path}"'
@@ -189,10 +192,11 @@ def record(args):
             data["left_gripper_q"] = positions.get("left_gripper_left_finger_joint")
             data["right_gripper_q"] = positions.get("gripper_left_finger_joint")
 
+    current_target = ["pallet_box_r0_c0"]
     def contacts(message):
         matching = [c for c in message.contacts if
                     "large_bin" in (c.collision1.name + c.collision2.name) and
-                    "pallet_box_r0_c0" in (c.collision1.name + c.collision2.name) and
+                    current_target[0] in (c.collision1.name + c.collision2.name) and
                     "bottom" in c.collision1.name and "bottom" in c.collision2.name]
         with data_lock:
             data["floor_contact"] = bool(matching)
@@ -221,6 +225,7 @@ def record(args):
     title_font = ImageFont.truetype(font_path, 21)
     small_font = ImageFont.truetype(font_path, 15)
     stage, offset, stop_at, passed = 0, 0, None, False
+    completed_transfers, cycle = 0, 1
     stop_requested = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop_requested.set())
@@ -238,7 +243,20 @@ def record(args):
                     lines = handle.readlines()
                     offset = handle.tell()
                 for line in lines:
-                    if "Pre-extracting perimeter tote" in line:
+                    if "SEQUENCE_TARGET " in line:
+                        current_target[0] = line.split("SEQUENCE_TARGET ", 1)[1].strip()
+                        cycle = completed_transfers + 1
+                        stage = 0
+                        with data_lock:
+                            data.pop("floor_verified_before_open", None)
+                            data.pop("box", None)
+                    elif "SEQUENCE_CLEAR_DESTINATION" in line:
+                        stage = 12
+                    elif "Returning empty robot to pallet" in line:
+                        stage = 11
+                    elif "Pre-extracting perimeter tote" in line:
+                        stage = 1
+                    elif "coordinated front pull approach: planning succeeded" in line or "physical side push without attachment: planning succeeded" in line:
                         stage = 1
                     elif "Starting complete pallet -> large-bin transfer" in line:
                         stage = 2
@@ -255,7 +273,9 @@ def record(args):
                     elif "Physical large-bin placement verified" in line:
                         stage = 6
                     elif "Complete transfer finished" in line:
-                        stage, passed, stop_at = 7, True, now + 8
+                        completed_transfers += 1
+                        if completed_transfers == args.expected_transfers:
+                            stage, passed, stop_at = 7, True, now + 8
                     elif "[FATAL]" in line:
                         stage, passed, stop_at = 9, False, now + 8
             with data_lock:
@@ -264,7 +284,7 @@ def record(args):
                 stage = 3
             camera = "pick" if stage in (1, 2) else "overview"
             at_bin = state.get("base", [0, 0, 0])[0] > 0.45 and state.get("base", [0, 0, 0])[1] < -1.4
-            if stage in (5, 7, 8, 10) or (stage == 4 and at_bin):
+            if stage in (5, 7, 8, 10, 12) or (stage == 4 and at_bin):
                 camera = "place"
             frame = receiver.get(camera)
             if frame is None:
@@ -278,18 +298,19 @@ def record(args):
                            WebMWriter(args.output_dir / f"overview_{args.speedup}x.webm", args.fps)]
                 print("Recording actual rendered images; both video encoders ready", flush=True)
             elapsed = now - started
-            canvas = Image.new("RGB", (WIDTH, HEIGHT + 80), (14, 22, 31))
+            canvas = Image.new("RGB", (WIDTH, HEIGHT + FOOTER_HEIGHT), (14, 22, 31))
             canvas.paste(Image.fromarray(frame[0]), (0, 48))
             draw = ImageDraw.Draw(canvas)
             title = STAGES[stage] if stage != 0 else (
                 f"初始场景：{args.finger_length_mm} mm 手指，最大弯腰 {args.waist_limit_deg:g}°")
             if stage == 5 and args.floor_seated:
                 title = "5/6 入箱：先低速落底，接触确认后才松爪"
+            if (args.total_boxes or args.expected_transfers) > 1:
+                title = f"箱 {cycle}/{args.total_boxes or args.expected_transfers}　" + title
             draw.text((12, 6), title, font=title_font, fill=(240, 246, 251))
             waist = state.get("waist_pitch_deg")
             angle_text = "实测弯腰：等待关节数据" if waist is None else f"实测弯腰：{waist:.2f}° | 允许下限 {args.waist_limit_deg:g}°"
-            draw.rectangle((8, 52, 405, 80), fill=(14, 22, 31))
-            draw.text((14, 56), angle_text, font=small_font, fill=(255, 226, 130))
+            draw.text((12, HEIGHT + 80), angle_text, font=small_font, fill=(255, 226, 130))
             draw.text((12, HEIGHT + 52),
                       f"15 kg | 手指 {args.finger_length_mm} / TCP {args.tcp_offset_mm} mm | " +
                       (f"箱心 {state.get('box', [0, 0, 0])[2]:.3f} m / 箱底反力 {state.get('floor_reaction_n', 0):.0f} N" if args.floor_seated else "浅夹取约 50 mm | 桌面 0.55 m"),
@@ -305,13 +326,14 @@ def record(args):
                           font=small_font, fill=(240, 220, 145))
                 writers[1].write(canvas)
             if stage != last_stage:
-                canvas.save(args.output_dir / f"stage_{stage}_{camera}.png")
+                prefix = f"cycle_{cycle}_" if (args.total_boxes or args.expected_transfers) > 1 else ""
+                canvas.save(args.output_dir / f"{prefix}stage_{stage}_{camera}.png")
                 print(f"Stage {stage}, view={camera}, real elapsed={elapsed:.1f}s", flush=True)
                 last_stage = stage
             if index % args.fps == 0:
                 final_data = {"wall_time": time.time(), "elapsed": elapsed, "stage": stage,
                               "camera": camera, "image_sim_time": frame[2],
-                              "image_age": now - frame[1], **state}
+                              "image_age": now - frame[1], "cycle": cycle, "target": current_target[0], **state}
                 telemetry.write(json.dumps(final_data) + "\n")
                 telemetry.flush()
             index += 1
@@ -329,6 +351,7 @@ def record(args):
             rclpy.shutdown()
         executor.join(timeout=2)
         summary = {"passed": passed, "frames": index, "fps": args.fps,
+                   "completed_transfers": completed_transfers,
                    "full_duration": index / args.fps, "views": CAMERAS,
                    "log": str(args.log), "final_telemetry": final_data,
                    "speedup": args.speedup,
@@ -365,6 +388,8 @@ def main():
     rec.add_argument("--tcp-offset-mm", type=int, default=140)
     rec.add_argument("--waist-limit-deg", type=float, default=-90)
     rec.add_argument("--floor-seated", action="store_true")
+    rec.add_argument("--expected-transfers", type=int, default=1)
+    rec.add_argument("--total-boxes", type=int, default=0)
     rec.set_defaults(action=record)
     args = parser.parse_args()
     args.action(args)

@@ -97,21 +97,19 @@ def generate_launch_description():
             "mobile_base_sim_mass": "71.53",
             "waist_pitch_min": LaunchConfiguration("waist_pitch_min"),
             "tote_finger_length": LaunchConfiguration("tote_finger_length"),
-            "initial_positions_file": os.path.join(
-                moveit_share, "config", "pallet_bin_initial_positions.yaml"
-            ),
+            "initial_positions_file": LaunchConfiguration("initial_positions_file"),
             # The base collision front is +0.234 m in base coordinates and
             # the pallet near edge is x=0.434 m.  Spawn at x=0 so the
             # chassis-to-pallet edge gap is exactly 0.200 m.
-            "x": "0.000",
-            "y": "-0.400617",
+            "x": LaunchConfiguration("spawn_x"),
+            "y": LaunchConfiguration("spawn_y"),
             # The wheel joint centres are already 82.5 mm above base_footprint
             # and the wheel radius is 85.8 mm.  The base collision bottom is
             # z=0 in that frame, so the settled spawn height is only 3.3 mm;
             # 90 mm would leave the whole robot floating and it then falls,
             # corrupting the initial odometry/yaw before docking.
             "z": "0.004",
-            "yaw": "0.0",
+            "yaw": LaunchConfiguration("spawn_yaw"),
             "allow_renaming": "false",
         }.items(),
     )
@@ -129,6 +127,9 @@ def generate_launch_description():
                 "robot_description_planning.joint_limits.waist_pitch_joint.min_position": ParameterValue(LaunchConfiguration("waist_pitch_min"), value_type=float),
                 "execute": ParameterValue(execute, value_type=bool),
                 "cleared_first_row_count": ParameterValue(LaunchConfiguration("cleared_first_row_count"), value_type=int),
+                "source_row_only": ParameterValue(LaunchConfiguration("source_row_only"), value_type=int),
+                "return_to_pallet_after_transfer": ParameterValue(LaunchConfiguration("return_to_pallet_after_transfer"), value_type=bool),
+                "return_empty_only": ParameterValue(LaunchConfiguration("return_empty_only"), value_type=bool),
                 "resume_after_pick": ParameterValue(LaunchConfiguration("resume_after_pick"), value_type=bool),
                 "resume_floor_seating": ParameterValue(LaunchConfiguration("resume_floor_seating"), value_type=bool),
                 "place_on_floor_before_release": ParameterValue(LaunchConfiguration("place_on_floor_before_release"), value_type=bool),
@@ -166,6 +167,14 @@ def generate_launch_description():
                 "hook_hole_z_offset": ParameterValue(
                     hook_hole_z_offset, value_type=float
                 ),
+                "hook_pose_x_offset": ParameterValue(LaunchConfiguration("hook_pose_x_offset"), value_type=float),
+                "rear_push_probe": ParameterValue(LaunchConfiguration("rear_push_probe"), value_type=bool),
+                "front_pull_probe": ParameterValue(LaunchConfiguration("front_pull_probe"), value_type=bool),
+                "front_pull_execute": ParameterValue(LaunchConfiguration("front_pull_execute"), value_type=bool),
+                "completed_source_columns": ParameterValue(LaunchConfiguration("completed_source_columns")),
+                "side_push_execute": ParameterValue(LaunchConfiguration("side_push_execute"), value_type=bool),
+                "side_push_distance": ParameterValue(LaunchConfiguration("side_push_distance"), value_type=float),
+                "side_push_continue_transfer": ParameterValue(LaunchConfiguration("side_push_continue_transfer"), value_type=bool),
                 "hook_hole_inset": ParameterValue(
                     hook_hole_inset, value_type=float
                 ),
@@ -204,6 +213,8 @@ def generate_launch_description():
                 ),
                 "source_grasp_x": ParameterValue(source_grasp_x, value_type=float),
                 "source_grasp_y": ParameterValue(source_grasp_y, value_type=float),
+                "align_with_extracted_center": ParameterValue(LaunchConfiguration("align_with_extracted_center"), value_type=bool),
+                "prefer_symmetric_arm_branch": ParameterValue(LaunchConfiguration("prefer_symmetric_arm_branch"), value_type=bool),
                 "swap_arm_grasps": ParameterValue(swap_arm_grasps, value_type=bool),
                 "left_tcp_roll": ParameterValue(left_tcp_roll, value_type=float),
                 "left_tcp_pitch": ParameterValue(left_tcp_pitch, value_type=float),
@@ -248,8 +259,16 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument("initial_positions_file", default_value=os.path.join(moveit_share, "config", "pallet_bin_initial_positions.yaml")),
+            DeclareLaunchArgument("spawn_x", default_value="0.000"),
+            DeclareLaunchArgument("spawn_y", default_value="-0.400617"),
+            DeclareLaunchArgument("spawn_yaw", default_value="0.0"),
             DeclareLaunchArgument("cleared_first_row_count", default_value="0"),
+            DeclareLaunchArgument("source_row_only", default_value="-1"),
+            DeclareLaunchArgument("return_to_pallet_after_transfer", default_value="false"),
+            DeclareLaunchArgument("return_empty_only", default_value="false"),
             DeclareLaunchArgument("target_model", default_value="pallet_box_r0_c0"),
+            DeclareLaunchArgument("measurement_bridge", default_value="true"),
             DeclareLaunchArgument("headless", default_value="true"),
             DeclareLaunchArgument("velocity_scaling", default_value="0.12"),
             DeclareLaunchArgument("acceleration_scaling", default_value="0.08"),
@@ -324,6 +343,14 @@ def generate_launch_description():
             DeclareLaunchArgument("pre_extract_waist_pitch", default_value="-1.0"),
             DeclareLaunchArgument("stop_on_failure", default_value="true"),
             DeclareLaunchArgument("hook_hole_z_offset", default_value="0.053"),
+            DeclareLaunchArgument("hook_pose_x_offset", default_value="-0.080"),
+            DeclareLaunchArgument("rear_push_probe", default_value="false"),
+            DeclareLaunchArgument("front_pull_probe", default_value="false"),
+            DeclareLaunchArgument("front_pull_execute", default_value="false"),
+            DeclareLaunchArgument("completed_source_columns", default_value="[-1]"),
+            DeclareLaunchArgument("side_push_execute", default_value="false"),
+            DeclareLaunchArgument("side_push_distance", default_value="0.324"),
+            DeclareLaunchArgument("side_push_continue_transfer", default_value="false"),
             DeclareLaunchArgument("hook_hole_inset", default_value="0.0"),
             DeclareLaunchArgument("hook_tcp_hole_clearance", default_value="0.060"),
             DeclareLaunchArgument("hook_approach_height", default_value="0.22"),
@@ -346,10 +373,13 @@ def generate_launch_description():
             DeclareLaunchArgument("pregrasp_clearance", default_value="0.16"),
             DeclareLaunchArgument("source_grasp_x", default_value="0.0"),
             DeclareLaunchArgument("source_grasp_y", default_value="-0.400617"),
+            DeclareLaunchArgument("align_with_extracted_center", default_value="false"),
+            DeclareLaunchArgument("prefer_symmetric_arm_branch", default_value="false"),
             DeclareLaunchArgument("swap_arm_grasps", default_value="false"),
             gazebo_moveit,
             Node(
                 package="ros_gz_bridge", executable="parameter_bridge",
+                condition=IfCondition(LaunchConfiguration("measurement_bridge")),
             arguments=[
                 ["/model/", target_model, "/pose@geometry_msgs/msg/PoseStamped[gz.msgs.Pose"],
                 "/model/zhishu_robot/pose@geometry_msgs/msg/PoseStamped[gz.msgs.Pose",
