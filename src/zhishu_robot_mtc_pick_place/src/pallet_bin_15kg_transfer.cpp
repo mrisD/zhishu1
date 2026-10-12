@@ -114,12 +114,20 @@ public:
     declare_if_missing("return_empty_only", false);
     declare_if_missing("pre_extract_enabled", false);
     declare_if_missing("rear_push_probe", false);
+    declare_if_missing("rear_push_execute", false);
     declare_if_missing("front_pull_probe", false);
     declare_if_missing("front_pull_execute", false);
     declare_if_missing("completed_source_columns", std::vector<int64_t>{});
     declare_if_missing("side_push_execute", false);
     declare_if_missing("side_push_distance", 0.324);
+    declare_if_missing("side_push_overtravel", 0.0);
     declare_if_missing("side_push_continue_transfer", false);
+    declare_if_missing("side_push_alpha", kPi);
+    declare_if_missing("side_push_contact_dx", 0.23);
+    declare_if_missing("side_push_contact_dy", 0.10);
+    declare_if_missing("side_push_waist_pitch", -0.785);
+    declare_if_missing("side_push_waist_lift", 0.04);
+    declare_if_missing("side_push_lean", 0.26);
     declare_if_missing("skip_pre_extract_stage", false);
     declare_if_missing("pre_extract_box_index", 0);
     declare_if_missing("continue_after_pre_extract_plan", false);
@@ -251,6 +259,7 @@ public:
       "/joint_states", 10, [this](const sensor_msgs::msg::JointState::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(data_mutex_);
         for (std::size_t i = 0; i < msg->name.size() && i < msg->position.size(); ++i) {
+          measured_joint_positions_[msg->name[i]] = msg->position[i];
           if (msg->name[i] == "waist_up_down_joint") measured_waist_[0] = msg->position[i];
           if (msg->name[i] == "waist_pitch_joint") measured_waist_[1] = msg->position[i];
           if (msg->name[i] == "left_gripper_left_finger_joint") measured_grippers_[0] = msg->position[i];
@@ -400,8 +409,9 @@ public:
       });
       bool pushed = false;
       try {
-        if (front_pull) prepareFrontPullPosture(box);
-        else setWaist(0.04, -0.785);
+        if (front_pull || get_parameter("rear_push_execute").as_bool()) prepareFrontPullPosture(box);
+        else setWaist(get_parameter("side_push_waist_lift").as_double(),
+                      get_parameter("side_push_waist_pitch").as_double());
         const auto held = currentOdom();
         RCLCPP_INFO(get_logger(), "RELOCATION_STATION before=(%.5f,%.5f,%.5f) after_waist=(%.5f,%.5f,%.5f)",
           dock.x, dock.y, dock.yaw, held.x, held.y, held.yaw);
@@ -431,10 +441,33 @@ public:
       if (!get_parameter("side_push_continue_transfer").as_bool()) return;
       // A pushed box is not attached: refresh the actual obstacle before homing.
       addEnvironmentToPlanningScene();
-      if (front_pull) prepareFrontPullPosture(box, true);
+      if (front_pull || get_parameter("rear_push_execute").as_bool()) prepareFrontPullPosture(box, true);
       moveArmsHome();
+      if (get_parameter("rear_push_execute").as_bool()) {
+        mtc::Task open_task;
+        open_task.stages()->setName("open push fingers before dual grasp");
+        open_task.loadRobotModel(shared_from_this());
+        open_task.add(std::make_unique<mtc::stages::CurrentState>("current state"));
+        addGroundContactStage(open_task);
+        auto open = std::make_unique<mtc::stages::MoveTo>("open both parked grippers", makeJointPlanner());
+        open->setGroup("both_grippers");
+        open->setGoal(std::map<std::string,double>{
+          {"left_gripper_left_finger_joint",0.0}, {"gripper_left_finger_joint",0.0}});
+        open_task.add(std::move(open));
+        if (!planAndMaybeExecute(open_task, true, "open parked grippers after rear push"))
+          throw std::runtime_error("Cannot open parked grippers after rear push");
+        rclcpp::sleep_for(std::chrono::milliseconds(500));
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        if (std::chrono::steady_clock::now() - waist_received_ > std::chrono::seconds(1) ||
+            std::abs(measured_grippers_[0]) > 0.005 || std::abs(measured_grippers_[1]) > 0.005)
+          throw std::runtime_error("Parked grippers are not physically open before dual grasp");
+        RCLCPP_INFO(get_logger(), "Both parked grippers physically open before dual grasp");
+      }
       if (!front_pull) setWaist(0.21, -0.20);
       // Route around the unobstructed north edge; never cross the pallet.
+      if (get_parameter("rear_push_execute").as_bool() &&
+          !driveToPose(Pose2D{dock.x, 1.20, 0.5 * kPi}, 0.015, 0.03))
+        throw std::runtime_error("Rear push north-side clearance waypoint failed");
       if (!front_pull && (!driveToPose(Pose2D{1.35, 1.20, 0.0}, 0.015, 0.03) ||
           !driveToPose(Pose2D{-0.15, 1.20, 0.0}, 0.015, 0.03) ||
           !driveToPose(Pose2D{-0.15, box.y, 0.0}, 0.015, 0.03) ||
@@ -455,13 +488,14 @@ public:
       const auto dock = currentOdom();
       mtc::Task probe;
       probe.loadRobotModel(shared_from_this());
+      const auto initial_probe_seed = currentSeed(probe.getRobotModel());
       bool complete = false;
-      for (double pitch : {-0.785, -1.10, -1.35, -1.5707}) {
-       for (double lean : {0.0, -0.26, 0.26, -0.52, 0.52}) {
+      for (double pitch : {-1.5707, -1.35, -1.10, -0.785}) {
+       for (double lean : {0.90, 1.15, 0.65, 0.78, 1.05, 1.30, 1.50, 0.52, 0.26}) {
         for (double contact_y : {-0.10, 0.10}) {
-        auto seed = currentSeed(probe.getRobotModel());
+        auto seed = initial_probe_seed;
         seed.setVariablePosition("waist_pitch_joint", pitch);
-        seed.setVariablePosition("waist_up_down_joint", 0.04);
+        seed.setVariablePosition("waist_up_down_joint", 0.0);
         seed.update();
         bool reachable = true;
         for (int step = 0; step <= 6; ++step) {
@@ -469,10 +503,10 @@ public:
           try {
             const auto point = worldPointInBase(box.x +
               (get_parameter("front_pull_probe").as_bool() ? -0.145 : 0.155) - travel,
-              box.y + contact_y, box.z + 0.084 + 0.060 * (1.0 - std::cos(lean)), dock);
+              box.y + contact_y, box.z + 0.064 + 0.010 * std::sin(std::abs(lean)), dock);
             const auto pose = makePose(point[0], point[1], point[2],
-              {-0.5 * kPi + lean, 0.0, normalizeAngle(kPi - dock.yaw)});
-            const auto goal = solveRightArmGoal(pose, seed, probe.getRobotModel(), 30, 0.01);
+              {-0.5 * kPi, -lean, normalizeAngle(kPi - dock.yaw)});
+            const auto goal = solveRightArmGoal(pose, seed, probe.getRobotModel(), 160, 0.02);
             if (step > 0) {
               for (const auto& item : goal)
                 if (std::abs(item.second - seed.getVariablePosition(item.first)) > 0.65)
@@ -482,9 +516,9 @@ public:
             seed.update();
             RCLCPP_INFO(get_logger(), "REAR_PUSH_IK pitch_deg=%.2f lean_deg=%.2f contact_y=%.2f travel=%.3f reachable=true",
               pitch * 180.0 / kPi, lean * 180.0 / kPi, contact_y, travel);
-          } catch (const std::runtime_error&) {
-            RCLCPP_WARN(get_logger(), "REAR_PUSH_IK pitch_deg=%.2f travel=%.3f reachable=false",
-              pitch * 180.0 / kPi, travel);
+          } catch (const std::runtime_error& error) {
+            RCLCPP_WARN(get_logger(), "REAR_PUSH_IK pitch_deg=%.2f travel=%.3f reachable=false reason=%s",
+              pitch * 180.0 / kPi, travel, error.what());
             reachable = false;
             break;
           }
@@ -1637,7 +1671,8 @@ private:
     reference.updateLinkTransforms();
     const Eigen::Isometry3d hand_to_tcp =
       reference.getGlobalLinkTransform("R_hand_link").inverse() *
-      reference.getGlobalLinkTransform("right_gripper_tcp");
+      reference.getGlobalLinkTransform((get_parameter("rear_push_probe").as_bool() ||
+        get_parameter("rear_push_execute").as_bool()) ? "right_gripper_push_tip" : "right_gripper_tcp");
     const auto hand_pose = eigenToPose(poseToEigen(tcp_pose) * hand_to_tcp.inverse());
     std::map<std::string, double> best_goal;
     double best_cost = std::numeric_limits<double>::infinity();
@@ -1657,6 +1692,11 @@ private:
       // while retaining the real robot self-collision check.
       self_collision_scene.getCurrentStateNonConst() = candidate;
       if (self_collision_scene.isStateColliding(candidate, "right_arm", false)) {
+        // Rear-tip paths must be valid goals for the strict MTC planner.
+        // The legacy hook-only waist exemption can select an unrecoverable
+        // gripper/torso overlap at the first unloaded waypoint.
+        if (get_parameter("rear_push_execute").as_bool() ||
+            get_parameter("rear_push_probe").as_bool()) continue;
         // The hook station uses the same crouched torso posture as the dual
         // grasp.  MoveIt's stock collision geometry reports a conservative
         // waist-to-shoulder/elbow contact there, although the actual links
@@ -1734,17 +1774,28 @@ private:
   moveit::core::RobotState currentSeed(
     const moveit::core::RobotModelConstPtr& model) const
   {
-    moveit::planning_interface::MoveGroupInterface move_group(
-      const_cast<PalletBin15kgTransfer*>(this)->shared_from_this(), "both_arms");
-    const auto current = move_group.getCurrentState(5.0);
-    if (current) {
+    std::map<std::string, double> positions;
+    {
+      std::lock_guard<std::mutex> lock(data_mutex_);
+      if (measured_joint_positions_.empty() ||
+          std::chrono::steady_clock::now() - waist_received_ > std::chrono::seconds(2))
+        throw std::runtime_error("Planning seed requires fresh measured joint states");
+      positions = measured_joint_positions_;
+    }
+    {
       // Gazebo/controller quantization can report a revolute joint a few
       // nanoradians beyond its URDF limit after the carry trajectory.  Keep
       // the planning seed strictly inside bounded limits so the place
       // pipeline's CheckStartStateBounds adapter does not reject an otherwise
       // valid handoff.
-      moveit::core::RobotState normalized(*current);
+      // Build on the task's exact model, without a temporary MoveGroupInterface
+      // (and its monitoring executor) at every trajectory boundary.
+      moveit::core::RobotState normalized(model);
+      normalized.setToDefaultValues();
       for (const auto& variable : model->getVariableNames()) {
+        if (!positions.count(variable) || !std::isfinite(positions.at(variable)))
+          throw std::runtime_error("Missing/non-finite measured planning joint: " + variable);
+        normalized.setVariablePosition(variable, positions.at(variable));
         const auto& bounds = model->getVariableBounds(variable);
         if (bounds.position_bounded_) {
           const double margin = 1.0e-6;
@@ -1757,14 +1808,6 @@ private:
       normalized.update();
       return normalized;
     }
-    moveit::core::RobotState seed(model);
-    seed.setToDefaultValues();
-    const auto* both = model->getJointModelGroup("both_arms");
-    if (both) {
-      seed.setToDefaultValues(both, "both_arms_home");
-    }
-    seed.update();
-    return seed;
   }
 
   void addGroundContactStage(mtc::Task& task) const
@@ -2241,6 +2284,8 @@ private:
 
   void prepareFrontPullPosture(const BoxSpec& box, bool recover = false)
   {
+    const bool rear = get_parameter("rear_push_execute").as_bool();
+    const double lean = rear ? get_parameter("side_push_lean").as_double() : 0.52;
     mtc::Task task;
     task.stages()->setName("coordinated front pull waist and right arm approach");
     task.loadRobotModel(shared_from_this());
@@ -2248,20 +2293,29 @@ private:
     addGroundContactStage(task);
     auto seed = currentSeed(task.getRobotModel());
     const auto dock = currentOdom();
+    if (rear && !recover) {
+      auto close = std::make_unique<mtc::stages::MoveTo>("close fingers before rear approach", makeJointPlanner());
+      close->setGroup("right_gripper");
+      close->setGoal(std::map<std::string, double>{{"gripper_left_finger_joint", 0.060}});
+      task.add(std::move(close));
+      seed.setVariablePosition("gripper_left_finger_joint", 0.060);
+      seed.update();
+    }
     const double start_lift = seed.getVariablePosition("waist_up_down_joint");
     const double start_pitch = seed.getVariablePosition("waist_pitch_joint");
-    const auto measured_tcp = seed.getGlobalLinkTransform("right_gripper_tcp").translation();
+    const auto measured_tcp = seed.getGlobalLinkTransform(rear ? "right_gripper_push_tip" : "right_gripper_tcp").translation();
     const auto start_world = recover ? basePointInWorld(
       {measured_tcp.x(), measured_tcp.y(), measured_tcp.z()}, dock) :
-      std::array<double, 3>{0.45, box.y + 0.10, 0.75};
+      std::array<double, 3>{rear ? dock.x - 0.45 : 0.45, box.y + 0.10, 0.75};
     const auto start = worldPointInBase(start_world[0], start_world[1], start_world[2], dock);
-    const auto rpy = std::vector<double>{-0.5 * kPi + 0.52, 0.0, normalizeAngle(-dock.yaw)};
+    const auto rpy = std::vector<double>{rear ? -0.5 * kPi : -0.5 * kPi + 0.52,
+      0.0, normalizeAngle((rear ? kPi : 0.0) - dock.yaw)};
     std::map<std::string, double> goal;
-    if (!recover) {
+    if (!recover && !rear) {
     goal = solveRightArmGoal(makePose(start[0], start[1], start[2], rpy), seed, task.getRobotModel());
     auto rise = std::make_unique<mtc::stages::MoveTo>("park long right fingers before waist bends", makePipeline(0.12));
     rise->setGroup("right_arm"); rise->setGoal(goal); rise->setTimeout(30.0);
-    task.add(std::move(rise));
+    if (!rear) task.add(std::move(rise));
     for (const auto& item : goal) seed.setVariablePosition(item.first, item.second);
     seed.update();
     }
@@ -2271,13 +2325,18 @@ private:
     // Finger joint origin adds 20 mm: longest point is 80 mm beyond TCP.
     // Include the 30 mm half-thickness corner of an inclined finger.
     const double finger_lowest = 0.080 * std::cos(0.52) + 0.030 * std::sin(0.52);
-    const double end_z = recover ? 0.75 : box.z + 0.074 - 0.050 + finger_lowest + 0.060;
-    const double end_x = recover ? 0.45 : box.x - 0.23;
-    const double end_lift = recover ? 0.21 : 0.04;
-    const double end_pitch = recover ? -0.20 : -1.5707;
+    const double end_z = recover ? 0.75 : (rear ? box.z + 0.064 + 0.010 * std::sin(std::abs(lean)) : box.z + 0.074 - 0.050 + finger_lowest + 0.060);
+    const double end_x = recover ? (rear ? dock.x - 0.45 : 0.45) :
+      (rear ? box.x + 0.165 : box.x - 0.23);
+    const double end_lift = recover ? 0.21 : (rear ? 0.0 : 0.04);
+    const double end_pitch = recover ? -0.20 : (rear ? get_parameter("side_push_waist_pitch").as_double() : -1.5707);
     // Smaller body/TCP increments keep the nearest IK branch continuous.
     constexpr int approach_steps = 48;
-    for (int i = 1; i <= approach_steps; ++i) {
+    const bool reverse_search = rear && !recover;
+    std::vector<std::unique_ptr<mtc::stages::MoveTo>> reverse_moves;
+    for (int order = 1; order <= approach_steps; ++order) {
+      const int i = reverse_search ? approach_steps + 1 - order : order;
+      const auto previous_seed = seed;
       const double t = i / static_cast<double>(approach_steps);
       seed.setVariablePosition("waist_up_down_joint", start_lift + t * (end_lift - start_lift));
       seed.setVariablePosition("waist_pitch_joint", start_pitch + t * (end_pitch - start_pitch));
@@ -2285,15 +2344,70 @@ private:
       const auto p = worldPointInBase(start_world[0] + t * (end_x - start_world[0]),
         start_world[1] + t * (box.y + 0.10 - start_world[1]),
         start_world[2] + t * (end_z - start_world[2]), dock);
-      goal = solveRightArmGoal(makePose(p[0], p[1], p[2], rpy), seed, task.getRobotModel());
+      auto waypoint_rpy = rpy;
+      // Keep the tip's push inclination during the unloaded approach. Rotating
+      // it back to vertical near the parked torso forced a wrist branch change.
+      // Keep the same reachable inclination for unloaded recovery as approach.
+      // Rotating toward vertical while standing forced a different wrist branch
+      // at recovery step 36. Reorient only after the fingers clear the pallet.
+      if (rear) waypoint_rpy[1] = -lean;
+      bool found = false;
+      for (double extra_z : {0.0, -0.05, -0.10, -0.15, 0.05, 0.10, 0.15}) {
+        for (double extra_x : {0.0, 0.05, -0.05, 0.10, -0.10, 0.15, 0.30, 0.45, 0.60}) {
+          if (!rear && (extra_x != 0.0 || extra_z != 0.0)) continue;
+          // Bow the unloaded approach away from the shell; the endpoints
+          // remain exact. Every resulting waypoint is still checked by MTC.
+          const double bow = std::sin(kPi * t);
+          try {
+            goal = solveRightArmGoal(makePose(p[0] + extra_x * bow, p[1], p[2] + extra_z * bow, waypoint_rpy),
+              seed, task.getRobotModel(), 60, 0.01);
+            if (rear && !(reverse_search && order == 1)) {
+              bool continuous = true;
+              for (const auto& item : goal)
+                continuous = continuous && std::abs(item.second - seed.getVariablePosition(item.first)) <= 0.45;
+              if (!continuous) continue;
+            }
+            found = true;
+            break;
+          } catch (const std::runtime_error&) {}
+        }
+        if (found) break;
+      }
+      if (!found) throw std::runtime_error("No bounded coordinated push approach at step " + std::to_string(i));
+      if (rear) RCLCPP_INFO(get_logger(), "REAR_APPROACH_IK step=%d/%d recover=%d", i, approach_steps, recover);
       goal["waist_up_down_joint"] = seed.getVariablePosition("waist_up_down_joint");
       goal["waist_pitch_joint"] = seed.getVariablePosition("waist_pitch_joint");
       for (const auto& item : goal) seed.setVariablePosition(item.first, item.second);
       seed.update();
-      auto move = std::make_unique<mtc::stages::MoveTo>("coordinated front pull approach " + std::to_string(i), joint);
+      if (rear && !reverse_search && i >= 43) {
+        auto audit = std::make_unique<mtc::stages::ModifyPlanningScene>("audit rear approach " + std::to_string(i));
+        audit->setCallback([this, candidate = seed, previous_seed, i](
+            const planning_scene::PlanningScenePtr& scene, const mtc::PropertyMap&) {
+          collision_detection::CollisionRequest request;
+          request.contacts = true; request.max_contacts = 30; request.max_contacts_per_pair = 1;
+          for (int sample = 0; sample <= 20; ++sample) {
+            auto intermediate = previous_seed;
+            previous_seed.interpolate(candidate, sample / 20.0, intermediate);
+            intermediate.update();
+            collision_detection::CollisionResult result;
+            scene->checkCollision(request, result, intermediate);
+            for (const auto& contact : result.contacts)
+              RCLCPP_WARN(get_logger(), "REAR_APPROACH_COLLISION step=%d sample=%d %s <-> %s depth=%.5f", i, sample,
+                contact.first.first.c_str(), contact.first.second.c_str(), contact.second.front().depth);
+          }
+        });
+        task.add(std::move(audit));
+      }
+      auto move = std::make_unique<mtc::stages::MoveTo>("coordinated front pull approach " + std::to_string(i),
+        rear ? std::static_pointer_cast<mtc::solvers::PlannerInterface>(makePipeline(0.08)) :
+               std::static_pointer_cast<mtc::solvers::PlannerInterface>(joint));
+      if (rear) move->setTimeout(30.0);
       move->setGroup("pallet_upper_body"); move->setGoal(goal);
-      task.add(std::move(move));
+      if (reverse_search) reverse_moves.push_back(std::move(move));
+      else task.add(std::move(move));
     }
+    for (auto it = reverse_moves.rbegin(); it != reverse_moves.rend(); ++it)
+      task.add(std::move(*it));
     if (!planAndMaybeExecute(task, true, recover ? "coordinated empty recovery after pull" : "coordinated front pull approach"))
       throw std::runtime_error("Coordinated front pull posture failed");
   }
@@ -2301,6 +2415,7 @@ private:
   mtc::Task createSidePushTask(const BoxSpec& box, const Pose2D& dock)
   {
     const bool front_pull = get_parameter("front_pull_execute").as_bool();
+    const bool rear = get_parameter("rear_push_execute").as_bool();
     mtc::Task task;
     task.stages()->setName("physical side push: no planning attachment");
     task.loadRobotModel(shared_from_this());
@@ -2312,17 +2427,19 @@ private:
     cart->setMaxVelocityScalingFactor(0.03);
     cart->setMaxAccelerationScalingFactor(0.03);
     cart->setStepSize(0.005);
-    const double lean = front_pull ? 0.52 : 0.26;
-    const double contact_x = box.x + (front_pull ? -0.145 : 0.23);
-    const double approach = front_pull ? 0.06 : 0.12;
+    const double lean = front_pull ? 0.52 : get_parameter("side_push_lean").as_double();
+    const double contact_x = box.x + (front_pull ? -0.145 : (rear ? 0.165 : get_parameter("side_push_contact_dx").as_double()));
+    const double approach = front_pull ? 0.06 : (rear ? 0.0 : 0.12);
     const double tcp_z = front_pull ?
       box.z + 0.074 - 0.050 + 0.080 * std::cos(lean) + 0.030 * std::sin(lean) :
-      box.z + 0.084 + 0.060 * (1.0 - std::cos(lean));
+      (rear ? box.z + 0.064 + 0.010 * std::sin(std::abs(lean)) : box.z + 0.084 + 0.060 * (1.0 - std::cos(lean)));
+    const std::vector<double> push_rpy{rear ? -0.5 * kPi : -0.5 * kPi + lean,
+      rear ? -lean : 0.0, normalizeAngle((front_pull ? 0.0 : kPi) - dock.yaw)};
     const double tool_yaw = normalizeAngle((front_pull ? 0.0 : kPi) - dock.yaw);
     const auto pre = worldPointInBase(front_pull ? box.x - 0.23 : contact_x,
       box.y + 0.10, tcp_z + approach, dock);
     const auto goal = solveRightArmGoal(makePose(pre[0], pre[1], pre[2],
-      {-0.5 * kPi + lean, 0.0, tool_yaw}), seed, task.getRobotModel());
+      push_rpy), seed, task.getRobotModel());
     auto above = std::make_unique<mtc::stages::MoveTo>("above side push contact", pipeline);
     above->setGroup("right_arm");
     above->setTimeout(30.0);
@@ -2334,10 +2451,16 @@ private:
       "gripper_left_finger_link", "gripper_right_finger_link"}, true);
     task.add(std::move(above));
     task.add(std::move(allow));
+    if (rear) {
+      auto close = std::make_unique<mtc::stages::MoveTo>("close fingers for front-tip push", makeJointPlanner());
+      close->setGroup("right_gripper");
+      close->setGoal(std::map<std::string, double>{{"gripper_left_finger_joint", 0.060}});
+      task.add(std::move(close));
+    }
     auto relative = [&](const std::string& name, double x, double y, double z, double distance) {
       auto move = std::make_unique<mtc::stages::MoveRelative>(name, cart);
       move->setGroup("right_arm");
-      move->setIKFrame("right_gripper_tcp");
+      move->setIKFrame(rear ? "right_gripper_push_tip" : "right_gripper_tcp");
       move->setTimeout(30.0);
       move->setMinMaxDistance(distance, distance);
       geometry_msgs::msg::Vector3Stamped direction;
@@ -2363,7 +2486,11 @@ private:
     auto joint = makeJointPlanner();
     joint->setMaxVelocityScalingFactor(0.03);
     joint->setMaxAccelerationScalingFactor(0.03);
-    const double distance = get_parameter("side_push_distance").as_double();
+    const double overtravel = get_parameter("side_push_overtravel").as_double();
+    if (overtravel < 0.0 || overtravel > 0.03)
+      throw std::runtime_error("side_push_overtravel must be in [0,0.03] m");
+    // Compensate contact take-up separately from the measured relocation target.
+    const double distance = get_parameter("side_push_distance").as_double() + overtravel;
     if (distance < 0.12 || distance > 0.36)
       throw std::runtime_error("side_push_distance must be in [0.12,0.36] m");
     const int steps = static_cast<int>(std::ceil(distance / 0.005));
@@ -2371,7 +2498,7 @@ private:
       const auto point = worldPointInBase(contact_x - distance * i / steps,
         box.y + 0.10, tcp_z, dock);
       const auto push_goal = solveRightArmGoal(makePose(point[0], point[1], point[2],
-        {-0.5 * kPi + lean, 0.0, tool_yaw}), seed, task.getRobotModel(), 60, 0.01);
+        push_rpy), seed, task.getRobotModel(), 60, 0.01);
       if (i > 0)
         for (const auto& item : push_goal)
           if (std::abs(item.second - seed.getVariablePosition(item.first)) > 0.35)
@@ -3349,6 +3476,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr waist_state_sub_;
   std::array<double, 2> measured_waist_{0.0, 0.0};
   std::array<double, 2> measured_grippers_{0.0, 0.0};
+  std::map<std::string, double> measured_joint_positions_;
   std::chrono::steady_clock::time_point waist_received_;
   std::optional<Pose2D> measured_base_pose_;
   Eigen::Isometry3d measured_base_transform_{Eigen::Isometry3d::Identity()};

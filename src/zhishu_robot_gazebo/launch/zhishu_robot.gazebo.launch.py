@@ -362,6 +362,15 @@ def generate_launch_description():
         '1',
         condition=IfCondition(software_rendering),
     )
+    # Headless Gazebo still needs a real X display for the OGRE v1 (GLX) render
+    # engine used by the camera sensors.  ros_gz_sim's gz_sim.launch.py only
+    # forwards GZ_SIM_* env vars, so DISPLAY/XAUTHORITY must be set explicitly
+    # here or the gz sim child process loses the X connection and fails with
+    # "Unable to create glx context".  Pin to the user's Xwayland display.
+    set_display = SetEnvironmentVariable(
+        'DISPLAY', os.environ.get('DISPLAY', ':0'))
+    set_xauthority = SetEnvironmentVariable(
+        'XAUTHORITY', os.environ.get('XAUTHORITY', ''))
 
     # Start Gazebo
     start_gazebo_cmd = IncludeLaunchDescription(
@@ -381,7 +390,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
         launch_arguments=[('gz_args', [
-            ' -s -v 4 ',
+            ' -s --headless-rendering -v 4 ',
             PythonExpression(["'' if '", paused, "' == 'true' else '-r'"]),
             ' ', world_path,
         ])],
@@ -391,7 +400,9 @@ def generate_launch_description():
         ])))
 
     managed_gazebo_headless_cmd = ExecuteProcess(
-        cmd=[
+        cmd=(['gdb', '-batch', '-ex', 'run', '-ex', 'info registers', '-ex', 'x/8i $pc-8', '-ex', 'thread apply all bt 12', '--args'] + [
+            '/usr/bin/ruby', '/opt/ros/jazzy/opt/gz_tools_vendor/bin/gz', 'sim', '-s', '--headless-rendering', '-v', '4', '-r', world_path,
+        ] if os.environ.get('PALLET_GZ_TRACE') == '1' else [
             sys.executable,
             os.path.join(
                 pkg_share_gazebo,
@@ -405,13 +416,14 @@ def generate_launch_description():
             '/opt/ros/jazzy/opt/gz_tools_vendor/bin/gz',
             'sim',
             '-s',
+            '--headless-rendering',
             '-v',
             '4',
             '-r',
             world_path,
             '--force-version',
             '8',
-        ],
+        ]),
         name='managed_gazebo',
         output='screen',
         condition=IfCondition(PythonExpression([
@@ -462,10 +474,11 @@ def generate_launch_description():
             '-P', pitch,
             '-Y', yaw
         ],
-        condition=IfCondition(use_gazebo))
+        condition=IfCondition(PythonExpression(["'", use_gazebo, "' == 'true' and '", LaunchConfiguration('spawn_robot'), "' == 'true'"])))
 
     # Create the launch description and populate
     ld = LaunchDescription()
+    ld.add_action(DeclareLaunchArgument('spawn_robot', default_value='true'))
 
     # Declare the launch options
     ld.add_action(declare_robot_name_cmd)
@@ -509,13 +522,20 @@ def generate_launch_description():
     ld.add_action(set_env_vars_system_plugins)
     ld.add_action(set_qt_x11)
     ld.add_action(set_software_rendering)
+    ld.add_action(set_display)
+    ld.add_action(set_xauthority)
     ld.add_action(robot_state_publisher_cmd)
     ld.add_action(start_gazebo_cmd)
     ld.add_action(start_gazebo_headless_cmd)
     ld.add_action(managed_gazebo_headless_cmd)
     ld.add_action(start_gazebo_ros_bridge_cmd)
     ld.add_action(start_gazebo_ros_image_bridge_cmd)
-    ld.add_action(start_gazebo_ros_spawner_cmd)
+    # The robot spawn (ros_gz_sim create) races gz sim's render-context init:
+    # loading the robot meshes while the OGRE GLX render context is still being
+    # created can make "Unable to create glx context" fire and segfault gz sim
+    # on GPU-contended Xwayland.  Give gz sim a short settling window so the
+    # render context is fully initialized before the robot meshes are inserted.
+    ld.add_action(TimerAction(period=8.0, actions=[start_gazebo_ros_spawner_cmd]))
     # gz_ros_control creates /controller_manager only after the robot entity
     # has been inserted into Gazebo.  Starting the spawner in the same launch
     # tick races that initialization and can leave joint_state_broadcaster

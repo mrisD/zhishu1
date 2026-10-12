@@ -1,0 +1,42 @@
+diff --git a/gz_ros2_control/src/gz_system.cpp b/gz_ros2_control/src/gz_system.cpp
+index 98cb463..9b4623c 100644
+--- a/gz_ros2_control/src/gz_system.cpp
++++ b/gz_ros2_control/src/gz_system.cpp
+@@ -675,7 +675,8 @@ hardware_interface::return_type GazeboSimSystem::read(
+       this->dataPtr->ecm->Component<sim::components::JointPosition>(
+       this->dataPtr->joints_[i].sim_joint);
+ 
+-    if (!jointPositions || !jointVelocity || !jointWrench) {
++    if (!jointPositions || !jointVelocity || !jointWrench ||
++      jointPositions->Data().empty() || jointVelocity->Data().empty()) {
+       continue;
+     }
+ 
+@@ -848,13 +849,22 @@ hardware_interface::return_type GazeboSimSystem::write(
+   // set values of all mimic joints with respect to mimicked joint
+   for (const auto & mimic_joint : this->info_.mimic_joints) {
+     // Get the joint position
+-    double position_mimicked_joint =
++    const auto * master_position =
+       this->dataPtr->ecm->Component<sim::components::JointPosition>(
+-      this->dataPtr->joints_[mimic_joint.mimicked_joint_index].sim_joint)->Data()[0];
++      this->dataPtr->joints_[mimic_joint.mimicked_joint_index].sim_joint);
+ 
+-    double position_mimic_joint =
++    const auto * follower_position =
+       this->dataPtr->ecm->Component<sim::components::JointPosition>(
+-      this->dataPtr->joints_[mimic_joint.joint_index].sim_joint)->Data()[0];
++      this->dataPtr->joints_[mimic_joint.joint_index].sim_joint);
++    // Physics populates these vectors after the first update. Do not read
++    // element zero during the earlier ros2_control PreUpdate callback.
++    if (!master_position || !follower_position || master_position->Data().empty() ||
++      follower_position->Data().empty()) {
++      RCLCPP_WARN_ONCE(this->nh_->get_logger(), "Waiting for initialized mimic joint positions");
++      continue;
++    }
++    const double position_mimicked_joint = master_position->Data()[0];
++    const double position_mimic_joint = follower_position->Data()[0];
+ 
+     double position_error =
+       position_mimic_joint -
+

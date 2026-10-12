@@ -15,6 +15,7 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
     headless = LaunchConfiguration("headless")
+    paused = LaunchConfiguration("paused")
     use_rviz = LaunchConfiguration("use_rviz")
     world_file = LaunchConfiguration("world_file")
     use_camera = LaunchConfiguration("use_camera")
@@ -74,6 +75,8 @@ def generate_launch_description():
             "headless": headless,
             "world_file": world_file,
             "load_controllers": "true",
+            "paused": paused,
+            "spawn_robot": LaunchConfiguration("spawn_robot"),
             "use_gazebo": "true",
             "use_robot_state_pub": "true",
             "use_sim_time": "true",
@@ -220,6 +223,7 @@ def generate_launch_description():
                 default_value="false",
                 description="Enable Gazebo DiffDrive for the robot base",
             ),
+            DeclareLaunchArgument("spawn_robot", default_value="true"),
             DeclareLaunchArgument("mobile_base_sim_mass", default_value="11.9793854739169"),
             DeclareLaunchArgument("waist_pitch_min", default_value="-1.57079632679"),
             DeclareLaunchArgument("tote_finger_length", default_value="0.200"),
@@ -240,6 +244,7 @@ def generate_launch_description():
                 default_value="false",
                 description="Work around known Gazebo teardown crashes",
             ),
+            DeclareLaunchArgument("paused", default_value="false"),
             DeclareLaunchArgument(
                 "use_left_arm_controller",
                 default_value="false",

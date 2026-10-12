@@ -18,6 +18,7 @@ from pathlib import Path
 
 
 CAMERAS = {
+    "rear": ((3.80, 2.50, 2.70), (1.45, 0.30, 0.90), 1.05),
     "pick": ((-1.35, 1.95, 2.10), (0.65, 0.05, 0.60), 1.05),
     "overview": ((-2.60, -3.80, 3.10), (0.66, -0.75, 0.63), 1.05),
     "place": ((1.95, -2.90, 2.10), (0.92, -1.55, 0.73), 1.05),
@@ -38,6 +39,8 @@ STAGES = {
     10: "5/6 落底已确认，再松爪并竖直撤离",
     11: "返程：空车返回托盘，暂不清除已放置箱",
     12: "仿真场景操作：已返托盘，清除大箱内上一箱",
+    13: "推箱位置已确认：撤爪后保持倾角收臂起身",
+    14: "双爪已张开：绕托盘返回正面取箱",
 }
 
 
@@ -192,7 +195,7 @@ def record(args):
             data["left_gripper_q"] = positions.get("left_gripper_left_finger_joint")
             data["right_gripper_q"] = positions.get("gripper_left_finger_joint")
 
-    current_target = ["pallet_box_r0_c0"]
+    current_target = [args.target_model]
     def contacts(message):
         matching = [c for c in message.contacts if
                     "large_bin" in (c.collision1.name + c.collision2.name) and
@@ -260,6 +263,10 @@ def record(args):
                         stage = 1
                     elif "Starting complete pallet -> large-bin transfer" in line:
                         stage = 2
+                    elif "Physical side push verified" in line:
+                        stage = 13
+                    elif "Both parked grippers physically open before dual grasp" in line:
+                        stage = 14
                     elif "Physical lift verified" in line:
                         stage = 4
                     elif "large-bin insertion" in line and "planning succeeded" in line:
@@ -283,6 +290,14 @@ def record(args):
             if stage == 2 and state.get("box", [0, 0, 0])[2] > 0.55:
                 stage = 3
             camera = "pick" if stage in (1, 2) else "overview"
+            if stage in (0, 1) and args.rear_push:
+                camera = "rear"
+            if stage == 13:
+                camera = "rear"
+            if stage == 14:
+                camera = "overview"
+            if stage in (0, 1) and state.get("base", [0, 0, 0])[0] > 1.65:
+                camera = "rear"
             at_bin = state.get("base", [0, 0, 0])[0] > 0.45 and state.get("base", [0, 0, 0])[1] < -1.4
             if stage in (5, 7, 8, 10, 12) or (stage == 4 and at_bin):
                 camera = "place"
@@ -312,7 +327,7 @@ def record(args):
             angle_text = "实测弯腰：等待关节数据" if waist is None else f"实测弯腰：{waist:.2f}° | 允许下限 {args.waist_limit_deg:g}°"
             draw.text((12, HEIGHT + 80), angle_text, font=small_font, fill=(255, 226, 130))
             draw.text((12, HEIGHT + 52),
-                      f"15 kg | 手指 {args.finger_length_mm} / TCP {args.tcp_offset_mm} mm | " +
+                      f"15 kg | 手指 {args.finger_length_mm} / TCP {380 if args.rear_push and stage in (0, 1, 13) else args.tcp_offset_mm} mm | " +
                       (f"箱心 {state.get('box', [0, 0, 0])[2]:.3f} m / 箱底反力 {state.get('floor_reaction_n', 0):.0f} N" if args.floor_seated else "浅夹取约 50 mm | 桌面 0.55 m"),
                       font=small_font, fill=(211, 224, 234))
             draw.text((WIDTH - 140, 12), f"{int(elapsed)//60:02d}:{int(elapsed)%60:02d} / 原速",
@@ -360,6 +375,8 @@ def record(args):
                    "tcp_offset_mm": args.tcp_offset_mm,
                    "waist_limit_deg": args.waist_limit_deg,
                    "floor_seated": args.floor_seated,
+                   "rear_push": args.rear_push,
+                   "target_model": args.target_model,
                    "note": f"Real Gazebo rendered images, wall-time original and explicitly labelled {args.speedup}x version"}
         (args.output_dir / "recording_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     if not passed:
@@ -390,6 +407,8 @@ def main():
     rec.add_argument("--floor-seated", action="store_true")
     rec.add_argument("--expected-transfers", type=int, default=1)
     rec.add_argument("--total-boxes", type=int, default=0)
+    rec.add_argument("--target-model", default="pallet_box_r0_c0")
+    rec.add_argument("--rear-push", action="store_true")
     rec.set_defaults(action=record)
     args = parser.parse_args()
     args.action(args)

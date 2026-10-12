@@ -93,6 +93,12 @@
     </joint>
 
     <link name="right_gripper_tcp"/>
+    <link name="right_gripper_push_tip"/>
+    <joint name="right_gripper_push_tip_joint" type="fixed">
+        <parent link="gripper_base_link"/>
+        <child link="right_gripper_push_tip"/>
+        <origin xyz="0 0 ${tote_finger_length + 0.020}" rpy="1.5708 0 0"/>
+    </joint>
 
     <joint name="right_gripper_tcp_joint" type="fixed">
         <parent link="gripper_base_link"/>
