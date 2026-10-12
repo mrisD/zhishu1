@@ -8,6 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(rcpputils REQUIRED)
 
 # ROS 2 Jazzy's MoveIt dependency chain currently exports the deprecated
@@ -118,6 +119,7 @@ target_include_directories(pallet_bin_15kg_transfer BEFORE PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(pallet_bin_15kg_transfer
+  rclcpp_action
   sensor_msgs
   ros_gz_interfaces
   rclcpp

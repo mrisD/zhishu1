@@ -1,4 +1,8 @@
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
+#include <moveit_task_constructor_msgs/action/execute_task_solution.hpp>
+#include <moveit/robot_trajectory/robot_trajectory.hpp>
+#include <moveit/trajectory_processing/time_optimal_trajectory_generation.hpp>
 
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -165,6 +169,7 @@ public:
     declare_if_missing("stage_timeout", 20.0);
     declare_if_missing("planner_id", std::string("RRTConnect"));
     declare_if_missing("velocity_scaling", 0.12);
+    declare_if_missing("continuous_arm_motion", true);
     declare_if_missing("acceleration_scaling", 0.10);
 
     declare_if_missing("base_max_linear", 0.18);
@@ -389,6 +394,34 @@ public:
       if (index < 0 || index >= static_cast<int>(boxes_.size()))
         throw std::runtime_error("Invalid side push target");
       auto& box = boxes_[index];
+      if (get_parameter("rear_push_execute").as_bool()) {
+        const Pose2D expected{2.068, box.y - 0.10, kPi};
+        const auto before = currentOdom();
+        const double position_error = std::hypot(before.x - expected.x, before.y - expected.y);
+        const double yaw_error = std::abs(normalizeAngle(before.yaw - expected.yaw));
+        RCLCPP_INFO(get_logger(),
+          "REAR_STATION_CHECK before=(%.5f,%.5f,%.5f) expected=(%.5f,%.5f,%.5f) error=(%.4f m,%.4f rad)",
+          before.x, before.y, before.yaw, expected.x, expected.y, expected.yaw,
+          position_error, yaw_error);
+        if (position_error > 0.005 || yaw_error > 0.005) {
+          // Differential drive cannot remove a lateral error while parked.
+          // Approach again from clear space behind the rear station instead
+          // of accepting the generic dock's 20 mm lateral allowance.
+          const Pose2D approach{expected.x + 0.20, expected.y, expected.yaw};
+          RCLCPP_INFO(get_logger(), "REAR_STATION_CORRECTION reapproach from 200 mm behind station");
+          if (!driveToPose(approach, 0.005, 0.005) ||
+              !driveToPose(expected, 0.003, 0.003))
+            throw std::runtime_error("Rear push station correction failed; do not push");
+        }
+        const auto aligned = currentOdom();
+        const double aligned_position_error = std::hypot(aligned.x - expected.x, aligned.y - expected.y);
+        const double aligned_yaw_error = std::abs(normalizeAngle(aligned.yaw - expected.yaw));
+        RCLCPP_INFO(get_logger(),
+          "REAR_STATION_CHECK aligned=(%.5f,%.5f,%.5f) error=(%.4f m,%.4f rad)",
+          aligned.x, aligned.y, aligned.yaw, aligned_position_error, aligned_yaw_error);
+        if (aligned_position_error > 0.008 || aligned_yaw_error > 0.008)
+          throw std::runtime_error("Rear push station still outside 8 mm / 0.008 rad; do not push");
+      }
       const auto dock = currentOdom();
       // Hold the station against contact reaction in the robot's actual heading.
       std::atomic_bool hold_running{true};
@@ -858,6 +891,15 @@ private:
     if (!driveToPose(Pose2D{-0.15, y, 0.0}, 0.05, 0.03) ||
         !driveToPose(Pose2D{0.0, y, 0.0}))
       throw std::runtime_error("Empty return to pallet failed; do not clear destination tote");
+    if (get_parameter("rear_push_execute").as_bool()) {
+      // Next middle-row box is pushed from the opposite edge, not front-pulled.
+      if (!driveToPose(Pose2D{-0.15, 1.20, 0.0}, 0.015, 0.03) ||
+          !driveToPose(Pose2D{1.35, 1.20, 0.0}, 0.015, 0.03) ||
+          !driveToPose(Pose2D{2.068, 1.20, 0.5 * kPi}, 0.015, 0.03) ||
+          !driveToPose(Pose2D{2.068, y - 0.10, kPi}, 0.005, 0.005))
+        throw std::runtime_error("Empty return to next rear-push station failed");
+      RCLCPP_INFO(get_logger(), "Rear station reached for next opposite-edge push");
+    }
     RCLCPP_INFO(get_logger(), "Empty robot returned to pallet; destination clearance now permitted");
   }
   static double forceNorm(const geometry_msgs::msg::WrenchStamped& msg)
@@ -2294,6 +2336,19 @@ private:
     auto seed = currentSeed(task.getRobotModel());
     const auto dock = currentOdom();
     if (rear && !recover) {
+      // Each new cycle starts after both arms home, rather than the first
+      // scene's outward left-arm park. Restore it with a checked trajectory.
+      std::map<std::string, double> idle_goal;
+      for (const auto& name : task.getRobotModel()->getJointModelGroup("left_arm")->getVariableNames())
+        idle_goal[name] = seed.getVariablePosition(name);
+      idle_goal["left_shoulder_roll_joint"] = -0.261799;
+      auto idle = std::make_unique<mtc::stages::MoveTo>("park idle left elbow before rear push", makePipeline(0.12));
+      idle->setGroup("left_arm");
+      idle->setGoal(idle_goal);
+      idle->setTimeout(30.0);
+      task.add(std::move(idle));
+      for (const auto& item : idle_goal) seed.setVariablePosition(item.first, item.second);
+      seed.update();
       auto close = std::make_unique<mtc::stages::MoveTo>("close fingers before rear approach", makeJointPlanner());
       close->setGroup("right_gripper");
       close->setGoal(std::map<std::string, double>{{"gripper_left_finger_joint", 0.060}});
@@ -3025,6 +3080,238 @@ private:
     return task;
   }
 
+  bool mergeArmTrajectories(mtc::Task& task,
+                           moveit_task_constructor_msgs::msg::Solution& solution,
+                           const std::string& label)
+  {
+    using Segment = moveit_task_constructor_msgs::msg::SubTrajectory;
+    const auto original = solution.sub_trajectory;
+    std::vector<Segment> merged;
+    planning_scene::PlanningScene scene(task.getRobotModel());
+    if (!scene.setPlanningSceneMsg(solution.start_scene)) {
+      RCLCPP_WARN(get_logger(), "CONTINUOUS_ARM cannot initialize validation scene");
+      return false;
+    }
+    double old_seconds = 0.0, new_seconds = 0.0;
+    std::size_t merged_runs = 0;
+    auto duration = [](const Segment& s) {
+      return s.trajectory.joint_trajectory.points.empty() ? 0.0 :
+        rclcpp::Duration(s.trajectory.joint_trajectory.points.back().time_from_start).seconds();
+    };
+    auto constraints = [](const Segment& s) {
+      auto diff = s.scene_diff;
+      // Motion segments differ in endpoint state. All other scene changes
+      // remain barriers, including attachment and allowed-contact changes.
+      diff.robot_state = moveit_msgs::msg::RobotState{};
+      diff.name.clear();  // MTC names intermediate scenes after their stages.
+      return diff;
+    };
+    auto armGroup = [&](const Segment& s) -> std::string {
+      const auto& names = s.trajectory.joint_trajectory.joint_names;
+      if (names.empty() || !s.trajectory.multi_dof_joint_trajectory.points.empty()) return {};
+      auto actual = names;
+      std::sort(actual.begin(), actual.end());
+      for (const auto& name : {"right_arm", "left_arm", "both_arms", "pallet_upper_body"}) {
+        const auto* group = task.getRobotModel()->getJointModelGroup(name);
+        if (!group) continue;
+        auto expected = group->getActiveJointModelNames();
+        std::sort(expected.begin(), expected.end());
+        if (actual == expected) return name;
+      }
+      return {};
+    };
+    for (std::size_t begin = 0; begin < original.size();) {
+      const auto& first = original[begin];
+      const auto group = armGroup(first);
+      std::size_t end = begin + 1;
+      if (!group.empty() && !first.trajectory.joint_trajectory.points.empty()) {
+        while (end < original.size()) {
+          const auto& previous = original[end - 1].trajectory.joint_trajectory;
+          const auto& next = original[end].trajectory.joint_trajectory;
+          if (next.points.empty() || next.joint_names != previous.joint_names ||
+              armGroup(original[end]) != group ||
+              original[end].execution_info != first.execution_info ||
+              constraints(original[end]) != constraints(first)) break;
+          const auto& a = previous.points.back().positions;
+          const auto& b = next.points.front().positions;
+          bool contiguous = a.size() == b.size();
+          for (std::size_t j = 0; contiguous && j < a.size(); ++j)
+            contiguous = std::abs(a[j] - b[j]) < 1e-5;
+          if (!contiguous) break;
+          ++end;
+        }
+      }
+      if (end - begin < 3) end = begin + 1;
+      Segment result = first;
+      if (end - begin >= 3) {
+        const auto processing_start = std::chrono::steady_clock::now();
+        robot_trajectory::RobotTrajectory path(task.getRobotModel(), group);
+        auto state = scene.getCurrentState();
+        for (std::size_t i = begin; i < end; ++i) {
+          const auto& trajectory = original[i].trajectory.joint_trajectory;
+          for (std::size_t k = (i == begin ? 0 : 1); k < trajectory.points.size(); ++k) {
+            state.setVariablePositions(trajectory.joint_names, trajectory.points[k].positions);
+            state.update();
+            path.addSuffixWayPoint(state, 0.0);
+          }
+        }
+        // Per-stage time resampling generated thousands of points on the
+        // same joint-space lines. RDP removes only geometrically redundant
+        // points (<= 1e-5 rad, prismatic coordinates weighted by ten).
+        // This prevents quadratic work in TOTG on repeated straight sections.
+        const auto* compact_group = task.getRobotModel()->getJointModelGroup(group);
+        const std::size_t input_points = path.getWayPointCount();
+        std::vector<Eigen::VectorXd> coordinates;
+        for (std::size_t k = 0; k < input_points; ++k) {
+          Eigen::VectorXd q(compact_group->getVariableCount());
+          std::vector<double> values;
+          path.getWayPoint(k).copyJointGroupPositions(compact_group, values);
+          for (std::size_t j = 0; j < values.size(); ++j) {
+            const auto* joint = task.getRobotModel()->getJointOfVariable(compact_group->getVariableNames()[j]);
+            q[j] = values[j] * (joint->getType() == moveit::core::JointModel::PRISMATIC ? 10.0 : 1.0);
+          }
+          coordinates.push_back(std::move(q));
+        }
+        std::vector<bool> keep(input_points, false);
+        keep.front() = keep.back() = true;
+        std::vector<std::pair<std::size_t, std::size_t>> pending{{0, input_points - 1}};
+        while (!pending.empty()) {
+          const auto [a, b] = pending.back(); pending.pop_back();
+          const Eigen::VectorXd delta = coordinates[b] - coordinates[a];
+          const double length2 = delta.squaredNorm();
+          double worst = 1e-5;
+          std::size_t split = a;
+          for (std::size_t k = a + 1; k < b; ++k) {
+            const Eigen::VectorXd offset = coordinates[k] - coordinates[a];
+            const double t = length2 > 1e-20 ? clamp(offset.dot(delta) / length2, 0.0, 1.0) : 0.0;
+            const double error = (offset - t * delta).norm();
+            if (error > worst) { worst = error; split = k; }
+          }
+          if (split != a) {
+            keep[split] = true;
+            pending.emplace_back(a, split); pending.emplace_back(split, b);
+          }
+        }
+        robot_trajectory::RobotTrajectory compact(task.getRobotModel(), group);
+        for (std::size_t k = 0; k < input_points; ++k)
+          if (keep[k]) compact.addSuffixWayPoint(path.getWayPoint(k), 0.0);
+        path = std::move(compact);
+        // Small configuration-space deviation; recheck the actual retimed
+        // path below because TOTG can round corners between original points.
+        trajectory_processing::TimeOptimalTrajectoryGeneration retime(0.0001, 0.05, 0.0001);
+        const bool pushing = label == "physical side push without attachment";
+        const double velocity = get_parameter("velocity_scaling").as_double();
+        const double acceleration = get_parameter("acceleration_scaling").as_double();
+        if (!retime.computeTimeStamps(path, velocity, acceleration)) {
+          RCLCPP_WARN(get_logger(), "CONTINUOUS_ARM retiming failed for %s; retain checked original solution", label.c_str());
+          return false;
+        }
+        const auto retimed_at = std::chrono::steady_clock::now();
+        const double seconds = path.getDuration();
+        if (!std::isfinite(seconds) || seconds <= 0.0 || seconds > 600.0) return false;
+        const auto* joint_group = task.getRobotModel()->getJointModelGroup(group);
+        // Sample by configuration distance, not by elapsed time: slow/stationary
+        // portions need no thousands of identical collision checks. Include
+        // every resampled corner and bound each interpolation to 0.005 rad or
+        // 0.5 mm, including both sides of every controller waypoint.
+        auto sample = path.getFirstWayPoint();
+        for (std::size_t k = 0; k < path.getWayPointCount(); ++k) {
+          const auto& a = path.getWayPoint(k == 0 ? 0 : k - 1);
+          const auto& b = path.getWayPoint(k);
+          int subdivisions = 1;
+          for (const auto* joint : joint_group->getActiveJointModels()) {
+            const double step = joint->getType() == moveit::core::JointModel::PRISMATIC ? 0.0005 : 0.005;
+            subdivisions = std::max(subdivisions, static_cast<int>(std::ceil(a.distance(b, joint) / step)));
+          }
+          for (int j = (k == 0 ? 0 : 1); j <= subdivisions; ++j) {
+            a.interpolate(b, static_cast<double>(j) / subdivisions, sample);
+            sample.update();
+            if (sample.satisfiesBounds(joint_group, 1e-5) && !scene.isStateColliding(sample)) continue;
+            RCLCPP_WARN(get_logger(), "CONTINUOUS_ARM path rejected for %s at waypoint %zu; retain checked original solution", label.c_str(), k);
+            return false;
+          }
+        }
+        path.getRobotTrajectoryMsg(result.trajectory);
+        if (pushing) {
+          // Limit the actual pushing tip speed as well as joint speeds.
+          // Continuous execution can use the normal arm limits without
+          // accelerating contact to an unrestricted Cartesian speed.
+          double stretch = 1.0;
+          for (std::size_t k = 1; k < path.getWayPointCount(); ++k) {
+            const auto p0 = path.getWayPoint(k - 1).getGlobalLinkTransform("right_gripper_push_tip").translation();
+            const auto p1 = path.getWayPoint(k).getGlobalLinkTransform("right_gripper_push_tip").translation();
+            const double dt = path.getWayPointDurationFromPrevious(k);
+            if (dt > 0.0) stretch = std::max(stretch, (p1 - p0).norm() / (dt * 0.015));
+          }
+          for (auto& point : result.trajectory.joint_trajectory.points) {
+            point.time_from_start = rclcpp::Duration::from_seconds(
+              rclcpp::Duration(point.time_from_start).seconds() * stretch);
+            for (auto& v : point.velocities) v /= stretch;
+            for (auto& a : point.accelerations) a /= stretch * stretch;
+          }
+        }
+        result.scene_diff = original[end - 1].scene_diff;
+        RCLCPP_INFO(get_logger(), "CONTINUOUS_ARM_PROCESS %s input_points=%zu compact_points=%zu retime_ms=%.1f collision_ms=%.1f",
+          label.c_str(), input_points, coordinates.empty() ? 0UL : static_cast<std::size_t>(std::count(keep.begin(), keep.end(), true)),
+          std::chrono::duration<double, std::milli>(retimed_at - processing_start).count(),
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - retimed_at).count());
+        ++merged_runs;
+      }
+      for (std::size_t i = begin; i < end; ++i) old_seconds += duration(original[i]);
+      new_seconds += duration(result);
+      merged.push_back(std::move(result));
+      for (std::size_t i = begin; i < end; ++i)
+        if (!scene.setPlanningSceneDiffMsg(original[i].scene_diff)) {
+          RCLCPP_WARN(get_logger(), "CONTINUOUS_ARM cannot apply scene diff %zu", i);
+          return false;
+        }
+      begin = end;
+    }
+    if (!merged_runs) {
+      for (std::size_t i = 0; i < std::min<std::size_t>(8, original.size()); ++i) {
+        const auto& s = original[i];
+        std::ostringstream names;
+        for (const auto& name : s.trajectory.joint_trajectory.joint_names) names << name << ',';
+        RCLCPP_INFO(get_logger(), "CONTINUOUS_ARM diagnostic segment=%zu group=%s points=%zu joints=%s scene_equal_next=%d",
+          i, armGroup(s).c_str(), s.trajectory.joint_trajectory.points.size(), names.str().c_str(),
+          i + 1 < original.size() && constraints(s) == constraints(original[i + 1]));
+      }
+      return false;
+    }
+    solution.sub_trajectory = std::move(merged);
+    RCLCPP_INFO(get_logger(), "CONTINUOUS_ARM %s segments=%zu->%zu planned_seconds=%.2f->%.2f merged_runs=%zu",
+      label.c_str(), original.size(), solution.sub_trajectory.size(), old_seconds, new_seconds, merged_runs);
+    return true;
+  }
+
+  moveit::core::MoveItErrorCode executeContinuousSolution(
+    moveit_task_constructor_msgs::msg::Solution solution)
+  {
+    using Action = moveit_task_constructor_msgs::action::ExecuteTaskSolution;
+    auto client = rclcpp_action::create_client<Action>(shared_from_this(), "execute_task_solution");
+    if (!client->wait_for_action_server(std::chrono::seconds(10)))
+      return moveit_msgs::msg::MoveItErrorCodes::FAILURE;
+    Action::Goal goal;
+    goal.solution = std::move(solution);
+    auto accepted = client->async_send_goal(goal);
+    if (accepted.wait_for(std::chrono::seconds(10)) != std::future_status::ready)
+      throw std::runtime_error("Continuous trajectory goal acknowledgement timed out; do not replay motion");
+    auto handle = accepted.get();
+    if (!handle) return moveit_msgs::msg::MoveItErrorCodes::FAILURE;
+    auto result = client->async_get_result(handle);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(45);
+    while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline) {
+      if (result.wait_for(std::chrono::seconds(1)) == std::future_status::ready) {
+        const auto wrapped = result.get();
+        if (wrapped.code != rclcpp_action::ResultCode::SUCCEEDED)
+          return moveit_msgs::msg::MoveItErrorCodes::FAILURE;
+        return wrapped.result->error_code;
+      }
+    }
+    client->async_cancel_goal(handle);
+    return moveit_msgs::msg::MoveItErrorCodes::TIMED_OUT;
+  }
+
   bool planAndMaybeExecute(mtc::Task& task, bool execute, const std::string& label)
   {
     const auto max_solutions = static_cast<std::size_t>(
@@ -3072,7 +3359,10 @@ private:
     if (!execute) {
       return true;
     }
-    const auto exec_result = task.execute(*task.solutions().front());
+    const bool continuous = get_parameter("continuous_arm_motion").as_bool() &&
+      mergeArmTrajectories(task, audit, label);
+    const auto exec_result = continuous ? executeContinuousSolution(std::move(audit)) :
+      task.execute(*task.solutions().front());
     if (exec_result.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS) {
       RCLCPP_ERROR(
         get_logger(), "%s: execution failed (MoveIt code=%d)",

@@ -241,6 +241,7 @@ def generate_launch_description():
                 # 15 kg contact pull; slower time-parameterisation prevents a
                 # transient path-tolerance hit without relaxing goal error.
                 "velocity_scaling": ParameterValue(LaunchConfiguration("velocity_scaling"), value_type=float),
+                "continuous_arm_motion": ParameterValue(LaunchConfiguration("continuous_arm_motion"), value_type=bool),
                 "acceleration_scaling": ParameterValue(LaunchConfiguration("acceleration_scaling"), value_type=float),
                 "grasp_waist_lift": ParameterValue(
                     grasp_waist_lift, value_type=float
@@ -288,6 +289,7 @@ def generate_launch_description():
             DeclareLaunchArgument("managed_gazebo_shutdown", default_value="false"),
             DeclareLaunchArgument("use_head_camera", default_value="true"),
             DeclareLaunchArgument("velocity_scaling", default_value="0.12"),
+            DeclareLaunchArgument("continuous_arm_motion", default_value="true"),
             DeclareLaunchArgument("acceleration_scaling", default_value="0.08"),
             DeclareLaunchArgument("base_motion_timeout", default_value="90.0"),
             DeclareLaunchArgument("world_file", default_value="pallet_bin_15kg.sdf"),

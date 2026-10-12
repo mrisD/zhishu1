@@ -29,6 +29,7 @@ parser.add_argument('--push-overtravel', type=float, default=0.0)
 parser.add_argument('--push-waist-pitch', type=float, default=-1.5707)
 parser.add_argument('--physics-engine', choices=('dartsim', 'bullet-featherstone'), default='dartsim')
 parser.add_argument('--col', type=int, choices=(0, 1, 2), default=2)
+parser.add_argument('--completed-source-columns', type=int, nargs='*', choices=(0, 1, 2), default=[])
 args = parser.parse_args()
 out = root / (('output/pallet_middle_side_push_20261009_lattice' if args.side else 'output/pallet_middle_rear_push_20261009_lattice') + args.suffix)
 out.mkdir(exist_ok=False)
@@ -44,6 +45,10 @@ world_file = root / 'output/pallet_middle_three_20261009_attempt3/video_world.sd
 if not front_mode:
     diagnostic = ET.parse(world_file)
     diagnostic_world = diagnostic.getroot().find('world')
+    for completed_col in args.completed_source_columns:
+        if completed_col == target_col:
+            raise ValueError('Cannot remove the current target')
+        diagnostic_world.remove(diagnostic_world.find(f"model[@name='pallet_box_r1_c{completed_col}']"))
     diagnostic_world.find("plugin[@name='gz::sim::systems::Physics']/engine/filename").text = 'gz-physics-' + args.physics_engine + '-plugin'
     if args.pushed_start_diagnostic:
         diagnostic_world.find(f"model[@name='pallet_box_r1_c{target_col}']/pose").text = f'0.701848 {target_y} 0.224 0 0 0'
@@ -95,6 +100,8 @@ common = ['headless:=true', 'use_rviz:=false', 'source_row_only:=1',
           'tote_finger_length:=0.360', 'waist_pitch_min:=-1.57079632679',
           f'target_model:=pallet_box_r1_c{target_col}',
           f'full_transfer_box_index:={3+target_col}']
+if args.completed_source_columns:
+    common += [f'completed_source_columns:={args.completed_source_columns}']
 if args.front_pull_probe:
     common += ['front_pull_probe:=true', 'completed_source_columns:=[2]']
 elif args.front_pull:
@@ -314,7 +321,7 @@ try:
                 'passed': True, 'target_model': f'pallet_box_r1_c{target_col}',
                 'full_transfer_completed': 'Complete transfer finished' in log,
                 'planning_probe_only': not args.physical,
-                'skipped_verified_columns': [2, 1] if target_col == 0 and front_mode else ([2] if front_mode else []),
+                'skipped_verified_columns': args.completed_source_columns or ([2, 1] if target_col == 0 and front_mode else ([2] if front_mode else [])),
                 'single_scene': True, 'front_pull': args.front_pull,
                 'pushed_start_diagnostic': args.pushed_start_diagnostic,
                 'finger_mm': 360, 'tcp_offset_mm': 300, 'waist_limit_deg': -90,
