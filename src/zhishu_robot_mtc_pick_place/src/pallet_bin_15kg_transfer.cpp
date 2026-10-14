@@ -37,6 +37,7 @@
 
 #include <Eigen/Geometry>
 
+#include <future>
 #include <algorithm>
 #include <atomic>
 #include <array>
@@ -114,14 +115,25 @@ public:
     declare_if_missing("full_transfer_box_index", 0);
     declare_if_missing("cleared_first_row_count", 0);
     declare_if_missing("source_row_only", -1);
+    declare_if_missing("retain_middle_row", false);
+    declare_if_missing("rear_side_pull", false);
+    declare_if_missing("rear_source_dock_x", 1.918);
     declare_if_missing("return_to_pallet_after_transfer", false);
     declare_if_missing("return_empty_only", false);
+    declare_if_missing("navigation_check_only", false);
     declare_if_missing("pre_extract_enabled", false);
     declare_if_missing("rear_push_probe", false);
     declare_if_missing("rear_push_execute", false);
     declare_if_missing("front_pull_probe", false);
     declare_if_missing("front_pull_execute", false);
     declare_if_missing("completed_source_columns", std::vector<int64_t>{});
+    declare_if_missing("completed_box_indices", std::vector<int64_t>{});
+    declare_if_missing("keep_all_source_rows", false);
+    declare_if_missing("empty_return_pose", std::vector<double>{-999.0, 0.0, 0.0});
+    declare_if_missing("strict_tool_body_guard", false);
+    declare_if_missing("tool_body_clearance", 0.004);
+    declare_if_missing("empty_velocity_scaling", 0.20);
+    declare_if_missing("empty_acceleration_scaling", 0.12);
     declare_if_missing("side_push_execute", false);
     declare_if_missing("side_push_distance", 0.324);
     declare_if_missing("side_push_overtravel", 0.0);
@@ -174,6 +186,8 @@ public:
 
     declare_if_missing("base_max_linear", 0.18);
     declare_if_missing("base_max_angular", 0.45);
+    declare_if_missing("empty_base_max_linear", 0.0);
+    declare_if_missing("empty_base_max_angular", 0.0);
     declare_if_missing("base_linear_acceleration", 0.30);
     declare_if_missing("base_angular_acceleration", 0.60);
     declare_if_missing("base_position_tolerance", 0.004);
@@ -386,6 +400,19 @@ public:
     waitForCurrentRobotState();
     addEnvironmentToPlanningScene();
 
+    if (get_parameter("navigation_check_only").as_bool()) {
+      if (!goToBinDock()) throw std::runtime_error("Navigation check: bin approach failed");
+      returnEmptyToPallet();
+      if (!driveToRearStation(-0.520617)) throw std::runtime_error("Navigation check: rear approach failed");
+      if (!driveToPose(Pose2D{2.28, 1.2, 0.5*kPi}, 0.04, 0.04) ||
+          !driveToPose(Pose2D{-0.18, 1.2, -0.5*kPi}, 0.04, 0.04) ||
+          !driveToPose(Pose2D{-0.18, 0.002017, 0.0}, 0.03, 0.03) ||
+          !driveToPose(Pose2D{0.0, 0.002017, 0.0}))
+        throw std::runtime_error("Navigation check: front approach failed");
+      RCLCPP_INFO(get_logger(), "NAVIGATION_CHECK_SUCCESS");
+      return;
+    }
+
     if (get_parameter("side_push_execute").as_bool() || get_parameter("front_pull_execute").as_bool()) {
       const bool front_pull = get_parameter("front_pull_execute").as_bool();
       if (!get_parameter("execute").as_bool())
@@ -498,6 +525,13 @@ public:
       }
       if (!front_pull) setWaist(0.21, -0.20);
       // Route around the unobstructed north edge; never cross the pallet.
+      if (get_parameter("strict_tool_body_guard").as_bool() && get_parameter("rear_push_execute").as_bool()) {
+        if (!driveToPose(Pose2D{dock.x, 1.20, 0.5 * kPi}, 0.04, 0.04) ||
+            !driveToPose(Pose2D{-0.18, 1.20, -0.5 * kPi}, 0.04, 0.04) ||
+            !driveToPose(Pose2D{-0.18, box.y, 0.0}, 0.002, 0.003) ||
+            !driveToPose(Pose2D{0.0, box.y, 0.0}))
+          throw std::runtime_error("Rear push optimized return-to-front docking failed");
+      } else {
       if (get_parameter("rear_push_execute").as_bool() &&
           !driveToPose(Pose2D{dock.x, 1.20, 0.5 * kPi}, 0.015, 0.03))
         throw std::runtime_error("Rear push north-side clearance waypoint failed");
@@ -508,6 +542,7 @@ public:
         throw std::runtime_error("Side push return-to-front docking failed");
       if (front_pull && !driveToPose(Pose2D{0.0, box.y, 0.0}))
         throw std::runtime_error("Front pull dual grasp alignment failed");
+      }
       RCLCPP_INFO(get_logger(), "SIDE_PUSH_RETURN front 200 mm station reached; remeasure before dual grasp");
     }
 
@@ -621,12 +656,14 @@ public:
           box.x, box.y, box.z);
       } else {
       RCLCPP_INFO(
-        get_logger(), "Pre-extracting perimeter tote %s with the right arm", box.id.c_str());
+        get_logger(), "Pre-extracting perimeter tote %s with the %s arm", box.id.c_str(),
+        get_parameter("rear_side_pull").as_bool() ? "left" : "right");
       if (!goToHookWorkPose(box)) {
         throw std::runtime_error("Failed to dock for perimeter pre-extraction");
       }
       addEnvironmentToPlanningScene();
-      if ((box.row == 0 || box.row == get_parameter("source_row_only").as_int()) && box.col > 0) {
+      if (get_parameter("strict_tool_body_guard").as_bool() || get_parameter("rear_side_pull").as_bool() ||
+          ((box.row == 0 || box.row == get_parameter("source_row_only").as_int()) && box.col > 0)) {
         prepareEmptyGrasp(box,
           get_parameter("pre_extract_waist_lift").as_double(),
           get_parameter("pre_extract_waist_pitch").as_double(), execute);
@@ -847,6 +884,23 @@ public:
         throw std::runtime_error("Failed to release seated tote and retreat");
     }
 
+    resetWorldBoxCollision(BoxSpec{box.id, bin_target_x, -1.55, settled_z, box.row, box.col});
+    // Arms have completed release/retreat. The home goal and robot start are
+    // known now; overlap planning with the retained placement settling check.
+    auto home_plan = std::async(std::launch::async, [this]() {
+      auto task = std::make_unique<mtc::Task>();
+      task->stages()->setName("preplanned released-arm home");
+      task->loadRobotModel(shared_from_this());
+      task->add(std::make_unique<mtc::stages::CurrentState>("released robot state"));
+      addGroundContactStage(*task);
+      addHomeClearanceStage(*task);
+      auto move = std::make_unique<mtc::stages::MoveTo>("both arms home", makePipeline(0.25));
+      move->setTimeout(get_parameter("stage_timeout").as_double());
+      move->setGroup("both_arms"); move->setGoal("both_arms_home");
+      task->add(std::move(move));
+      if (!planAndMaybeExecute(*task, false, "preplanned arms home")) task.reset();
+      return task;
+    });
     rclcpp::sleep_for(std::chrono::seconds(1));
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
@@ -863,8 +917,7 @@ public:
       RCLCPP_INFO(get_logger(), "Physical large-bin placement verified: (%.4f, %.4f, %.4f)",
         found->second[0], found->second[1], found->second[2]);
     }
-    resetWorldBoxCollision(BoxSpec{box.id, bin_target_x, -1.55, settled_z, box.row, box.col});
-    moveArmsHome();
+    moveArmsHome(home_plan.get());
     // The long, open inner finger enters the chassis if the waist is then
     // independently lowered to zero. Keep the collision-checked park posture.
     RCLCPP_INFO(get_logger(), "Keeping checked long-finger park waist posture; no blind zero reset");
@@ -886,8 +939,29 @@ private:
     const auto current = currentOdom();
     if ((current.x > 0.25 || current.y < -1.20) &&
         (!driveToPose(Pose2D{0.0, -1.55, 0.0}, 0.02, 0.03) ||
-         !driveToPose(Pose2D{0.0, -1.20, 0.5 * kPi}, 0.02, 0.03)))
+         !driveToPose(Pose2D{0.0, -1.20, 0.5 * kPi}, 0.05, 0.04)))
       throw std::runtime_error("Empty return could not exit destination corridor");
+    const auto explicit_pose = get_parameter("empty_return_pose").as_double_array();
+    if (!explicit_pose.empty() && explicit_pose[0] > -99.0) {
+      if (explicit_pose.size() != 3) throw std::runtime_error("empty_return_pose requires x,y,yaw");
+      const Pose2D goal{explicit_pose[0], explicit_pose[1], explicit_pose[2]};
+      bool docked = false;
+      if (goal.x > 1.8) docked = driveToRearStation(goal.y);
+      else docked = driveToPose(Pose2D{-0.18, goal.y, 0.0}, 0.03, 0.03) && driveToPose(goal);
+      if (!docked) throw std::runtime_error("Empty return to next nine-box station failed");
+      RCLCPP_INFO(get_logger(), "Empty robot returned to pallet; destination clearance now permitted");
+      return;
+    }
+    if (get_parameter("retain_middle_row").as_bool() &&
+        get_parameter("full_transfer_box_index").as_int() / 3 == 2) {
+      const double rear_x = get_parameter("rear_source_dock_x").as_double();
+      if (!driveToPose(Pose2D{0.0, 1.20, 0.5 * kPi}, 0.05, 0.05) ||
+          !driveToPose(Pose2D{2.10, 1.20, 0.0}, 0.05, 0.05) ||
+          !driveToPose(Pose2D{rear_x, y, kPi}))
+        throw std::runtime_error("Empty return to rear grasp station failed");
+      RCLCPP_INFO(get_logger(), "Empty robot returned to pallet; destination clearance now permitted");
+      return;
+    }
     if (!driveToPose(Pose2D{-0.15, y, 0.0}, 0.05, 0.03) ||
         !driveToPose(Pose2D{0.0, y, 0.0}))
       throw std::runtime_error("Empty return to pallet failed; do not clear destination tote");
@@ -1014,20 +1088,33 @@ private:
   bool driveToPose(const Pose2D& target, double transit_position_tol = -1.0,
                    double transit_yaw_tol = -1.0)
   {
-    const double max_linear = get_parameter("base_max_linear").as_double();
-    const double max_angular = get_parameter("base_max_angular").as_double();
+    const bool empty = attached_box_id_.empty();
+    const double empty_linear = get_parameter("empty_base_max_linear").as_double();
+    const double empty_angular = get_parameter("empty_base_max_angular").as_double();
+    const double max_linear = empty && empty_linear > 0.0 ? empty_linear : get_parameter("base_max_linear").as_double();
+    const double max_angular = empty && empty_angular > 0.0 ? empty_angular : get_parameter("base_max_angular").as_double();
     const double position_tol = transit_position_tol > 0.0 ? transit_position_tol :
       get_parameter("base_position_tolerance").as_double();
     const double yaw_tol = transit_yaw_tol > 0.0 ? transit_yaw_tol :
       get_parameter("base_yaw_tolerance").as_double();
+    const double lateral_tol = (get_parameter("rear_side_pull").as_bool() ||
+      get_parameter("strict_tool_body_guard").as_bool()) ? std::min(0.002, position_tol) : 0.020;
     const double timeout = get_parameter("base_motion_timeout").as_double();
     const auto deadline = std::chrono::steady_clock::now() +
       std::chrono::duration_cast<std::chrono::steady_clock::duration>(
         std::chrono::duration<double>(timeout));
     rclcpp::WallRate rate(30.0);
     bool final_alignment = false;
+    bool docking_backoff = false;
+    bool precise_docking_mode = false;
+    bool docking_orientation_ready = false;
+    bool direction_selected = false;
+    bool reverse_drive = false;
+    double accumulated_yaw = 0.0;
+    double previous_yaw = currentOdom().yaw;
     geometry_msgs::msg::Twist previous_cmd;
     auto previous_time = std::chrono::steady_clock::now();
+    auto diagnostic_time = previous_time;
 
     while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline) {
       if (!attached_box_id_.empty()) {
@@ -1041,6 +1128,13 @@ private:
         }
       }
       const auto current = currentOdom();
+      accumulated_yaw += std::abs(normalizeAngle(current.yaw - previous_yaw));
+      previous_yaw = current.yaw;
+      if (accumulated_yaw > 2.0 * kPi) {
+        cmd_vel_pub_->publish(geometry_msgs::msg::Twist{});
+        RCLCPP_ERROR(get_logger(), "Docking aborted: accumulated rotation exceeded one turn");
+        return false;
+      }
       // Rotate about the driven axle, not the offset base origin. Otherwise
       // final yaw alignment displaces the reference by up to 30 mm and a
       // tight position tolerance causes a rotate/translate limit cycle.
@@ -1055,26 +1149,73 @@ private:
       // Latch final yaw alignment once position has converged. Previously a
       // tiny residual/slip sent the controller back to atan2(dy, dx), making
       // it turn towards a millimetre-scale error and circle at the table.
-      if (distance <= position_tol) final_alignment = true;
+      // A tighter lateral tolerance must also be satisfied before latching.
+      // Otherwise a 3 mm sideways residual inside a 4 mm distance tolerance
+      // re-latches every tick, preventing the requested bearing correction.
+      const double target_lateral = -dx * std::sin(target.yaw) + dy * std::cos(target.yaw);
+      if (distance <= position_tol &&
+          (!attached_box_id_.empty() || position_tol >= 0.01 ||
+           std::abs(target_lateral) <= lateral_tol)) final_alignment = true;
       if (final_alignment && distance > std::max(0.025, 4.0 * position_tol))
         final_alignment = false;
       const double yaw_error = normalizeAngle(target.yaw - current.yaw);
       const double longitudinal = dx * std::cos(target.yaw) + dy * std::sin(target.yaw);
       const double lateral = -dx * std::sin(target.yaw) + dy * std::cos(target.yaw);
-      const bool straight_empty_finish = attached_box_id_.empty() && distance < 0.04 &&
-        std::abs(lateral) <= 0.020 && std::abs(yaw_error) < 0.25;
-      if (straight_empty_finish) {
+      const bool straight_empty_finish = attached_box_id_.empty() && distance < 0.08 &&
+        std::abs(lateral) <= lateral_tol;
+      if (empty && position_tol < 0.01 &&
+          (distance < 0.08 || (distance < 0.30 && std::abs(yaw_error) < 0.7)))
+        precise_docking_mode = true;
+      const bool precise_empty_approach = precise_docking_mode;
+      if (precise_empty_approach) {
+        // A differential-drive base cannot correct a lateral residual by
+        // translating sideways. Create a finite approach runway instead of
+        // chasing atan2 of millimetre errors and rotating repeatedly.
+        if (!docking_backoff && std::abs(longitudinal) < 0.008 &&
+            std::abs(lateral) > lateral_tol) {
+          docking_backoff = true;
+          docking_orientation_ready = false;
+        }
+        if (docking_backoff && longitudinal >= std::max(0.15, 3.0 * std::abs(lateral))) docking_backoff = false;
+        if (!docking_orientation_ready && std::abs(yaw_error) <= 0.02)
+          docking_orientation_ready = true;
+        if (!docking_orientation_ready) {
+          cmd.angular.z = clamp(1.4 * yaw_error, -max_angular, max_angular);
+        } else if (docking_backoff) {
+          cmd.linear.x = std::abs(yaw_error) < 0.03 ? -0.04 : 0.0;
+          cmd.angular.z = clamp(1.4 * yaw_error, -max_angular, max_angular);
+        } else if (std::abs(lateral) <= lateral_tol) {
+          if (std::abs(longitudinal) <= position_tol && std::abs(yaw_error) <= yaw_tol) {
+            cmd_vel_pub_->publish(geometry_msgs::msg::Twist{});
+            RCLCPP_INFO(get_logger(), "Base docked at (%.3f, %.3f, %.3f)", current.x, current.y, current.yaw);
+            return true;
+          }
+          cmd.linear.x = std::abs(yaw_error) < 0.15 ? clamp(0.8 * longitudinal, -0.04, 0.04) : 0.0;
+          cmd.angular.z = clamp(1.4 * yaw_error, -max_angular, max_angular);
+        } else {
+          const double correction = std::atan2(lateral, std::max(0.005, longitudinal));
+          cmd.angular.z = clamp(1.8 * normalizeAngle(yaw_error + correction), -max_angular, max_angular);
+          cmd.linear.x = std::max(0.0, std::min(0.04, 0.4 * longitudinal)) *
+            std::max(0.0, std::cos(yaw_error + correction));
+        }
+      } else if (straight_empty_finish) {
         if (std::abs(longitudinal) <= position_tol && std::abs(yaw_error) <= yaw_tol) {
           cmd_vel_pub_->publish(geometry_msgs::msg::Twist());
           RCLCPP_INFO(get_logger(), "Base docked at (%.3f, %.3f, %.3f)", current.x, current.y, current.yaw);
           return true;
         }
-        cmd.linear.x = clamp(0.8 * longitudinal, -0.03, 0.03);
+        cmd.linear.x = std::abs(yaw_error) < 0.25 ? clamp(0.8 * longitudinal, -0.03, 0.03) : 0.0;
         cmd.angular.z = clamp(1.4 * yaw_error, -max_angular, max_angular);
       } else if (!final_alignment) {
         const double heading = std::atan2(dy, dx);
         double heading_error = normalizeAngle(heading - current.yaw);
-        const bool reverse = attached_box_id_.empty() && std::abs(heading_error) > 2.4;
+        if (!direction_selected) {
+          reverse_drive = empty && std::abs(heading_error) > 2.4;
+          direction_selected = true;
+        }
+        // Keep the travel direction for this goal. Switching forward/reverse
+        // around 90 degrees causes alternating turn commands at transit corners.
+        const bool reverse = reverse_drive;
         if (reverse) heading_error = normalizeAngle(heading_error + kPi);
         const bool empty_final_approach = attached_box_id_.empty() && distance < 0.30;
         if (std::abs(heading_error) > (empty_final_approach ? 0.9 : 0.22)) {
@@ -1084,7 +1225,8 @@ private:
           if (empty_final_approach) {
             const double beta = normalizeAngle(target.yaw - heading - (reverse ? kPi : 0.0));
             cmd.linear.x *= std::max(0.0, std::cos(heading_error));
-            cmd.angular.z = clamp(1.4 * heading_error - 0.5 * beta, -max_angular, max_angular);
+            (void)beta;
+            cmd.angular.z = clamp(1.4 * heading_error, -max_angular, max_angular);
           } else {
             cmd.angular.z = clamp(1.1 * heading_error, -max_angular, max_angular);
           }
@@ -1094,7 +1236,7 @@ private:
         const bool precise_empty_dock = attached_box_id_.empty() && position_tol < 0.01;
         if (std::abs(yaw_error) <= yaw_tol &&
             (!precise_empty_dock ||
-             (std::abs(longitudinal) <= position_tol && std::abs(lateral) <= 0.020))) {
+             (std::abs(longitudinal) <= position_tol && std::abs(lateral) <= lateral_tol))) {
           cmd_vel_pub_->publish(geometry_msgs::msg::Twist());
           RCLCPP_INFO(
             get_logger(), "Base docked at (%.3f, %.3f, %.3f)",
@@ -1105,7 +1247,7 @@ private:
         // latch. Never declare docking success on yaw alone: finish the
         // remaining longitudinal error without another bearing-angle turn.
         if (precise_empty_dock && std::abs(yaw_error) <= yaw_tol) {
-          if (std::abs(lateral) <= 0.020)
+          if (std::abs(lateral) <= lateral_tol)
             cmd.linear.x = clamp(0.8 * longitudinal, -0.03, 0.03);
           else
             final_alignment = false;
@@ -1118,6 +1260,12 @@ private:
       const double angular_step = get_parameter("base_angular_acceleration").as_double() * dt;
       cmd.linear.x = clamp(cmd.linear.x, previous_cmd.linear.x - linear_step, previous_cmd.linear.x + linear_step);
       cmd.angular.z = clamp(cmd.angular.z, previous_cmd.angular.z - angular_step, previous_cmd.angular.z + angular_step);
+      if (command_time - diagnostic_time > std::chrono::seconds(2)) {
+        RCLCPP_INFO(get_logger(), "DOCK_FEEDBACK current=(%.4f,%.4f,%.4f) goal=(%.4f,%.4f,%.4f) distance=%.5f lateral=%.5f cmd=(%.4f,%.4f) accumulated_yaw=%.3f backoff=%d",
+          current.x,current.y,current.yaw,target.x,target.y,target.yaw,distance,lateral,
+          cmd.linear.x,cmd.angular.z,accumulated_yaw,docking_backoff);
+        diagnostic_time = command_time;
+      }
       previous_cmd = cmd;
       previous_time = command_time;
       cmd_vel_pub_->publish(cmd);
@@ -1131,6 +1279,17 @@ private:
       "Base docking timed out. current=(%.3f, %.3f, %.3f), target=(%.3f, %.3f, %.3f)",
       current.x, current.y, current.yaw, target.x, target.y, target.yaw);
     return false;
+  }
+
+  bool driveToRearStation(double y)
+  {
+    constexpr double outside_x = 2.28;
+    const auto current = currentOdom();
+    if (current.x < 1.95 &&
+        (!driveToPose(Pose2D{0.0, 1.20, 0.5 * kPi}, 0.04, 0.04) ||
+         !driveToPose(Pose2D{outside_x, 1.20, -0.5 * kPi}, 0.04, 0.04))) return false;
+    if (!driveToPose(Pose2D{outside_x, y, kPi}, 0.001, 0.001)) return false;
+    return driveToPose(Pose2D{get_parameter("rear_source_dock_x").as_double(), y, kPi}, 0.001, 0.001);
   }
 
   bool goToSourceWorkPose(const BoxSpec& box)
@@ -1158,11 +1317,14 @@ private:
 
     // Back row: route outside the pallet far edge before moving laterally.
     constexpr double outside_rear_x = 2.10;
-    constexpr double rear_dock_x = 1.918;  // 50 mm from pallet rear edge.
-    if (!driveToPose(Pose2D{outside_rear_x, corridor_y, 0.0})) {
+    const double rear_dock_x = get_parameter("rear_source_dock_x").as_double();
+    if (currentOdom().x >= 1.95) {
+      return driveToPose(Pose2D{rear_dock_x, box.y, kPi});
+    }
+    if (!driveToPose(Pose2D{outside_rear_x, corridor_y, 0.0}, 0.05, 0.05)) {
       return false;
     }
-    if (!driveToPose(Pose2D{outside_rear_x, box.y, kPi})) {
+    if (!driveToPose(Pose2D{outside_rear_x, box.y, kPi}, 0.03, 0.05)) {
       return false;
     }
     return driveToPose(Pose2D{rear_dock_x, box.y, kPi});
@@ -1170,11 +1332,21 @@ private:
 
   bool goToHookWorkPose(const BoxSpec& box)
   {
+    if (box.row == 2 && get_parameter("rear_side_pull").as_bool()) {
+      if (currentOdom().x < 1.95) return driveToRearStation(
+        box.y - get_parameter("pre_extract_distance").as_double());
+      const double work_y = box.y - get_parameter("pre_extract_distance").as_double();
+      if (std::abs(currentOdom().y - work_y) > 0.001) return driveToRearStation(work_y);
+      return driveToPose(Pose2D{get_parameter("rear_source_dock_x").as_double(), work_y, kPi}, 0.001, 0.001);
+    }
     const bool active_front = box.row == 0 || box.row == get_parameter("source_row_only").as_int();
     const double work_y = box.y - (active_front &&
       get_parameter("align_with_extracted_center").as_bool() ?
       get_parameter("pre_extract_distance").as_double() : 0.0);
-    if (active_front && box.col > 0 &&
+    const auto current = currentOdom();
+    const bool already_front_aligned = std::hypot(current.x, current.y - work_y) < 0.025 &&
+      std::abs(normalizeAngle(current.yaw)) < 0.03;
+    if (active_front && box.col > 0 && !already_front_aligned &&
         !driveToPose(Pose2D{-0.15, work_y, 0.0}, 0.05, 0.03))
       return false;
     // Keep the chassis front 200 mm from the pallet near edge.  The outer tote
@@ -1203,9 +1375,19 @@ private:
   bool goToBinDock()
   {
     // Go around the extraction deck, whose footprint occupies
-    // x=[0.384,0.784], y=[-1.010,-0.600]. Keep the column outside the table.
+    // x=[0.384,1.634], y=[-1.010,-0.600]. Keep the column outside the table.
     constexpr double dock_x = 0.50;
     constexpr double dock_y = -1.55;
+    const int source_row = get_parameter("full_transfer_box_index").as_int() / 3;
+    if (source_row == 2) {
+      // A back-row pickup starts behind the pallet. Reach the bin corridor by
+      // going around the clear north edge; the front-row direct route cuts
+      // across the pallet's rear corner and can stall while carrying a tote.
+      if (!driveToPose(Pose2D{2.10, 1.20, 0.5 * kPi}, 0.05, 0.05) ||
+          !driveToPose(Pose2D{0.0, 1.20, -0.5 * kPi}, 0.05, 0.05)) {
+        return false;
+      }
+    }
     // Corridor waypoints need clearance, not millimetre assembly precision.
     // Preserve the strict default tolerance at the actual manipulation docks.
     if (!driveToPose(Pose2D{0.0, -1.20, -0.5 * kPi}, 0.015, 0.03) ||
@@ -1236,16 +1418,26 @@ private:
     trajectory.points.push_back(point);
     body_pub_->publish(trajectory);
     RCLCPP_INFO(get_logger(), "Command waist lift=%.3f m pitch=%.3f rad", lift, pitch);
-    rclcpp::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(
-      std::chrono::duration<double>(seconds + 0.35)));
     if (get_parameter("execute").as_bool()) {
-      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+      // End the wait on fresh endpoint feedback, rather than waiting out an
+      // additional fixed command duration when the coordinated arms already
+      // put the waist at this target. Require a short stable interval.
+      const auto issued = std::chrono::steady_clock::now();
+      auto stable_since = issued;
+      bool stable = false;
+      const auto deadline = issued + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+        std::chrono::duration<double>(std::max(15.0, seconds * 3.0)));
       while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline) {
         {
           std::lock_guard<std::mutex> lock(data_mutex_);
-          if (std::chrono::steady_clock::now() - waist_received_ < std::chrono::seconds(1) &&
+          const auto sample_time = std::chrono::steady_clock::now();
+          const bool at_target = waist_received_ > issued &&
+              sample_time - waist_received_ < std::chrono::milliseconds(250) &&
               std::abs(measured_waist_[0] - lift) < 0.001 &&
-              std::abs(measured_waist_[1] - pitch) < 0.002) {
+              std::abs(measured_waist_[1] - pitch) < 0.002;
+          if (!at_target) stable = false;
+          else if (!stable) { stable = true; stable_since = sample_time; }
+          if (stable && sample_time - stable_since >= std::chrono::milliseconds(200)) {
             RCLCPP_INFO(get_logger(), "Physical waist verified lift=%.4f pitch=%.4f",
                         measured_waist_[0], measured_waist_[1]);
             return;
@@ -1254,6 +1446,9 @@ private:
         rclcpp::sleep_for(std::chrono::milliseconds(100));
       }
       throw std::runtime_error("Physical waist failed to reach requested lift/pitch");
+    } else {
+      rclcpp::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::duration<double>(seconds + 0.35)));
     }
   }
 
@@ -1413,8 +1608,8 @@ private:
     extraction_deck.header.frame_id = "base_footprint";
     extraction_deck.id = "perimeter_extraction_deck";
     extraction_deck.operation = moveit_msgs::msg::CollisionObject::ADD;
-    appendWorldBox(extraction_deck, 0.40, 0.41, 0.15,
-                   0.584355, -0.805, 0.075, 0.0, base);
+    appendWorldBox(extraction_deck, 1.25, 0.41, 0.15,
+                   1.009355, -0.805, 0.075, 0.0, base);
     objects.push_back(extraction_deck);
 
     moveit_msgs::msg::CollisionObject table;
@@ -1461,7 +1656,8 @@ private:
 
     for (const auto& box : boxes_) {
       const int source_row = get_parameter("source_row_only").as_int();
-      if (source_row >= 0 && box.row != source_row) continue;
+      if (!get_parameter("keep_all_source_rows").as_bool() && source_row >= 0 && box.row != source_row &&
+          !(get_parameter("retain_middle_row").as_bool() && box.row == 1)) continue;
       if (box.row == (source_row >= 0 ? source_row : 0) && box.col < get_parameter("cleared_first_row_count").as_int()) continue;
       // While an MTC pick is physically being carried, this id is attached to
       // left_gripper_tcp in the planning scene. Do not also recreate it in the
@@ -1475,16 +1671,28 @@ private:
     std::vector<std::string> cleared_ids;
     const int source_row = get_parameter("source_row_only").as_int();
     for (const auto& box : boxes_)
-      if ((source_row >= 0 && box.row != source_row) ||
+      if ((!get_parameter("keep_all_source_rows").as_bool() && source_row >= 0 && box.row != source_row &&
+          !(get_parameter("retain_middle_row").as_bool() && box.row == 1)) ||
           (box.row == (source_row >= 0 ? source_row : 0) && box.col < get_parameter("cleared_first_row_count").as_int()))
         cleared_ids.push_back(box.id);
     const auto completed_columns = get_parameter("completed_source_columns").as_integer_array();
     for (const auto col : completed_columns) {
       if (col == -1) continue;
       if (col < 0 || col > 2) throw std::runtime_error("Invalid completed source column");
-      cleared_ids.push_back("pallet_box_r1_c" + std::to_string(col));
+      const int completed_row = source_row >= 0 ? source_row : 1;
+      cleared_ids.push_back("pallet_box_r" + std::to_string(completed_row) + "_c" + std::to_string(col));
       objects.erase(std::remove_if(objects.begin(), objects.end(), [&](const auto& object) {
         return object.id == cleared_ids.back();
+      }), objects.end());
+    }
+    const auto completed_indices = get_parameter("completed_box_indices").as_integer_array();
+    for (const auto index : completed_indices) {
+      if (index == -1) continue;
+      if (index < 0 || index >= 9) throw std::runtime_error("Invalid completed box index");
+      const auto& id = boxes_[static_cast<std::size_t>(index)].id;
+      cleared_ids.push_back(id);
+      objects.erase(std::remove_if(objects.begin(), objects.end(), [&](const auto& object) {
+        return object.id == id;
       }), objects.end());
     }
     if (!cleared_ids.empty()) psi.removeCollisionObjects(cleared_ids);
@@ -1642,6 +1850,13 @@ private:
         ++bounds_failures;
         continue;
       }
+      if (get_parameter("strict_tool_body_guard").as_bool()) {
+        double clearance = std::numeric_limits<double>::max();
+        if (!toolBodyClear(self_collision_scene, candidate, toolBodyMatrix(model), clearance, false, 0.002)) {
+          ++collision_failures;
+          continue;
+        }
+      }
       if (self_collision_scene.isStateColliding(candidate, "both_arms", false)) {
         // With the waist pitched forward for a low pallet grasp, the stock
         // waist collision boxes overlap the right elbow/shoulder even though
@@ -1662,7 +1877,9 @@ private:
           const bool has_waist =
             a == "waist_pitch_link" || b == "waist_pitch_link" ||
             a == "waist_up_down_link" || b == "waist_up_down_link";
-          waist_only = waist_only && has_waist;
+          const bool has_tool = a.find("gripper") != std::string::npos ||
+                                b.find("gripper") != std::string::npos;
+          waist_only = waist_only && has_waist && !has_tool;
           if (collision_failures == 0) {
             RCLCPP_WARN(
               get_logger(), "dual-arm IK first self-collision: %s <-> %s",
@@ -1699,9 +1916,12 @@ private:
     const moveit::core::RobotState& seed,
     const moveit::core::RobotModelConstPtr& model,
     std::size_t attempts = 120,
-    double ik_timeout = 0.20) const
+    double ik_timeout = 0.20, bool use_left_arm = false) const
   {
-    const auto* right = model->getJointModelGroup("right_arm");
+    const std::string arm_group = use_left_arm ? "left_arm" : "right_arm";
+    const std::string hand_link = use_left_arm ? "L_hand_link" : "R_hand_link";
+    const std::string prefix = use_left_arm ? "left_" : "right_";
+    const auto* right = model->getJointModelGroup(arm_group);
     if (!right) {
       throw std::runtime_error("SRDF does not contain right_arm");
     }
@@ -1712,8 +1932,8 @@ private:
     moveit::core::RobotState reference(seed);
     reference.updateLinkTransforms();
     const Eigen::Isometry3d hand_to_tcp =
-      reference.getGlobalLinkTransform("R_hand_link").inverse() *
-      reference.getGlobalLinkTransform((get_parameter("rear_push_probe").as_bool() ||
+      reference.getGlobalLinkTransform(hand_link).inverse() *
+      reference.getGlobalLinkTransform(use_left_arm ? "left_gripper_tcp" : (get_parameter("rear_push_probe").as_bool() ||
         get_parameter("rear_push_execute").as_bool()) ? "right_gripper_push_tip" : "right_gripper_tcp");
     const auto hand_pose = eigenToPose(poseToEigen(tcp_pose) * hand_to_tcp.inverse());
     std::map<std::string, double> best_goal;
@@ -1724,7 +1944,7 @@ private:
         candidate.setToRandomPositions(right);
       }
       candidate.update();
-      if (!candidate.setFromIK(right, hand_pose, "R_hand_link", ik_timeout)) {
+      if (!candidate.setFromIK(right, hand_pose, hand_link, ik_timeout)) {
         continue;
       }
       candidate.update();
@@ -1733,18 +1953,22 @@ private:
       // extra retry budget above is enough to search the alternate elbow branch
       // while retaining the real robot self-collision check.
       self_collision_scene.getCurrentStateNonConst() = candidate;
-      if (self_collision_scene.isStateColliding(candidate, "right_arm", false)) {
+      if (get_parameter("strict_tool_body_guard").as_bool()) {
+        double clearance = std::numeric_limits<double>::max();
+        if (!toolBodyClear(self_collision_scene, candidate, toolBodyMatrix(model), clearance, false, 0.002)) continue;
+      }
+      if (self_collision_scene.isStateColliding(candidate, arm_group, false)) {
         // Rear-tip paths must be valid goals for the strict MTC planner.
         // The legacy hook-only waist exemption can select an unrecoverable
         // gripper/torso overlap at the first unloaded waypoint.
-        if (get_parameter("rear_push_execute").as_bool() ||
+        if (use_left_arm || get_parameter("rear_push_execute").as_bool() ||
             get_parameter("rear_push_probe").as_bool()) continue;
         // The hook station uses the same crouched torso posture as the dual
         // grasp.  MoveIt's stock collision geometry reports a conservative
         // waist-to-shoulder/elbow contact there, although the actual links
         // clear the shell.  Keep the hook check strict for every other pair.
         collision_detection::CollisionRequest request;
-        request.group_name = "right_arm";
+        request.group_name = arm_group;
         request.contacts = true;
         request.max_contacts = 8;
         request.max_contacts_per_pair = 2;
@@ -1754,7 +1978,8 @@ private:
         for (const auto& contact : result.contacts) {
           const auto& a = contact.first.first;
           const auto& b = contact.first.second;
-          waist_only = waist_only &&
+          waist_only = waist_only && a.find("gripper") == std::string::npos &&
+            b.find("gripper") == std::string::npos &&
             (a == "waist_pitch_link" || b == "waist_pitch_link" ||
              a == "waist_up_down_link" || b == "waist_up_down_link");
           RCLCPP_WARN_ONCE(
@@ -1778,11 +2003,11 @@ private:
       // technically satisfies the URDF bounds.
       bool wrist_margin_ok = true;
       for (const auto& joint_name : {
-          std::string("right_shoulder_roll_joint"),
-          std::string("right_shoulder_yaw_joint"),
-          std::string("right_wrist_yaw_joint"),
-          std::string("right_wrist_pitch_joint"),
-          std::string("right_wrist_roll_joint")}) {
+          prefix + "shoulder_roll_joint",
+          prefix + "shoulder_yaw_joint",
+          prefix + "wrist_yaw_joint",
+          prefix + "wrist_pitch_joint",
+          prefix + "wrist_roll_joint"}) {
         const auto& bounds = model->getVariableBounds(joint_name);
         if (bounds.position_bounded_ &&
             (candidate.getVariablePosition(joint_name) < bounds.min_position_ + 0.18 ||
@@ -1852,6 +2077,115 @@ private:
     }
   }
 
+  template<typename Apply>
+  static void forEachToolBodyPair(Apply apply)
+  {
+    const std::vector<std::string> right_tools{
+      "gripper_base_link", "gripper_left_finger_link", "gripper_right_finger_link"};
+    const std::vector<std::string> left_tools{
+      "left_gripper_base_link", "left_gripper_left_finger_link", "left_gripper_right_finger_link"};
+    const std::vector<std::string> body{
+      "base_link", "laser_link", "waist_pitch_link", "waist_up_down_link",
+      "camera_link", "head_yaw_link", "head_pitch_link", "left_wheel_link", "right_wheel_link"};
+    for (const auto& tool : right_tools) for (const auto& link : body) apply(tool, link);
+    for (const auto& tool : left_tools) for (const auto& link : body) apply(tool, link);
+    for (const auto& side : {std::string("left"), std::string("right")}) {
+      const auto& tools = side == "left" ? left_tools : right_tools;
+      const std::string other = side == "left" ? "right" : "left";
+      for (const auto& tool : tools) {
+        for (const auto& suffix : {"shoulder_pitch_link", "shoulder_roll_link", "shoulder_yaw_link", "elbow_pitch_link"}) {
+          apply(tool, side + "_" + suffix);
+          apply(tool, other + "_" + suffix);
+        }
+        for (const auto& suffix : {"wrist_yaw_link", "wrist_pitch_link", "wrist_roll_link"})
+          apply(tool, other + "_" + suffix);
+        apply(tool, other == "left" ? "L_hand_link" : "R_hand_link");
+      }
+    }
+    for (const auto& a : left_tools) for (const auto& b : right_tools) apply(a, b);
+  }
+
+  void enforceBodyToolCollisions(mtc::stages::ModifyPlanningScene& stage) const
+  {
+    forEachToolBodyPair([&](const std::string& tool, const std::string& body) {
+      stage.allowCollisions(tool, body, false);
+    });
+  }
+
+  collision_detection::AllowedCollisionMatrix toolBodyMatrix(
+    const moveit::core::RobotModelConstPtr& model) const
+  {
+    collision_detection::AllowedCollisionMatrix matrix(model->getLinkModelNames(), true);
+    forEachToolBodyPair([&](const std::string& tool, const std::string& body) {
+      matrix.setEntry(tool, body, false);
+    });
+    return matrix;
+  }
+
+  bool toolBodyClear(const planning_scene::PlanningScene& scene,
+    const moveit::core::RobotState& state, const collision_detection::AllowedCollisionMatrix& matrix,
+    double& minimum, bool report = false, double planning_margin = 0.0) const
+  {
+    collision_detection::CollisionRequest request;
+    request.distance = true;
+    request.contacts = report;
+    request.max_contacts = 8;
+    collision_detection::CollisionResult result;
+    // Attached totes belong to the object/fixture validator, not this robot
+    // body guard. checkSelfCollision also checks attached objects, so remove
+    // them from a copy to avoid misclassifying intentional finger contact.
+    auto robot_only = state;
+    robot_only.clearAttachedBodies();
+    scene.checkSelfCollision(request, result, robot_only, matrix);
+    minimum = std::min(minimum, result.distance);
+    const bool safe = !result.collision && result.distance >= get_parameter("tool_body_clearance").as_double() + planning_margin;
+    if (!safe && report) {
+      RCLCPP_ERROR(get_logger(), "TOOL_BODY_GUARD rejected clearance=%.6f m collision=%d", result.distance, result.collision);
+      for (const auto& contact : result.contacts)
+        RCLCPP_ERROR(get_logger(), "TOOL_BODY_GUARD contact %s <-> %s",
+          contact.first.first.c_str(), contact.first.second.c_str());
+    }
+    return safe;
+  }
+
+  bool validateToolBodySolution(mtc::Task& task,
+    const moveit_task_constructor_msgs::msg::Solution& solution, const std::string& label) const
+  {
+    if (!get_parameter("strict_tool_body_guard").as_bool()) return true;
+    planning_scene::PlanningScene scene(task.getRobotModel());
+    if (!scene.setPlanningSceneMsg(solution.start_scene)) return false;
+    const auto matrix = toolBodyMatrix(task.getRobotModel());
+    double minimum = std::numeric_limits<double>::max();
+    std::size_t samples = 0;
+    for (const auto& segment : solution.sub_trajectory) {
+      auto state = scene.getCurrentState();
+      const auto& trajectory = segment.trajectory.joint_trajectory;
+      for (const auto& point : trajectory.points) {
+        auto goal = state;
+        goal.setVariablePositions(trajectory.joint_names, point.positions);
+        goal.update();
+        int subdivisions = 1;
+        for (const auto& name : trajectory.joint_names) {
+          const auto* joint = task.getRobotModel()->getJointOfVariable(name);
+          const double step = joint->getType() == moveit::core::JointModel::PRISMATIC ? 0.0005 : 0.005;
+          subdivisions = std::max(subdivisions, static_cast<int>(std::ceil(state.distance(goal, joint) / step)));
+        }
+        for (int sample = 0; sample <= subdivisions; ++sample) {
+          auto interpolated = state;
+          state.interpolate(goal, sample / static_cast<double>(subdivisions), interpolated);
+          interpolated.update();
+          if (!toolBodyClear(scene, interpolated, matrix, minimum, true)) return false;
+          ++samples;
+        }
+        state = goal;
+      }
+      scene.setCurrentState(state);
+      if (!scene.setPlanningSceneDiffMsg(segment.scene_diff)) return false;
+    }
+    RCLCPP_INFO(get_logger(), "TOOL_BODY_GUARD %s samples=%zu minimum_clearance=%.6f m", label.c_str(), samples, minimum);
+    return true;
+  }
+
   void addGroundContactStage(mtc::Task& task) const
   {
     auto contact = std::make_unique<mtc::stages::ModifyPlanningScene>("allow wheel-ground support only");
@@ -1866,6 +2200,7 @@ private:
     // Reapply the existing SRDF fixed torso-camera exemption: task scene
     // diffs can otherwise lose this already-configured assembly pair.
     contact->allowCollisions("camera_link", "waist_up_down_link", true);
+    enforceBodyToolCollisions(*contact);
     task.add(std::move(contact));
   }
 
@@ -2009,6 +2344,7 @@ private:
     allow_waist_clearance->allowCollisions("source_pallet", "base_link", true);
     const std::vector<std::string> base_wheel_links{"left_wheel_link", "right_wheel_link"};
     allow_waist_clearance->allowCollisions("source_pallet", base_wheel_links, true);
+    enforceBodyToolCollisions(*allow_waist_clearance);
     task.add(std::move(allow_waist_clearance));
 
     auto pipeline = makePipeline(0.25);
@@ -2155,6 +2491,7 @@ private:
                                "destination_table", "large_bin", "simulation_ground"}) {
       strict_approach->allowCollisions(fixture, all_arm_links, false);
     }
+    enforceBodyToolCollisions(*strict_approach);
     task.add(std::move(strict_approach));
 
     // A deterministic joint interpolation is more reliable than OMPL for
@@ -2248,6 +2585,15 @@ private:
     // of the attached-object waypoint check.
     allow->allowCollisions("source_pallet", true);
     allow->allowCollisions(object_id, "perimeter_extraction_deck", true);
+    if (get_parameter("retain_middle_row").as_bool()) {
+      for (const auto& neighbor : boxes_) {
+        if (neighbor.id != object_id) {
+          allow->allowCollisions(neighbor.id, all_arm_links, false);
+          allow->allowCollisions(object_id, neighbor.id, false);
+        }
+      }
+    }
+    enforceBodyToolCollisions(*allow);
     task.add(std::move(allow));
 
     auto to_grasp = std::make_unique<mtc::stages::MoveTo>("both arms on side handles", pipeline);
@@ -2505,6 +2851,7 @@ private:
     allow->allowCollisions(box.id, std::vector<std::string>{
       "gripper_left_finger_link", "gripper_right_finger_link"}, true);
     task.add(std::move(above));
+    enforceBodyToolCollisions(*allow);
     task.add(std::move(allow));
     if (rear) {
       auto close = std::make_unique<mtc::stages::MoveTo>("close fingers for front-tip push", makeJointPlanner());
@@ -2627,8 +2974,17 @@ private:
     if (distance < 0.12 || distance > 0.30) {
       throw std::runtime_error("pre_extract_distance must be in [0.12, 0.30] m");
     }
+    const bool mirrored = get_parameter("rear_side_pull").as_bool();
+    const double side = mirrored ? -1.0 : 1.0;
+    const std::string arm_group = mirrored ? "left_arm" : "right_arm";
+    const std::string gripper_group = mirrored ? "left_gripper" : "right_gripper";
+    const std::string tcp = mirrored ? "left_gripper_tcp" : "right_gripper_tcp";
+    const std::string finger_joint = mirrored ? "left_gripper_left_finger_joint" : "gripper_left_finger_joint";
+    const std::vector<std::string> fingers = mirrored ?
+      std::vector<std::string>{"left_gripper_left_finger_link", "left_gripper_right_finger_link"} :
+      std::vector<std::string>{"gripper_left_finger_link", "gripper_right_finger_link"};
     mtc::Task task;
-    task.stages()->setName("right-arm perimeter tote extraction");
+    task.stages()->setName(mirrored ? "left-arm mirrored perimeter tote extraction" : "right-arm perimeter tote extraction");
     task.loadRobotModel(shared_from_this());
     task.add(std::make_unique<mtc::stages::CurrentState>("current state"));
     addGroundContactStage(task);
@@ -2677,7 +3033,9 @@ private:
       {-0.012, 0.0, 0.0}, {0.012, 0.0, 0.0}};
     auto solve_hook_waypoint = [&](double x, double y, double z) {
       for (const auto& offset : pose_offsets) {
+        if (mirrored && offset != pose_offsets.front()) continue;
         for (const auto& rpy : orientations) {
+          if (mirrored && rpy != orientations.front()) continue;
           try {
             const double candidate_x = x + offset[0];
             const double candidate_y = y + offset[1];
@@ -2689,9 +3047,9 @@ private:
             // retry from the measured startup state.
             std::map<std::string, double> goal;
             try {
-              goal = solveRightArmGoal(pose, seed, task.getRobotModel(), 20, 0.02);
+              goal = solveRightArmGoal(pose, seed, task.getRobotModel(), mirrored ? 120 : 20, 0.02, mirrored);
             } catch (const std::runtime_error&) {
-              goal = solveRightArmGoal(pose, initial_seed, task.getRobotModel(), 20, 0.02);
+              goal = solveRightArmGoal(pose, initial_seed, task.getRobotModel(), mirrored ? 120 : 20, 0.02, mirrored);
             }
             RCLCPP_INFO(
               get_logger(),
@@ -2708,28 +3066,28 @@ private:
     };
     const auto pre_result = solve_hook_waypoint(
       center[0] + hook_x_offset,
-      center[1] + hook_y_offset - half_span - approach_outset,
+      center[1] + side * (hook_y_offset - half_span - approach_outset),
       hole_z + approach_height);
     auto pre_goal = pre_result.first;
     for (const auto& item : pre_goal) seed.setVariablePosition(item.first, item.second);
     seed.update();
     const auto insert_result = solve_hook_waypoint(
       center[0] + hook_x_offset,
-      center[1] + hook_y_offset - half_span + inset,
+      center[1] + side * (hook_y_offset - half_span + inset),
       hole_z + tcp_hole_clearance + 0.5 * seat_drop);
     auto insert_goal = insert_result.first;
     for (const auto& item : insert_goal) seed.setVariablePosition(item.first, item.second);
     seed.update();
     const auto hook_result = solve_hook_waypoint(
       center[0] + hook_x_offset,
-      center[1] + hook_y_offset - half_span + inset,
+      center[1] + side * (hook_y_offset - half_span + inset),
       hole_z + tcp_hole_clearance - seat_drop);
     auto hook_goal = hook_result.first;
     for (const auto& item : hook_goal) seed.setVariablePosition(item.first, item.second);
     seed.update();
     const auto pull_result = solve_hook_waypoint(
       center[0] + hook_x_offset,
-      center[1] + hook_y_offset - half_span + inset - distance,
+      center[1] + side * (hook_y_offset - half_span + inset - distance),
       hole_z + tcp_hole_clearance - seat_drop);
     auto pull_goal = pull_result.first;
     // The shifted hook pad remains behind the rail after the pull.  Retreat
@@ -2737,7 +3095,7 @@ private:
     // otherwise the pad can still overlap the now-relocated tote.
     const auto clear_result = solve_hook_waypoint(
       center[0] + hook_x_offset,
-      center[1] + hook_y_offset - half_span + inset - distance - approach_outset,
+      center[1] + side * (hook_y_offset - half_span + inset - distance - approach_outset),
       hole_z + approach_height + 0.12);
     auto clear_goal = clear_result.first;
 
@@ -2751,19 +3109,24 @@ private:
       "allow hook clearance before pre-pose");
     allow_pre_environment->allowCollisions(
       object_id,
-      {"gripper_left_finger_link", "gripper_right_finger_link"}, false);
+      fingers, false);
     for (const auto& box : boxes_) {
       allow_pre_environment->allowCollisions(
         box.id,
-        {"gripper_left_finger_link", "gripper_right_finger_link"}, true);
+        fingers, true);
     }
     allow_pre_environment->allowCollisions("source_pallet", {"base_link"}, true);
-    const std::vector<std::string> pre_hook_arm_links{
+    std::vector<std::string> pre_hook_arm_links{
       "right_shoulder_pitch_link", "right_shoulder_roll_link",
       "right_shoulder_yaw_link", "right_elbow_pitch_link",
       "right_wrist_yaw_link", "right_wrist_pitch_link",
       "right_wrist_roll_link", "R_hand_link", "gripper_base_link",
       "gripper_left_finger_link", "gripper_right_finger_link"};
+    if (mirrored) for (auto& link : pre_hook_arm_links) {
+      if (link.rfind("right_", 0) == 0) link.replace(0, 6, "left_");
+      else if (link.rfind("gripper_", 0) == 0) link = "left_" + link;
+      else if (link == "R_hand_link") link = "L_hand_link";
+    }
     allow_pre_environment->allowCollisions("source_pallet", pre_hook_arm_links, false);
     for (const auto& box : boxes_) {
       allow_pre_environment->allowCollisions(box.id, pre_hook_arm_links, false);
@@ -2773,7 +3136,7 @@ private:
     auto to_pre = std::make_unique<mtc::stages::MoveTo>(
       "right arm above perimeter handle hole", pipeline);
     to_pre->setTimeout(timeout);
-    to_pre->setGroup("right_arm");
+    to_pre->setGroup(arm_group);
     to_pre->setGoal(pre_goal);
     task.add(std::move(to_pre));
 
@@ -2790,7 +3153,8 @@ private:
       "allow right finger contact");
     allow->allowCollisions(
       object_id,
-      {"gripper_left_finger_link", "gripper_right_finger_link"}, true);
+      fingers, true);
+    enforceBodyToolCollisions(*allow);
     task.add(std::move(allow));
 
     // The 2--4 mm CAD spacing means the extended hook finger can graze the
@@ -2803,7 +3167,7 @@ private:
       if (box.id != object_id) {
         allow_neighbor_contact->allowCollisions(
           box.id,
-          {"gripper_left_finger_link", "gripper_right_finger_link"}, true);
+          fingers, true);
       }
     }
     task.add(std::move(allow_neighbor_contact));
@@ -2813,17 +3177,28 @@ private:
     // contact for the complete right-arm chain during this short insertion
     // segment; the attached tote and all environment collisions are restored
     // immediately after the pull.
-    const std::vector<std::string> hook_arm_links{
+    std::vector<std::string> hook_arm_links{
       "right_shoulder_pitch_link", "right_shoulder_roll_link",
       "right_shoulder_yaw_link", "right_elbow_pitch_link",
       "right_wrist_yaw_link", "right_wrist_pitch_link",
       "right_wrist_roll_link", "R_hand_link", "gripper_base_link",
       "gripper_left_finger_link", "gripper_right_finger_link"};
+    if (mirrored) for (auto& link : hook_arm_links) {
+      if (link.rfind("right_", 0) == 0) link.replace(0, 6, "left_");
+      else if (link.rfind("gripper_", 0) == 0) link = "left_" + link;
+      else if (link == "R_hand_link") link = "L_hand_link";
+    }
     auto allow_hook_environment = std::make_unique<mtc::stages::ModifyPlanningScene>(
       "allow right hook contact with perimeter environment");
     allow_hook_environment->allowCollisions("source_pallet", hook_arm_links, true);
     for (const auto& box : boxes_) {
       allow_hook_environment->allowCollisions(box.id, hook_arm_links, true);
+    }
+    if (mirrored) {
+      allow_hook_environment->allowCollisions("source_pallet", hook_arm_links, false);
+      for (const auto& neighbor : boxes_)
+        if (neighbor.id != object_id) allow_hook_environment->allowCollisions(neighbor.id, hook_arm_links, false);
+      enforceBodyToolCollisions(*allow_hook_environment);
     }
     task.add(std::move(allow_hook_environment));
 
@@ -2834,19 +3209,19 @@ private:
     auto align = std::make_unique<mtc::stages::MoveRelative>(
       "align above continuous wall", cartesian);
     align->setTimeout(timeout);
-    align->setGroup("right_arm");
-    align->setIKFrame("right_gripper_tcp");
+    align->setGroup(arm_group);
+    align->setIKFrame(tcp);
     align->setMinMaxDistance(approach_outset + inset, approach_outset + inset);
     geometry_msgs::msg::Vector3Stamped align_direction;
     align_direction.header.frame_id = "base_footprint";
-    align_direction.vector.y = 1.0;
+    align_direction.vector.y = side;
     align->setDirection(align_direction);
     task.add(std::move(align));
     auto insert = std::make_unique<mtc::stages::MoveRelative>(
       "lower open fingers vertically around wall", cartesian);
     insert->setTimeout(timeout);
-    insert->setGroup("right_arm");
-    insert->setIKFrame("right_gripper_tcp");
+    insert->setGroup(arm_group);
+    insert->setIKFrame(tcp);
     const double insertion_depth = approach_height - tcp_hole_clearance + seat_drop;
     insert->setMinMaxDistance(insertion_depth, insertion_depth);
     geometry_msgs::msg::Vector3Stamped insert_direction;
@@ -2859,9 +3234,9 @@ private:
     // onto it before pulling; MoveIt attachment alone creates no Gazebo force.
     auto close_wall = std::make_unique<mtc::stages::MoveTo>(
       "close right gripper on continuous wall", joint);
-    close_wall->setGroup("right_gripper");
+    close_wall->setGroup(gripper_group);
     close_wall->setGoal(std::map<std::string, double>{
-      {"gripper_left_finger_joint", 0.057}});
+      {finger_joint, 0.057}});
     task.add(std::move(close_wall));
 
     // The tote is still resting on the pallet when the hook is seated.  MTC
@@ -2876,30 +3251,30 @@ private:
 
     auto attach = std::make_unique<mtc::stages::ModifyPlanningScene>(
       "attach hooked tote to right TCP for planning");
-    attach->attachObject(object_id, "right_gripper_tcp");
+    attach->attachObject(object_id, tcp);
     task.add(std::move(attach));
 
     auto pull = std::make_unique<mtc::stages::MoveRelative>(
       "straight pull with fixed wall-clamp orientation", cartesian);
     pull->setTimeout(timeout);
-    pull->setGroup("right_arm");
-    pull->setIKFrame("right_gripper_tcp");
+    pull->setGroup(arm_group);
+    pull->setIKFrame(tcp);
     pull->setMinMaxDistance(distance, distance);
     geometry_msgs::msg::Vector3Stamped pull_direction;
     pull_direction.header.frame_id = "base_footprint";
-    pull_direction.vector.y = -1.0;
+    pull_direction.vector.y = -side;
     pull->setDirection(pull_direction);
     task.add(std::move(pull));
 
     auto open_wall = std::make_unique<mtc::stages::MoveTo>(
       "release continuous wall after pull", joint);
-    open_wall->setGroup("right_gripper");
+    open_wall->setGroup(gripper_group);
     open_wall->setGoal(std::map<std::string, double>{
-      {"gripper_left_finger_joint", 0.0}});
+      {finger_joint, 0.0}});
     task.add(std::move(open_wall));
 
     auto detach = std::make_unique<mtc::stages::ModifyPlanningScene>("detach extracted tote");
-    detach->detachObject(object_id, "right_gripper_tcp");
+    detach->detachObject(object_id, tcp);
     task.add(std::move(detach));
 
     // Detach leaves the hook at the pulled pose.  Clear the aperture before
@@ -2908,8 +3283,8 @@ private:
     auto clear_hook = std::make_unique<mtc::stages::MoveRelative>(
       "lift open fingers vertically clear of tote", cartesian);
     clear_hook->setTimeout(timeout);
-    clear_hook->setGroup("right_arm");
-    clear_hook->setIKFrame("right_gripper_tcp");
+    clear_hook->setGroup(arm_group);
+    clear_hook->setIKFrame(tcp);
     clear_hook->setMinMaxDistance(0.15, 0.15);
     geometry_msgs::msg::Vector3Stamped clear_direction;
     clear_direction.header.frame_id = "base_footprint";
@@ -2928,7 +3303,7 @@ private:
       if (box.id != object_id) {
         restore_neighbor_contact->allowCollisions(
           box.id,
-          {"gripper_left_finger_link", "gripper_right_finger_link"}, false);
+          fingers, false);
       }
     }
     task.add(std::move(restore_neighbor_contact));
@@ -2980,6 +3355,7 @@ private:
     // all table/bin and tote contacts remain separately checked.
     allow_waist_clearance->allowCollisions("waist_pitch_link", true);
     allow_waist_clearance->allowCollisions("waist_up_down_link", true);
+    enforceBodyToolCollisions(*allow_waist_clearance);
     task.add(std::move(allow_waist_clearance));
 
     auto joint = makeJointPlanner();
@@ -3141,9 +3517,9 @@ private:
           ++end;
         }
       }
-      if (end - begin < 3) end = begin + 1;
+      if (end - begin < 2) end = begin + 1;
       Segment result = first;
-      if (end - begin >= 3) {
+      if (end - begin >= 2) {
         const auto processing_start = std::chrono::steady_clock::now();
         robot_trajectory::RobotTrajectory path(task.getRobotModel(), group);
         auto state = scene.getCurrentState();
@@ -3200,8 +3576,9 @@ private:
         // path below because TOTG can round corners between original points.
         trajectory_processing::TimeOptimalTrajectoryGeneration retime(0.0001, 0.05, 0.0001);
         const bool pushing = label == "physical side push without attachment";
-        const double velocity = get_parameter("velocity_scaling").as_double();
-        const double acceleration = get_parameter("acceleration_scaling").as_double();
+        const bool empty_approach = label == "empty long-finger coordinated approach";
+        const double velocity = get_parameter(empty_approach ? "empty_velocity_scaling" : "velocity_scaling").as_double();
+        const double acceleration = get_parameter(empty_approach ? "empty_acceleration_scaling" : "acceleration_scaling").as_double();
         if (!retime.computeTimeStamps(path, velocity, acceleration)) {
           RCLCPP_WARN(get_logger(), "CONTINUOUS_ARM retiming failed for %s; retain checked original solution", label.c_str());
           return false;
@@ -3285,7 +3662,8 @@ private:
   }
 
   moveit::core::MoveItErrorCode executeContinuousSolution(
-    moveit_task_constructor_msgs::msg::Solution solution)
+    moveit_task_constructor_msgs::msg::Solution solution,
+    const moveit::core::RobotModelConstPtr& model)
   {
     using Action = moveit_task_constructor_msgs::action::ExecuteTaskSolution;
     auto client = rclcpp_action::create_client<Action>(shared_from_this(), "execute_task_solution");
@@ -3299,24 +3677,37 @@ private:
     auto handle = accepted.get();
     if (!handle) return moveit_msgs::msg::MoveItErrorCodes::FAILURE;
     auto result = client->async_get_result(handle);
+    planning_scene::PlanningScene guard_scene(model);
+    const auto guard_matrix = toolBodyMatrix(model);
+    double minimum_clearance = std::numeric_limits<double>::max();
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(45);
     while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline) {
-      if (result.wait_for(std::chrono::seconds(1)) == std::future_status::ready) {
+      if (result.wait_for(std::chrono::milliseconds(200)) == std::future_status::ready) {
         const auto wrapped = result.get();
         if (wrapped.code != rclcpp_action::ResultCode::SUCCEEDED)
           return moveit_msgs::msg::MoveItErrorCodes::FAILURE;
         return wrapped.result->error_code;
+      }
+      if (get_parameter("strict_tool_body_guard").as_bool()) {
+        const auto actual = currentSeed(model);
+        if (!toolBodyClear(guard_scene, actual, guard_matrix, minimum_clearance, true)) {
+          client->async_cancel_goal(handle);
+          cmd_vel_pub_->publish(geometry_msgs::msg::Twist{});
+          RCLCPP_ERROR(get_logger(), "TOOL_BODY_GUARD stopped execution on measured joint state");
+          return moveit_msgs::msg::MoveItErrorCodes::INVALID_MOTION_PLAN;
+        }
       }
     }
     client->async_cancel_goal(handle);
     return moveit_msgs::msg::MoveItErrorCodes::TIMED_OUT;
   }
 
-  bool planAndMaybeExecute(mtc::Task& task, bool execute, const std::string& label)
+  bool planAndMaybeExecute(mtc::Task& task, bool execute, const std::string& label, bool reuse_plan = false)
   {
     const auto max_solutions = static_cast<std::size_t>(
       std::max<int64_t>(1, get_parameter("max_solutions").as_int()));
-    auto result = task.plan(max_solutions);
+    auto result = reuse_plan ? moveit::core::MoveItErrorCode(moveit_msgs::msg::MoveItErrorCodes::SUCCESS) :
+      task.plan(max_solutions);
     // Sampling/smoothing can reject an otherwise reachable approach. Retry
     // planning only; never replay execution after a physical motion failure.
     // Task::plan resets its stages before each call. All collision validators
@@ -3333,9 +3724,27 @@ private:
       task.printState();
       return false;
     }
-    task.introspection().publishSolution(*task.solutions().front());
+    auto selected = task.solutions().front();
     moveit_task_constructor_msgs::msg::Solution audit;
-    task.solutions().front()->toMsg(audit);
+    bool safe = false;
+    for (int attempt = 0; attempt < 5 && !safe; ++attempt) {
+      for (const auto& candidate : task.solutions()) {
+        audit = moveit_task_constructor_msgs::msg::Solution{};
+        candidate->toMsg(audit);
+        if (!validateToolBodySolution(task, audit, label)) continue;
+        selected = candidate;
+        safe = true;
+        break;
+      }
+      if (!safe && attempt < 4) {
+        RCLCPP_WARN(get_logger(), "%s: tool/body clearance rejected candidates; replanning %d/5", label.c_str(), attempt + 2);
+        // Request additional candidates rather than repeatedly validating
+        // only the same first solutions on a clearance rejection.
+        result = task.plan(max_solutions * static_cast<std::size_t>(attempt + 2));
+      }
+    }
+    if (!safe) return false;
+    task.introspection().publishSolution(*selected);
     moveit::core::RobotState audit_state(task.getRobotModel());
     moveit::core::robotStateMsgToRobotState(audit.start_scene.robot_state, audit_state);
     for (const auto& segment : audit.sub_trajectory) {
@@ -3359,10 +3768,15 @@ private:
     if (!execute) {
       return true;
     }
-    const bool continuous = get_parameter("continuous_arm_motion").as_bool() &&
+    const auto original_audit = audit;
+    bool continuous = get_parameter("continuous_arm_motion").as_bool() &&
       mergeArmTrajectories(task, audit, label);
-    const auto exec_result = continuous ? executeContinuousSolution(std::move(audit)) :
-      task.execute(*task.solutions().front());
+    if (continuous && !validateToolBodySolution(task, audit, label + " retimed")) {
+      audit = original_audit;
+      continuous = false;
+    }
+    const auto exec_result = (continuous || get_parameter("strict_tool_body_guard").as_bool()) ?
+      executeContinuousSolution(std::move(audit), task.getRobotModel()) : task.execute(*selected);
     if (exec_result.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS) {
       RCLCPP_ERROR(
         get_logger(), "%s: execution failed (MoveIt code=%d)",
@@ -3452,7 +3866,25 @@ private:
       task.add(std::move(move));
     }
     if (!planAndMaybeExecute(task, true, "coordinated level tote posture")) return false;
-    rclcpp::sleep_for(std::chrono::seconds(1));
+    const auto posture_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    auto posture_stable_since = std::chrono::steady_clock::now();
+    bool posture_stable = false;
+    while (rclcpp::ok() && std::chrono::steady_clock::now() < posture_deadline) {
+      const auto sample_time = std::chrono::steady_clock::now();
+      {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        const bool ready = measured_boxes_.count(object_id) &&
+          sample_time - measured_boxes_received_.at(object_id) < std::chrono::milliseconds(250) &&
+          std::abs(measured_boxes_.at(object_id)[2] - height) <= 0.05 &&
+          measured_box_tilt_ <= 10.0 * kPi / 180.0;
+        if (!ready) posture_stable = false;
+        else if (!posture_stable) { posture_stable = true; posture_stable_since = sample_time; }
+      }
+      if (posture_stable && sample_time - posture_stable_since >= std::chrono::milliseconds(200)) break;
+      rclcpp::sleep_for(std::chrono::milliseconds(50));
+    }
+    if (!posture_stable || std::chrono::steady_clock::now() - posture_stable_since < std::chrono::milliseconds(200))
+      throw std::runtime_error("Level tote posture did not stabilize");
     std::lock_guard<std::mutex> lock(data_mutex_);
     if (std::chrono::steady_clock::now() - measured_boxes_received_.at(object_id) > std::chrono::seconds(1) ||
         std::abs(measured_boxes_.at(object_id)[2] - height) > 0.05 ||
@@ -3485,9 +3917,11 @@ private:
           try {
             const auto current = currentOdom();
             geometry_msgs::msg::Twist cmd;
-            cmd.linear.x = clamp(1.8 * (hold_target.x - current.x), -0.18, 0.18);
-            cmd.linear.y = clamp(1.8 * (hold_target.y - current.y), -0.18, 0.18);
-            cmd.angular.z = clamp(2.0 * normalizeAngle(hold_target.yaw - current.yaw), -0.35, 0.35);
+            const double dx = hold_target.x - current.x;
+            const double dy = hold_target.y - current.y;
+            cmd.linear.x = clamp(1.8 * (dx * std::cos(current.yaw) +
+              dy * std::sin(current.yaw)), -0.08, 0.08);
+            cmd.angular.z = clamp(2.0 * normalizeAngle(hold_target.yaw - current.yaw), -0.12, 0.12);
             cmd_vel_pub_->publish(cmd);
           } catch (const std::exception&) {
             // Keep the extraction alive if one odom update is late; the next
@@ -3499,7 +3933,7 @@ private:
       });
     }
     const bool result = planAndMaybeExecute(
-      task, execute, "right-arm pre-extraction " + object_id);
+      task, execute, (get_parameter("rear_side_pull").as_bool() ? "left-arm mirrored pre-extraction " : "right-arm pre-extraction ") + object_id);
     hold_running.store(false);
     if (hold_thread.joinable()) {
       hold_thread.join();
@@ -3564,7 +3998,7 @@ private:
         seed.getGlobalLinkTransform("right_gripper_tcp").translation().z()) - center[2];
     }
     bool clamp_unloaded = false;
-    for (int step = 0; step <= 15; ++step) {
+    for (int step = 0; step <= 40; ++step) {
       bool stable = true;
       double force = 0.0, z = 0.0, tilt = 0.0;
       const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(750);
@@ -3624,10 +4058,14 @@ private:
         rclcpp::sleep_for(std::chrono::seconds(2));
         continue;
       }
-      if (step == 15) break;
+      if (step == 40) break;
       // A recovery starts at the measured height, not at the original
       // insertion height: never raise a floor-supported tote on restart.
-      const double desired_z = std::max(settled_z - 0.006, std::min(z, settled_z + 0.020) - 0.002);
+      // Do not drive a full 2 mm step into the rigid floor. Keep the
+      // coarse free-space descent, then approach support in 0.25 mm steps.
+      const double seating_step = z > settled_z + 0.003 ? 0.002 : 0.00025;
+      const double desired_z = std::max(settled_z - 0.00025,
+        std::min(z, settled_z + 0.020) - seating_step);
       RCLCPP_INFO(get_logger(), "Floor seating step %d: actual_z=%.6f tilt=%.3f reaction=%.1f N target_z=%.6f",
                   step + 1, z, tilt, force, desired_z);
       mtc::Task task;
@@ -3712,21 +4150,101 @@ private:
       throw std::runtime_error("Collision-checked empty torso-arm approach failed");
   }
 
-  void moveArmsHome()
+  void addHomeClearanceStage(mtc::Task& task) const
   {
+    if (!get_parameter("strict_tool_body_guard").as_bool()) return;
+    auto guard_scene = std::make_shared<planning_scene::PlanningScene>(task.getRobotModel());
+    auto matrix = toolBodyMatrix(task.getRobotModel());
+    const double required = get_parameter("tool_body_clearance").as_double();
+    auto guard = std::make_unique<mtc::stages::ModifyPlanningScene>("plan home with tool body clearance");
+    guard->setCallback([guard_scene, matrix, required](const planning_scene::PlanningScenePtr& scene,
+                                                      const mtc::PropertyMap&) {
+      collision_detection::CollisionRequest request; request.distance = true;
+      collision_detection::CollisionResult initial;
+      auto start = scene->getCurrentState(); start.clearAttachedBodies();
+      guard_scene->checkSelfCollision(request, initial, start, matrix);
+      const double planning_clearance = std::max(required,
+        std::min(required + 0.001, initial.distance - 0.0001));
+      scene->setStateFeasibilityPredicate([guard_scene, matrix, planning_clearance](
+          const moveit::core::RobotState& state, bool) {
+        auto robot = state; robot.clearAttachedBodies();
+        collision_detection::CollisionRequest req; req.distance = true;
+        collision_detection::CollisionResult result;
+        guard_scene->checkSelfCollision(req, result, robot, matrix);
+        return !result.collision && result.distance >= planning_clearance;
+      });
+    });
+    task.add(std::move(guard));
+  }
+
+  void moveArmsHome(std::unique_ptr<mtc::Task> prepared = nullptr)
+  {
+    if (prepared) {
+      moveit_task_constructor_msgs::msg::Solution audit;
+      prepared->solutions().front()->toMsg(audit);
+      moveit::core::RobotState planned(prepared->getRobotModel());
+      moveit::core::robotStateMsgToRobotState(audit.start_scene.robot_state, planned);
+      auto actual = currentSeed(prepared->getRobotModel());
+      bool current = true;
+      for (const auto& name : prepared->getRobotModel()->getJointModelGroup("both_arms")->getVariableNames())
+        current = current && std::abs(planned.getVariablePosition(name) - actual.getVariablePosition(name)) < 0.01;
+      if (current) {
+        RCLCPP_INFO(get_logger(), "EARLY_PLAN use checked home prepared during placement settling");
+        if (!planAndMaybeExecute(*prepared, true, "return both arms home", true))
+          throw std::runtime_error("Preplanned home execution failed; do not replay");
+        return;
+      }
+      RCLCPP_WARN(get_logger(), "EARLY_PLAN discard home because measured start changed");
+    }
+    if (get_parameter("strict_tool_body_guard").as_bool()) {
+      mtc::Task direct;
+      direct.stages()->setName("checked direct empty-arm home");
+      direct.loadRobotModel(shared_from_this());
+      direct.add(std::make_unique<mtc::stages::CurrentState>("current released state"));
+      addGroundContactStage(direct);
+      auto planner = makeJointPlanner();
+      planner->setMaxVelocityScalingFactor(0.25);
+      planner->setMaxAccelerationScalingFactor(0.15);
+      auto move = std::make_unique<mtc::stages::MoveTo>("direct both arms home", planner);
+      move->setGroup("both_arms");
+      move->setGoal("both_arms_home");
+      direct.add(std::move(move));
+      const auto planned = direct.plan(1);
+      if (planned && direct.numSolutions() > 0) {
+        moveit_task_constructor_msgs::msg::Solution audit;
+        direct.solutions().front()->toMsg(audit);
+        if (validateToolBodySolution(direct, audit, "direct empty-arm home candidate")) {
+          RCLCPP_INFO(get_logger(), "EMPTY_HOME_OPT selected checked direct joint path");
+          if (!planAndMaybeExecute(direct, true, "return both arms home", true))
+            throw std::runtime_error("Checked direct home execution failed; do not replay");
+          return;
+        }
+      }
+      RCLCPP_INFO(get_logger(), "EMPTY_HOME_OPT direct candidate invalid; plan collision-free detour before execution");
+    }
+    for (int home_attempt = 1; home_attempt <= 8; ++home_attempt) {
     mtc::Task task;
     task.stages()->setName("return both arms home");
     task.loadRobotModel(shared_from_this());
     task.add(std::make_unique<mtc::stages::CurrentState>("current state"));
     addGroundContactStage(task);
+    addHomeClearanceStage(task);
     auto move = std::make_unique<mtc::stages::MoveTo>("both arms home", makePipeline(0.25));
     move->setTimeout(get_parameter("stage_timeout").as_double());
     move->setGroup("both_arms");
     move->setGoal("both_arms_home");
     task.add(std::move(move));
-    if (!planAndMaybeExecute(task, true, "return both arms home")) {
-      throw std::runtime_error("Could not return both arms home; do not reset the waist");
+    // Rebuild the planning task and pipeline for a fresh sampling search.
+    // Revalidating retained rejected candidates does not create a safe detour.
+    if (!planAndMaybeExecute(task, false, "return both arms home candidate")) {
+      RCLCPP_WARN(get_logger(), "EMPTY_HOME_OPT rebuild rejected detour search %d/8", home_attempt);
+      continue;
     }
+    if (!planAndMaybeExecute(task, true, "return both arms home", true))
+      throw std::runtime_error("Checked detour home execution failed; do not replay");
+    return;
+    }
+    throw std::runtime_error("Could not plan safe arms home after fresh searches; do not reset the waist");
   }
 
   void logWristLoad(const std::string& context)

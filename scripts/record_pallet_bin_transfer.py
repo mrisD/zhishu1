@@ -8,6 +8,7 @@ system packages or capturing the user's desktop.
 """
 
 import argparse
+from collections import deque
 import json
 import math
 import signal
@@ -26,8 +27,8 @@ CAMERAS = {
 WIDTH, HEIGHT = 960, 540
 FOOTER_HEIGHT = 110
 STAGES = {
-    0: "初始场景：200 mm 夹爪，浅夹取 50 mm",
-    1: "1/6 真实接触预移位：侧推或夹拉约 324 mm",
+    0: "初始场景：360 mm 夹指，浅夹取约 50 mm",
+    1: "1/6 真实接触预移位：侧拉或侧推，按实测箱位抓取",
     2: "2/6 重新定位，双臂下探闭合与抬升",
     3: "3/6 腰臂协调直腰，保持料箱水平",
     4: "4/6 绕过接料台，转运至 0.55 m 桌面",
@@ -61,7 +62,7 @@ def make_world(args):
         link = ET.SubElement(model, "link", name="observer")
         sensor = ET.SubElement(link, "sensor", name=f"{name}_camera", type="camera")
         ET.SubElement(sensor, "always_on").text = "true"
-        ET.SubElement(sensor, "update_rate").text = "10"
+        ET.SubElement(sensor, "update_rate").text = str(args.fps)
         ET.SubElement(sensor, "topic").text = f"/pallet_video/{name}/image"
         camera = ET.SubElement(sensor, "camera")
         ET.SubElement(camera, "horizontal_fov").text = str(fov)
@@ -83,9 +84,11 @@ class CameraReceiver:
         from gz.transport13 import Node
         from gz.msgs10.image_pb2 import Image
         self.frames = {}
+        self.history = {name: deque(maxlen=30) for name in CAMERAS}
         self.lock = threading.Lock()
         self.node = Node()
         self.callbacks = []
+        self.closed = False
         for name in CAMERAS:
             callback = lambda message, name=name: self.receive(name, message)
             self.callbacks.append(callback)
@@ -93,6 +96,8 @@ class CameraReceiver:
                 raise RuntimeError(f"Cannot subscribe to {name} camera")
 
     def receive(self, name, message):
+        if self.closed:
+            return
         import numpy as np
         channels = {3: 3, 8: 3, 4: 4, 5: 4}.get(message.pixel_format_type)
         if channels is None:
@@ -105,11 +110,29 @@ class CameraReceiver:
             image = image[:, :, ::-1]
         stamp = message.header.stamp.sec + message.header.stamp.nsec * 1e-9
         with self.lock:
-            self.frames[name] = (image.copy(), time.monotonic(), stamp)
+            frame = (image.copy(), time.monotonic(), stamp)
+            self.frames[name] = frame
+            self.history[name].append(frame)
 
     def get(self, name):
         with self.lock:
             return self.frames.get(name)
+
+    def at_sim_time(self, name, stamp):
+        with self.lock:
+            frames = self.history[name]
+            if not frames or frames[-1][2] + 1e-6 < stamp:
+                return None
+            if frames[0][2] > stamp + 2.0 / 30.0:
+                raise RuntimeError(f"{name} camera buffer overrun at simulation time {stamp:.3f}")
+            return min(frames, key=lambda frame: abs(frame[2] - stamp))
+
+    def close(self):
+        self.closed = True
+        for name in CAMERAS:
+            self.node.unsubscribe(f"/pallet_video/{name}/image")
+        self.node = None
+        self.callbacks.clear()
 
 
 def preview(args):
@@ -131,7 +154,7 @@ def preview(args):
 
 
 class WebMWriter:
-    def __init__(self, path, fps):
+    def __init__(self, path, fps, width=WIDTH, height=HEIGHT + FOOTER_HEIGHT):
         import gi
         gi.require_version("Gst", "1.0")
         from gi.repository import Gst
@@ -141,7 +164,7 @@ class WebMWriter:
         self.fps = fps
         self.pipeline = Gst.parse_launch(
             f'appsrc name=frames format=time block=true '
-            f'caps="video/x-raw,format=RGB,width={WIDTH},height={HEIGHT + FOOTER_HEIGHT},framerate={fps}/1" '
+            f'caps="video/x-raw,format=RGB,width={width},height={height},framerate={fps}/1" '
             f'! queue max-size-buffers=4 ! videoconvert '
             f'! vp8enc deadline=1 cpu-used=6 target-bitrate=1500000 keyframe-max-dist={fps * 5} '
             f'! webmmux ! filesink location="{path}"'
@@ -222,19 +245,24 @@ def record(args):
     node.create_subscription(PoseStamped, "/pallet_bin/measured_box_pose", box, 10)
     node.create_subscription(PoseStamped, "/pallet_bin/measured_base_pose", base, 10)
     node.create_subscription(Contacts, "/pallet_bin/tote_bottom_contacts", contacts, 10)
-    executor = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    from rclpy.executors import SingleThreadedExecutor
+    ros_executor = SingleThreadedExecutor()
+    ros_executor.add_node(node)
+    executor = threading.Thread(target=ros_executor.spin, daemon=True)
     executor.start()
     font_path = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
     title_font = ImageFont.truetype(font_path, 21)
     small_font = ImageFont.truetype(font_path, 15)
     stage, offset, stop_at, passed = 0, 0, None, False
-    completed_transfers, cycle = 0, 1
+    completed_transfers = args.initial_completed_transfers
+    cycle = completed_transfers + 1
     stop_requested = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop_requested.set())
     writers = []
     telemetry = (args.output_dir / "telemetry.jsonl").open("w")
     started = None
+    sim_started = None
     index, last_stage, final_data = 0, -1, {}
     deadline = time.monotonic() + args.max_seconds
     try:
@@ -296,7 +324,7 @@ def record(args):
                 camera = "rear"
             if stage == 14:
                 camera = "overview"
-            if stage in (0, 1) and state.get("base", [0, 0, 0])[0] > 1.65:
+            if stage in (0, 1, 2, 3) and state.get("base", [0, 0, 0])[0] > 1.65:
                 camera = "rear"
             at_bin = state.get("base", [0, 0, 0])[0] > 0.45 and state.get("base", [0, 0, 0])[1] < -1.4
             if stage in (5, 7, 8, 10, 12) or (stage == 4 and at_bin):
@@ -309,10 +337,19 @@ def record(args):
                 raise RuntimeError(f"Selected {camera} camera stopped publishing; recording aborted")
             if started is None:
                 started = now
-                writers = [WebMWriter(args.output_dir / "full_process.webm", args.fps),
-                           WebMWriter(args.output_dir / f"overview_{args.speedup}x.webm", args.fps)]
+                sim_started = frame[2]
+                video_height = HEIGHT if args.clean_video else HEIGHT + FOOTER_HEIGHT
+                writers = [WebMWriter(args.output_dir / "full_process.webm", args.fps, height=video_height),
+                           WebMWriter(args.output_dir / f"overview_{args.speedup}x.webm", args.fps, height=video_height)]
                 print("Recording actual rendered images; both video encoders ready", flush=True)
             elapsed = now - started
+            if args.sampling_time == "simulation":
+                target_sim_time = sim_started + index / args.fps
+                frame = receiver.at_sim_time(camera, target_sim_time)
+                if frame is None:
+                    time.sleep(0.002)
+                    continue
+                elapsed = target_sim_time - sim_started
             canvas = Image.new("RGB", (WIDTH, HEIGHT + FOOTER_HEIGHT), (14, 22, 31))
             canvas.paste(Image.fromarray(frame[0]), (0, 48))
             draw = ImageDraw.Draw(canvas)
@@ -334,11 +371,14 @@ def record(args):
                       font=small_font, fill=(240, 220, 145))
             if now - frame[1] > 3:
                 draw.text((12, 64), "图像更新暂停", font=title_font, fill=(255, 150, 80))
+            if args.clean_video:
+                canvas = Image.fromarray(frame[0])
             writers[0].write(canvas)
             if index % args.speedup == 0:
-                draw.rectangle((WIDTH - 145, 5, WIDTH, 42), fill=(14, 22, 31))
-                draw.text((WIDTH - 140, 12), f"{int(elapsed)//60:02d}:{int(elapsed)%60:02d} / {args.speedup}倍速",
-                          font=small_font, fill=(240, 220, 145))
+                if not args.clean_video:
+                    draw.rectangle((WIDTH - 145, 5, WIDTH, 42), fill=(14, 22, 31))
+                    draw.text((WIDTH - 140, 12), f"{int(elapsed)//60:02d}:{int(elapsed)%60:02d} / {args.speedup}倍速",
+                              font=small_font, fill=(240, 220, 145))
                 writers[1].write(canvas)
             if stage != last_stage:
                 prefix = f"cycle_{cycle}_" if (args.total_boxes or args.expected_transfers) > 1 else ""
@@ -354,20 +394,27 @@ def record(args):
             index += 1
             if stop_at is not None and now >= stop_at:
                 break
-            # Wall-time recording. The quick version uniformly subsamples frames
-            # at the same playback FPS, and is explicitly labelled accelerated.
-            target_tick = started + index / args.fps
-            time.sleep(max(0, target_tick - time.monotonic()))
+            # Simulation sampling advances only when timestamped camera frames
+            # arrive; wall-time simulation slowdown does not duplicate footage.
+            if args.sampling_time == "wall":
+                target_tick = started + index / args.fps
+                time.sleep(max(0, target_tick - time.monotonic()))
     finally:
         for writer in writers:
             writer.close()
         telemetry.close()
+        ros_executor.shutdown(timeout_sec=2)
+        executor.join(timeout=2)
+        node.destroy_node()
+        receiver.close()
         if rclpy.ok():
             rclpy.shutdown()
-        executor.join(timeout=2)
         summary = {"passed": passed, "frames": index, "fps": args.fps,
                    "completed_transfers": completed_transfers,
+                   "initial_completed_transfers": args.initial_completed_transfers,
+                   "recorded_completed_transfers": completed_transfers - args.initial_completed_transfers,
                    "full_duration": index / args.fps, "views": CAMERAS,
+                   "sampling_time": args.sampling_time, "sim_start": sim_started,
                    "log": str(args.log), "final_telemetry": final_data,
                    "speedup": args.speedup,
                    "quick_frames": writers[1].index if writers else 0,
@@ -377,7 +424,9 @@ def record(args):
                    "floor_seated": args.floor_seated,
                    "rear_push": args.rear_push,
                    "target_model": args.target_model,
-                   "note": f"Real Gazebo rendered images, wall-time original and explicitly labelled {args.speedup}x version"}
+                   "clean_video": args.clean_video,
+                   "video_width": WIDTH, "video_height": HEIGHT if args.clean_video else HEIGHT + FOOTER_HEIGHT,
+                   "note": f"Real Gazebo rendered images, {args.sampling_time}-time sampling; uniform {args.speedup}x overview"}
         (args.output_dir / "recording_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     if not passed:
         raise SystemExit("Recording ended without a complete-transfer success log")
@@ -390,6 +439,7 @@ def main():
     world = subparsers.add_parser("world")
     world.add_argument("--source", type=Path, required=True)
     world.add_argument("--output", type=Path, required=True)
+    world.add_argument("--fps", type=int, default=30)
     world.set_defaults(action=make_world)
     pre = subparsers.add_parser("preview")
     pre.add_argument("--output-dir", type=Path, required=True)
@@ -398,7 +448,8 @@ def main():
     rec = subparsers.add_parser("record")
     rec.add_argument("--output-dir", type=Path, required=True)
     rec.add_argument("--log", type=Path, required=True)
-    rec.add_argument("--fps", type=int, default=10)
+    rec.add_argument("--fps", type=int, default=30)
+    rec.add_argument("--sampling-time", choices=("simulation", "wall"), default="simulation")
     rec.add_argument("--max-seconds", type=float, default=2400)
     rec.add_argument("--speedup", type=int, choices=(2, 4, 8), default=4)
     rec.add_argument("--finger-length-mm", type=int, default=200)
@@ -406,9 +457,11 @@ def main():
     rec.add_argument("--waist-limit-deg", type=float, default=-90)
     rec.add_argument("--floor-seated", action="store_true")
     rec.add_argument("--expected-transfers", type=int, default=1)
+    rec.add_argument("--initial-completed-transfers", type=int, default=0)
     rec.add_argument("--total-boxes", type=int, default=0)
     rec.add_argument("--target-model", default="pallet_box_r0_c0")
     rec.add_argument("--rear-push", action="store_true")
+    rec.add_argument("--clean-video", action="store_true", help="Record only camera pixels, without title cards, captions or black bars")
     rec.set_defaults(action=record)
     args = parser.parse_args()
     args.action(args)

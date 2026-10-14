@@ -123,15 +123,15 @@
          robot base at the calibrated x=0.19 m hook station. -->
     <model name="perimeter_extraction_deck">
       <static>true</static>
-      <pose>0.584355 -0.805 0.075 0 0 0</pose>
+      <pose>1.009355 -0.805 0.075 0 0 0</pose>
       <link name="deck_link">
         <collision name="collision">
           <pose>0 0 0 0 0 0</pose>
-          <geometry><box><size>0.40 0.41 0.15</size></box></geometry>
+          <geometry><box><size>1.25 0.41 0.15</size></box></geometry>
         </collision>
         <visual name="visual">
           <pose>0 0 0 0 0 0</pose>
-          <geometry><box><size>0.40 0.41 0.15</size></box></geometry>
+          <geometry><box><size>1.25 0.41 0.15</size></box></geometry>
           <material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.35 0.35 0.35 1</diffuse></material>
         </visual>
       </link>

@@ -1,0 +1,54 @@
+{
+  "baseline_seconds": 11548.221059322357,
+  "optimized_seconds": 11196.535292863846,
+  "change_seconds": -351.68576645851135,
+  "change_percent": -3.0453674609442234,
+  "metric": "per-transfer wall time from controller log timestamps; not simulation duration",
+  "boxes": [
+    {
+      "index": 0,
+      "wall_seconds": 1235.7426691055298,
+      "early_home": 1
+    },
+    {
+      "index": 1,
+      "wall_seconds": 1130.7000031471252,
+      "early_home": 1
+    },
+    {
+      "index": 2,
+      "wall_seconds": 1185.7181260585785,
+      "early_home": 1
+    },
+    {
+      "index": 6,
+      "wall_seconds": 1401.7747189998627,
+      "early_home": 1
+    },
+    {
+      "index": 7,
+      "wall_seconds": 1279.7361087799072,
+      "early_home": 1
+    },
+    {
+      "index": 8,
+      "wall_seconds": 1155.7004458904266,
+      "early_home": 1
+    },
+    {
+      "index": 5,
+      "wall_seconds": 1325.749180316925,
+      "early_home": 1
+    },
+    {
+      "index": 4,
+      "wall_seconds": 1308.7124435901642,
+      "early_home": 1
+    },
+    {
+      "index": 3,
+      "wall_seconds": 1172.7015969753265,
+      "early_home": 1
+    }
+  ]
+}
