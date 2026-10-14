@@ -79,6 +79,8 @@ def generate_launch_description():
     bottle_grasp_sim_enabled = LaunchConfiguration('bottle_grasp_sim_enabled')
     mobile_base_sim_enabled = LaunchConfiguration('mobile_base_sim_enabled')
     managed_gazebo_shutdown = LaunchConfiguration('managed_gazebo_shutdown')
+    tcp_calibration_enabled = LaunchConfiguration('tcp_calibration_enabled')
+    tcp_calibration_tool = LaunchConfiguration('tcp_calibration_tool')
     robot_description = ParameterValue(
         Command([
             FindExecutable(name='xacro'), ' ', robot_xacro,
@@ -92,6 +94,8 @@ def generate_launch_description():
             ' mobile_base_sim_mass:=', LaunchConfiguration('mobile_base_sim_mass'),
             ' waist_pitch_min:=', LaunchConfiguration('waist_pitch_min'),
             ' tote_finger_length:=', LaunchConfiguration('tote_finger_length'),
+            ' tcp_calibration_enabled:=', tcp_calibration_enabled,
+            ' tcp_calibration_tool:=', tcp_calibration_tool,
         ]),
         value_type=str,
     )
@@ -127,6 +131,13 @@ def generate_launch_description():
     allow_renaming = LaunchConfiguration('allow_renaming')
 
     # Declare the launch arguments
+    declare_tcp_calibration_enabled_cmd = DeclareLaunchArgument(
+        'tcp_calibration_enabled', default_value='false',
+        description='Simulation-only pivot probes, disabled by default')
+    declare_tcp_calibration_tool_cmd = DeclareLaunchArgument(
+        'tcp_calibration_tool', default_value='probe',
+        description='Calibration tool ID: probe or long_probe')
+
     declare_robot_name_cmd = DeclareLaunchArgument(
         name='robot_name',
         default_value=default_robot_name,
@@ -488,6 +499,8 @@ def generate_launch_description():
     ld.add_action(declare_render_engine_gui_cmd)
     ld.add_action(declare_software_rendering_cmd)
     ld.add_action(declare_jsp_gui_cmd)
+    ld.add_action(declare_tcp_calibration_enabled_cmd)
+    ld.add_action(declare_tcp_calibration_tool_cmd)
     ld.add_action(declare_load_controllers_cmd)
     ld.add_action(declare_use_left_arm_controller_cmd)
     ld.add_action(declare_use_camera_cmd)

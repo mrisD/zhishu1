@@ -17,9 +17,25 @@
     <xacro:arg name="handeye_target_enabled" default="false" />
     <xacro:arg name="bottle_grasp_sim_enabled" default="false" />
     <xacro:arg name="mobile_base_sim_enabled" default="false" />
+    <!-- Simulation-only TCP pivot tool. False by default: never affects hardware bringup. -->
+    <xacro:arg name="tcp_calibration_enabled" default="false" />
+    <xacro:arg name="tcp_calibration_tool" default="probe" />
 
     <!-- Import zhishu_robot urdf file -->
     <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot.urdf.xacro" />
+
+    <xacro:if value="$(arg tcp_calibration_enabled)">
+        <!-- A world-fixed fixture requires a world-fixed robot base. Keep this
+             anchor confined to TCP calibration simulation. -->
+        <link name="world"/>
+        <joint name="tcp_calibration_world_anchor" type="fixed">
+            <parent link="world"/>
+            <child link="base_footprint"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </joint>
+        <xacro:include filename="$(find zhishu_robot_tcp_calibration)/urdf/tcp_probe.xacro" />
+        <xacro:tcp_calibration_probes tool="$(arg tcp_calibration_tool)" />
+    </xacro:if>
 
     <!-- Import control_xacro -->
     <xacro:include filename="zhishu_robot.left_arm.ros2_control.xacro" />

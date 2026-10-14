@@ -1,0 +1,27 @@
+version: 1
+arm: right
+tool_id: probe
+parent_frame: R_hand_link
+reference_frame: base_link
+translation_xyz_m: [0.0144975372, 4.92034937e-05, -0.299539232]
+orientation_rpy_rad: [-3.02625685, -0.0851442482, 0.178037051]
+orientation_quaternion_xyzw: [0.9932656789, 0.09111603604, 0.03720103287, -0.06113298766]
+orientation_calibrated: true
+orientation_method: ABB_TCP_Z_X
+method: four_point
+sample_count: 4
+validation_count: 3
+noise: ideal
+metrics:
+  fit_rms_mm: 0.108476903
+  fit_max_mm: 0.1214165635
+  validation_rms_mm: 0.3684556207
+  validation_max_mm: 0.5437410835
+  truth_error_mm: 0.6835178143
+  truth_orientation_error_deg: 0.4194013501
+  orientation_holdout_position_rms_mm: 0.2385930551
+  orientation_holdout_position_max_mm: 0.3369210782
+  orientation_holdout_rms_deg: 0.06154575366
+  orientation_holdout_max_deg: 0.07542863396
+  design_condition: 11.17921128
+  fixture_position_base_m: [0.550879252, -0.224584419, 0.531280876]

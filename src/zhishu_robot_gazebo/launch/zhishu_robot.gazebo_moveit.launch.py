@@ -22,6 +22,8 @@ def generate_launch_description():
     use_head_camera = LaunchConfiguration("use_head_camera")
     hide_head_pitch_visual = LaunchConfiguration("hide_head_pitch_visual")
     handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
+    tcp_calibration_enabled = LaunchConfiguration("tcp_calibration_enabled")
+    tcp_calibration_tool = LaunchConfiguration("tcp_calibration_tool")
     bottle_grasp_sim_enabled = LaunchConfiguration("bottle_grasp_sim_enabled")
     mobile_base_sim_enabled = LaunchConfiguration("mobile_base_sim_enabled")
     initial_positions_file = LaunchConfiguration("initial_positions_file")
@@ -52,12 +54,17 @@ def generate_launch_description():
         )
         .robot_description(
             mappings={
+                "use_gazebo": "true",
+                "use_fake_hardware": "false",
+                "initial_positions_file": initial_positions_file,
                 "handeye_target_enabled": handeye_target_enabled,
                 "bottle_grasp_sim_enabled": bottle_grasp_sim_enabled,
                 "mobile_base_sim_enabled": mobile_base_sim_enabled,
                 "mobile_base_sim_mass": LaunchConfiguration("mobile_base_sim_mass"),
                 "waist_pitch_min": LaunchConfiguration("waist_pitch_min"),
                 "tote_finger_length": LaunchConfiguration("tote_finger_length"),
+                "tcp_calibration_enabled": tcp_calibration_enabled,
+                "tcp_calibration_tool": tcp_calibration_tool,
                 "use_head_camera": use_head_camera,
                 "hide_head_pitch_visual": hide_head_pitch_visual,
             }
@@ -89,6 +96,8 @@ def generate_launch_description():
             "mobile_base_sim_mass": LaunchConfiguration("mobile_base_sim_mass"),
             "waist_pitch_min": LaunchConfiguration("waist_pitch_min"),
             "tote_finger_length": LaunchConfiguration("tote_finger_length"),
+            "tcp_calibration_enabled": tcp_calibration_enabled,
+            "tcp_calibration_tool": tcp_calibration_tool,
             "initial_positions_file": initial_positions_file,
             "managed_gazebo_shutdown": managed_gazebo_shutdown,
             "use_left_arm_controller": use_left_arm_controller,
@@ -223,6 +232,8 @@ def generate_launch_description():
                 default_value="false",
                 description="Enable Gazebo DiffDrive for the robot base",
             ),
+            DeclareLaunchArgument("tcp_calibration_enabled", default_value="false"),
+            DeclareLaunchArgument("tcp_calibration_tool", default_value="probe"),
             DeclareLaunchArgument("spawn_robot", default_value="true"),
             DeclareLaunchArgument("mobile_base_sim_mass", default_value="11.9793854739169"),
             DeclareLaunchArgument("waist_pitch_min", default_value="-1.57079632679"),

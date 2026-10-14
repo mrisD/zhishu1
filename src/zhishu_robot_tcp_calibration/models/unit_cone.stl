@@ -1,0 +1,114 @@
+solid tcp_needle
+ facet normal 0.678598344545847 0.28108463771482023 0.678598344545847
+  outer loop
+   vertex 1 0 0
+   vertex 0.7071067811865476 0.7071067811865475 0
+   vertex 0 0 1
+  endloop
+ endfacet
+ facet normal 0 0 -1
+  outer loop
+   vertex 0.7071067811865476 0.7071067811865475 0
+   vertex 1 0 0
+   vertex 0 0 0
+  endloop
+ endfacet
+ facet normal 0.28108463771482034 0.678598344545847 0.678598344545847
+  outer loop
+   vertex 0.7071067811865476 0.7071067811865475 0
+   vertex 6.123233995736766e-17 1 0
+   vertex 0 0 1
+  endloop
+ endfacet
+ facet normal 0 0 -1
+  outer loop
+   vertex 6.123233995736766e-17 1 0
+   vertex 0.7071067811865476 0.7071067811865475 0
+   vertex 0 0 0
+  endloop
+ endfacet
+ facet normal -0.2810846377148202 0.678598344545847 0.678598344545847
+  outer loop
+   vertex 6.123233995736766e-17 1 0
+   vertex -0.7071067811865475 0.7071067811865476 0
+   vertex 0 0 1
+  endloop
+ endfacet
+ facet normal 0 0 -1
+  outer loop
+   vertex -0.7071067811865475 0.7071067811865476 0
+   vertex 6.123233995736766e-17 1 0
+   vertex 0 0 0
+  endloop
+ endfacet
+ facet normal -0.678598344545847 0.28108463771482034 0.678598344545847
+  outer loop
+   vertex -0.7071067811865475 0.7071067811865476 0
+   vertex -1 1.2246467991473532e-16 0
+   vertex 0 0 1
+  endloop
+ endfacet
+ facet normal 0 0 -1
+  outer loop
+   vertex -1 1.2246467991473532e-16 0
+   vertex -0.7071067811865475 0.7071067811865476 0
+   vertex 0 0 0
+  endloop
+ endfacet
+ facet normal -0.6785983445458471 -0.2810846377148201 0.6785983445458471
+  outer loop
+   vertex -1 1.2246467991473532e-16 0
+   vertex -0.7071067811865477 -0.7071067811865475 0
+   vertex 0 0 1
+  endloop
+ endfacet
+ facet normal 0 0 -1
+  outer loop
+   vertex -0.7071067811865477 -0.7071067811865475 0
+   vertex -1 1.2246467991473532e-16 0
+   vertex 0 0 0
+  endloop
+ endfacet
+ facet normal -0.28108463771482034 -0.678598344545847 0.678598344545847
+  outer loop
+   vertex -0.7071067811865477 -0.7071067811865475 0
+   vertex -1.8369701987210297e-16 -1 0
+   vertex 0 0 1
+  endloop
+ endfacet
+ facet normal 0 0 -1
+  outer loop
+   vertex -1.8369701987210297e-16 -1 0
+   vertex -0.7071067811865477 -0.7071067811865475 0
+   vertex 0 0 0
+  endloop
+ endfacet
+ facet normal 0.2810846377148201 -0.6785983445458471 0.6785983445458471
+  outer loop
+   vertex -1.8369701987210297e-16 -1 0
+   vertex 0.7071067811865474 -0.7071067811865477 0
+   vertex 0 0 1
+  endloop
+ endfacet
+ facet normal 0 0 -1
+  outer loop
+   vertex 0.7071067811865474 -0.7071067811865477 0
+   vertex -1.8369701987210297e-16 -1 0
+   vertex 0 0 0
+  endloop
+ endfacet
+ facet normal 0.678598344545847 -0.28108463771482034 0.678598344545847
+  outer loop
+   vertex 0.7071067811865474 -0.7071067811865477 0
+   vertex 1 0 0
+   vertex 0 0 1
+  endloop
+ endfacet
+ facet normal 0 0 -1
+  outer loop
+   vertex 1 0 0
+   vertex 0.7071067811865474 -0.7071067811865477 0
+   vertex 0 0 0
+  endloop
+ endfacet
+endsolid tcp_needle

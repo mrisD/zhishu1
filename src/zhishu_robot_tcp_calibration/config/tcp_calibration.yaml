@@ -1,0 +1,19 @@
+calibration:
+  arm: right
+  tool_id: probe
+  mode: auto
+  method: multi_point
+  count: 12
+  base_frame: base_link
+  right_flange_frame: R_hand_link
+  left_flange_frame: L_hand_link
+  speed_scale: 0.1
+  acceleration_scale: 0.1
+  max_condition_number: 150.0
+  max_pose_residual_mm: 3.0
+  noise_mode: ideal
+  noise_seed: 42
+  noise_position_sigma_mm: 0.2
+  noise_orientation_sigma_deg: 0.02
+  elongator_length_m: 0.05
+  output_dir: /tmp/guohua_tcp_calibration

@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="one_probe" params="side parent tx ty tz rr rp ry">
+      <xacro:property name="needle_length" value="${sqrt(tx*tx+ty*ty+tz*tz)}"/>
+      <xacro:property name="needle_pitch" value="${atan2(sqrt(tx*tx+ty*ty),tz)}"/>
+      <xacro:property name="needle_yaw" value="${atan2(ty,tx)}"/>
+      <xacro:property name="shaft_fraction" value="${(needle_length-0.03)/needle_length}"/>
+      <xacro:property name="mount_fraction" value="${0.025/needle_length}"/>
+      <link name="${side}_calibration_probe">
+        <visual name="${side}_needle_shaft">
+          <origin xyz="${tx*(shaft_fraction+mount_fraction)/2} ${ty*(shaft_fraction+mount_fraction)/2} ${tz*(shaft_fraction+mount_fraction)/2}" rpy="0 ${needle_pitch} ${needle_yaw}"/>
+          <geometry><cylinder radius="0.009" length="${needle_length-0.055}"/></geometry>
+          <material name="calibration_probe_blue"><color rgba="0.05 0.55 1.0 1"/></material>
+        </visual>
+        <collision name="${side}_needle_shaft_collision">
+          <origin xyz="${tx*(shaft_fraction+mount_fraction)/2} ${ty*(shaft_fraction+mount_fraction)/2} ${tz*(shaft_fraction+mount_fraction)/2}" rpy="0 ${needle_pitch} ${needle_yaw}"/>
+          <geometry><cylinder radius="0.009" length="${needle_length-0.055}"/></geometry>
+        </collision>
+        <visual name="${side}_needle_sharp_tip">
+          <origin xyz="${tx*shaft_fraction} ${ty*shaft_fraction} ${tz*shaft_fraction}" rpy="0 ${needle_pitch} ${needle_yaw}"/>
+          <geometry><mesh filename="package://zhishu_robot_tcp_calibration/models/unit_cone.stl" scale="0.009 0.009 0.03"/></geometry>
+          <material name="calibration_tip_gold"><color rgba="1.0 0.7 0.05 1"/></material>
+        </visual>
+      </link>
+      <joint name="${side}_calibration_probe_fixed" type="fixed">
+        <parent link="${parent}"/>
+        <child link="${side}_calibration_probe"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+      </joint>
+      <link name="${side}_calibration_tip_truth"/>
+      <joint name="${side}_calibration_tip_truth_joint" type="fixed">
+        <parent link="${side}_calibration_probe"/>
+        <child link="${side}_calibration_tip_truth"/>
+        <origin xyz="${tx} ${ty} ${tz}" rpy="${rr} ${rp} ${ry}"/>
+      </joint>
+    </xacro:macro>
+
+  <!-- Both tips are rigidly fixed to the wrist/flange links.  Simulation only.
+       Calibration solver DOES NOT use these fixed-tip transforms. -->
+  <xacro:macro name="tcp_calibration_probes" params="tool">
+    <xacro:if value="${tool == 'probe'}">
+      <xacro:property name="left_tip_x" value="0.015"/>
+      <xacro:property name="left_tip_y" value="0.0"/>
+      <xacro:property name="left_tip_z" value="-0.30"/>
+      <xacro:property name="right_tip_x" value="0.015"/>
+      <xacro:property name="right_tip_y" value="0.0"/>
+      <xacro:property name="right_tip_z" value="-0.30"/>
+      <xacro:property name="tip_roll" value="${pi+0.12}"/>
+      <xacro:property name="tip_pitch" value="-0.08"/>
+      <xacro:property name="tip_yaw" value="0.18"/>
+    </xacro:if>
+    <xacro:if value="${tool == 'long_probe'}">
+      <xacro:property name="left_tip_x" value="0.010"/>
+      <xacro:property name="left_tip_y" value="0.005"/>
+      <xacro:property name="left_tip_z" value="-0.36"/>
+      <xacro:property name="right_tip_x" value="-0.010"/>
+      <xacro:property name="right_tip_y" value="-0.005"/>
+      <xacro:property name="right_tip_z" value="-0.36"/>
+      <xacro:property name="tip_roll" value="${pi-0.10}"/>
+      <xacro:property name="tip_pitch" value="0.14"/>
+      <xacro:property name="tip_yaw" value="-0.22"/>
+    </xacro:if>
+
+    <xacro:one_probe side="left" parent="L_hand_link"
+      tx="${left_tip_x}" ty="${left_tip_y}" tz="${left_tip_z}"
+      rr="${tip_roll}" rp="${tip_pitch}" ry="${tip_yaw}"/>
+    <xacro:one_probe side="right" parent="R_hand_link"
+      tx="${right_tip_x}" ty="${right_tip_y}" tz="${right_tip_z}"
+      rr="${tip_roll}" rp="${tip_pitch}" ry="${tip_yaw}"/>
+  </xacro:macro>
+</robot>
