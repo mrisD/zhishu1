@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>zhishu_robot_workobject_calibration</name>
+  <version>0.1.0</version>
+  <description>Three-point workobject frame calibration and Gazebo verification</description>
+  <maintainer email="dev@example.com">robotics</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>shape_msgs</exec_depend>
+  <exec_depend>moveit_msgs</exec_depend>
+  <exec_depend>controller_manager_msgs</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>zhishu_robot_gazebo</exec_depend>
+  <exec_depend>zhishu_robot_tcp_calibration</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>xacro</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

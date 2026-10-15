@@ -1,0 +1,101 @@
+method: X1-X2-Y1 three-point
+origin_mode: first_point
+tcp_source: /home/dky666/zhul/codex_guohua_ws/install/zhishu_robot_workobject_calibration/share/zhishu_robot_workobject_calibration/config/calibrated_probe.yaml
+noise_sigma_mm: 0.1
+base_T_user:
+  translation_xyz_m:
+  - 0.4974701184716571
+  - -0.2538202002281023
+  - 0.5336686121202739
+  orientation_quaternion_xyzw:
+  - -0.02673919082667339
+  - 0.025049311625592964
+  - 0.24739129253003417
+  - 0.9682226479696381
+user_T_object:
+  translation_xyz_m:
+  - 0.0
+  - 0.0
+  - 0.0
+  orientation_quaternion_xyzw:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+base_T_object:
+  translation_xyz_m:
+  - 0.4974701184716571
+  - -0.2538202002281023
+  - 0.5336686121202739
+  orientation_quaternion_xyzw:
+  - -0.02673919082667339
+  - 0.025049311625592964
+  - 0.24739129253003417
+  - 0.9682226479696381
+measured_points_base_m:
+- - 0.4974701184716571
+  - -0.2538202002281023
+  - 0.5336686121202739
+- - 0.6026479365916273
+  - -0.19648452067601968
+  - 0.5262590096660066
+- - 0.521143268534857
+  - -0.17249081023253418
+  - 0.5275980601982809
+geometry:
+  x_baseline_mm: 120.01939752684531
+  y_height_mm: 60.124499445425904
+origin_error_mm: 0.13136004088918846
+orientation_error_deg: 0.11891583824351994
+independent_validation:
+- workobject_target_m:
+  - -0.035
+  - 0.025
+  - 0.05
+  actual_base_m:
+  - 0.45657180572569384
+  - -0.2452754230045486
+  - 0.5847886228696633
+  error_mm: 0.2858610684908215
+- workobject_target_m:
+  - 0.035
+  - 0.025
+  - 0.05
+  actual_base_m:
+  - 0.5179779689707495
+  - -0.2119269720712135
+  - 0.5804951814678695
+  error_mm: 0.2709022617649105
+- workobject_target_m:
+  - 0
+  - -0.035
+  - 0.05
+  actual_base_m:
+  - 0.5161208081894137
+  - -0.2814677787297066
+  - 0.5852219868369757
+  error_mm: 0.49305938331222965
+returned_to_start: true
+accepted: true
+rectangle_local_points_m:
+- - -0.03
+  - -0.025
+  - 0.055
+- - 0.03
+  - -0.025
+  - 0.055
+- - 0.03
+  - 0.025
+  - 0.055
+- - -0.03
+  - 0.025
+  - 0.055
+- - -0.03
+  - -0.025
+  - 0.055
+rectangle_observed_max_error_mm_per_edge:
+- 0.3127382655866446
+- 0.17239335720458324
+- 0.1903026848970442
+- 0.16364415725891365
+non_teaching_arm_max_joint_drift_rad: 3.1711533665657043e-05

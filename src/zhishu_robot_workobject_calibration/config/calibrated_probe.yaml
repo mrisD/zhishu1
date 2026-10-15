@@ -1,0 +1,6 @@
+# Previously calibrated TCP, ideal 12-point run, 2026-10-15.
+# Used to convert measured flange poses into contact points, not fitted again.
+source: right_probe_multi_point_1792042435.yaml
+parent_frame: R_hand_link
+translation_xyz_m: [0.0149981661, -0.00000262420954, -0.30000218]
+orientation_quaternion_xyzw: [0.9928223157, 0.09462599825, 0.03478967885, -0.0643385431]

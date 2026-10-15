@@ -41,7 +41,7 @@
 
   <!-- Both tips are rigidly fixed to the wrist/flange links.  Simulation only.
        Calibration solver DOES NOT use these fixed-tip transforms. -->
-  <xacro:macro name="tcp_calibration_probes" params="tool">
+  <xacro:macro name="tcp_calibration_probes" params="tool arm:=both">
     <xacro:if value="${tool == 'probe'}">
       <xacro:property name="left_tip_x" value="0.015"/>
       <xacro:property name="left_tip_y" value="0.0"/>
@@ -65,11 +65,15 @@
       <xacro:property name="tip_yaw" value="-0.22"/>
     </xacro:if>
 
+    <xacro:if value="${arm == 'both' or arm == 'left'}">
     <xacro:one_probe side="left" parent="L_hand_link"
       tx="${left_tip_x}" ty="${left_tip_y}" tz="${left_tip_z}"
       rr="${tip_roll}" rp="${tip_pitch}" ry="${tip_yaw}"/>
+    </xacro:if>
+    <xacro:if value="${arm == 'both' or arm == 'right'}">
     <xacro:one_probe side="right" parent="R_hand_link"
       tx="${right_tip_x}" ty="${right_tip_y}" tz="${right_tip_z}"
       rr="${tip_roll}" rp="${tip_pitch}" ry="${tip_yaw}"/>
+    </xacro:if>
   </xacro:macro>
 </robot>

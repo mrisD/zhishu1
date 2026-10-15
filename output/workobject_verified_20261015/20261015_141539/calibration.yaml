@@ -1,0 +1,100 @@
+method: X1-X2-Y1 three-point
+origin_mode: axis_intersection
+tcp_source: /home/dky666/zhul/codex_guohua_ws/install/zhishu_robot_workobject_calibration/share/zhishu_robot_workobject_calibration/config/calibrated_probe.yaml
+noise_sigma_mm: 0.0
+base_T_user:
+  translation_xyz_m:
+  - 0.5499994266987113
+  - -0.2250019249629547
+  - 0.529991061612277
+  orientation_quaternion_xyzw:
+  - -0.023958847741771816
+  - 0.02695237133414262
+  - 0.14005269213966412
+  - 0.9894871331749522
+user_T_object:
+  translation_xyz_m:
+  - 0.0
+  - 0.0
+  - 0.0
+  orientation_quaternion_xyzw:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+base_T_object:
+  translation_xyz_m:
+  - 0.5499994266987113
+  - -0.2250019249629547
+  - 0.529991061612277
+  orientation_quaternion_xyzw:
+  - -0.023958847741771816
+  - 0.02695237133414262
+  - 0.14005269213966412
+  - 0.9894871331749522
+measured_points_base_m:
+- - 0.4924405625719784
+  - -0.2415540200234423
+  - 0.5335939925958858
+- - 0.6075525992176398
+  - -0.20845146662749384
+  - 0.5263884868982093
+- - 0.5332926107955062
+  - -0.16742566190555708
+  - 0.5275992402733604
+geometry:
+  x_baseline_mm: 119.99366372606084
+  y_height_mm: 59.99887144434914
+origin_error_mm: 0.00916127348303636
+orientation_error_deg: 0.0057683128715876695
+independent_validation:
+- workobject_target_m:
+  - -0.035
+  - 0.025
+  - 0.05
+  actual_base_m:
+  - 0.5117291239886728
+  - -0.20796829616446721
+  - 0.5809162617749588
+  error_mm: 0.09716023223552327
+- workobject_target_m:
+  - 0.035
+  - 0.025
+  - 0.05
+  actual_base_m:
+  - 0.5790005795014757
+  - -0.18836625241774899
+  - 0.5767550101829961
+  error_mm: 0.2463743581623072
+- workobject_target_m:
+  - 0
+  - -0.035
+  - 0.05
+  actual_base_m:
+  - 0.5620821396013648
+  - -0.25585303848384017
+  - 0.5810077088718271
+  error_mm: 0.2601783285363401
+returned_to_start: true
+accepted: true
+rectangle_local_points_m:
+- - -0.03
+  - -0.025
+  - 0.055
+- - 0.03
+  - -0.025
+  - 0.055
+- - 0.03
+  - 0.025
+  - 0.055
+- - -0.03
+  - 0.025
+  - 0.055
+- - -0.03
+  - -0.025
+  - 0.055
+rectangle_observed_max_error_mm_per_edge:
+- 0.3214934902159976
+- 0.007626485204409828
+- 0.004844204725880879
+- 0.00884766326364813

@@ -24,6 +24,7 @@ def generate_launch_description():
     handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
     tcp_calibration_enabled = LaunchConfiguration("tcp_calibration_enabled")
     tcp_calibration_tool = LaunchConfiguration("tcp_calibration_tool")
+    tcp_calibration_arm = LaunchConfiguration("tcp_calibration_arm")
     bottle_grasp_sim_enabled = LaunchConfiguration("bottle_grasp_sim_enabled")
     mobile_base_sim_enabled = LaunchConfiguration("mobile_base_sim_enabled")
     initial_positions_file = LaunchConfiguration("initial_positions_file")
@@ -65,6 +66,7 @@ def generate_launch_description():
                 "tote_finger_length": LaunchConfiguration("tote_finger_length"),
                 "tcp_calibration_enabled": tcp_calibration_enabled,
                 "tcp_calibration_tool": tcp_calibration_tool,
+                "tcp_calibration_arm": tcp_calibration_arm,
                 "use_head_camera": use_head_camera,
                 "hide_head_pitch_visual": hide_head_pitch_visual,
             }
@@ -98,6 +100,7 @@ def generate_launch_description():
             "tote_finger_length": LaunchConfiguration("tote_finger_length"),
             "tcp_calibration_enabled": tcp_calibration_enabled,
             "tcp_calibration_tool": tcp_calibration_tool,
+            "tcp_calibration_arm": tcp_calibration_arm,
             "initial_positions_file": initial_positions_file,
             "managed_gazebo_shutdown": managed_gazebo_shutdown,
             "use_left_arm_controller": use_left_arm_controller,
@@ -234,6 +237,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument("tcp_calibration_enabled", default_value="false"),
             DeclareLaunchArgument("tcp_calibration_tool", default_value="probe"),
+            DeclareLaunchArgument("tcp_calibration_arm", default_value="both"),
             DeclareLaunchArgument("spawn_robot", default_value="true"),
             DeclareLaunchArgument("mobile_base_sim_mass", default_value="11.9793854739169"),
             DeclareLaunchArgument("waist_pitch_min", default_value="-1.57079632679"),

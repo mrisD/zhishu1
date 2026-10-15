@@ -81,6 +81,7 @@ def generate_launch_description():
     managed_gazebo_shutdown = LaunchConfiguration('managed_gazebo_shutdown')
     tcp_calibration_enabled = LaunchConfiguration('tcp_calibration_enabled')
     tcp_calibration_tool = LaunchConfiguration('tcp_calibration_tool')
+    tcp_calibration_arm = LaunchConfiguration('tcp_calibration_arm')
     robot_description = ParameterValue(
         Command([
             FindExecutable(name='xacro'), ' ', robot_xacro,
@@ -96,6 +97,7 @@ def generate_launch_description():
             ' tote_finger_length:=', LaunchConfiguration('tote_finger_length'),
             ' tcp_calibration_enabled:=', tcp_calibration_enabled,
             ' tcp_calibration_tool:=', tcp_calibration_tool,
+            ' tcp_calibration_arm:=', tcp_calibration_arm,
         ]),
         value_type=str,
     )
@@ -501,6 +503,7 @@ def generate_launch_description():
     ld.add_action(declare_jsp_gui_cmd)
     ld.add_action(declare_tcp_calibration_enabled_cmd)
     ld.add_action(declare_tcp_calibration_tool_cmd)
+    ld.add_action(DeclareLaunchArgument('tcp_calibration_arm', default_value='both'))
     ld.add_action(declare_load_controllers_cmd)
     ld.add_action(declare_use_left_arm_controller_cmd)
     ld.add_action(declare_use_camera_cmd)

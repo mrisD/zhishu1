@@ -1,0 +1,3 @@
+Recorded after VALIDATION PASSED when stopping the old TF publisher to run the rotated-board test. This is a shutdown diagnostic, not a calibration acceptance failure. The shutdown handling has since been corrected.
+
+Original diagnostic: failed to initialize wait set: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/wait.c:130

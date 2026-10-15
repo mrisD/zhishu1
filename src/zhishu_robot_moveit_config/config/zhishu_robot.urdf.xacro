@@ -20,6 +20,7 @@
     <!-- Simulation-only TCP pivot tool. False by default: never affects hardware bringup. -->
     <xacro:arg name="tcp_calibration_enabled" default="false" />
     <xacro:arg name="tcp_calibration_tool" default="probe" />
+    <xacro:arg name="tcp_calibration_arm" default="both" />
 
     <!-- Import zhishu_robot urdf file -->
     <xacro:include filename="$(find zhishu_robot_description)/urdf/zhishu_robot.urdf.xacro" />
@@ -34,7 +35,7 @@
             <origin xyz="0 0 0" rpy="0 0 0"/>
         </joint>
         <xacro:include filename="$(find zhishu_robot_tcp_calibration)/urdf/tcp_probe.xacro" />
-        <xacro:tcp_calibration_probes tool="$(arg tcp_calibration_tool)" />
+        <xacro:tcp_calibration_probes tool="$(arg tcp_calibration_tool)" arm="$(arg tcp_calibration_arm)" />
     </xacro:if>
 
     <!-- Import control_xacro -->
