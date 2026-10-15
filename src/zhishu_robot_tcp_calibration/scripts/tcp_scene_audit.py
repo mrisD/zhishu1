@@ -6,6 +6,10 @@ from google.protobuf import text_format, json_format
 from gz.msgs10.scene_pb2 import Scene
 from gz.msgs10.pose_pb2 import Pose
 import json
+import rclpy
+from rclpy.node import Node
+from moveit_msgs.srv import GetPlanningScene, GetStateValidity
+from moveit_msgs.msg import PlanningSceneComponents
 
 
 def transform(pose):
@@ -61,6 +65,34 @@ def main():
         [0, 0, visual.geometry.mesh.scale.z, 1])
     print('Right tool / fixed needle tip separation: %.6f mm' %
           (np.linalg.norm(tips['right']-fixed_apex[:3])*1000))
+    rclpy.init()
+    node = Node('tcp_collision_scene_audit')
+    try:
+        scene_client = node.create_client(GetPlanningScene, '/get_planning_scene')
+        validity_client = node.create_client(GetStateValidity, '/check_state_validity')
+        if not scene_client.wait_for_service(timeout_sec=5) or not validity_client.wait_for_service(timeout_sec=5):
+            raise RuntimeError('MoveIt audit services unavailable; check ROS_DOMAIN_ID')
+        request = GetPlanningScene.Request()
+        request.components.components = PlanningSceneComponents.WORLD_OBJECT_GEOMETRY
+        future = scene_client.call_async(request)
+        rclpy.spin_until_future_complete(node, future, timeout_sec=5)
+        if not future.done():
+            raise RuntimeError('MoveIt scene audit timed out')
+        obstacle = next(o for o in future.result().scene.world.collision_objects if o.id == 'tcp_pivot_fixture')
+        if len(obstacle.primitives) < 3:
+            raise RuntimeError('Fixture collision geometry is incomplete')
+        print('MoveIt fixture collision primitives: %d' % len(obstacle.primitives))
+        request = GetStateValidity.Request()
+        request.robot_state.is_diff = True
+        request.group_name = 'right_arm'
+        future = validity_client.call_async(request)
+        rclpy.spin_until_future_complete(node, future, timeout_sec=5)
+        if not future.done() or not future.result().valid:
+            raise RuntimeError('Current calibration pose is not collision-valid')
+        print('Current right-arm collision state: valid')
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':

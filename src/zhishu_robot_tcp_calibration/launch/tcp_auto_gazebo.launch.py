@@ -8,7 +8,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -64,6 +64,7 @@ def generate_launch_description():
             moveit_config.robot_description,
             moveit_config.robot_description_semantic,
             moveit_config.robot_description_kinematics,
+            moveit_config.joint_limits,
             {'arm': arm, 'tool': tool, 'method': method, 'noise': noise,
              'samples': samples, 'seed_pose': seed_pose,
              'base_frame': 'base_link',
@@ -74,6 +75,10 @@ def generate_launch_description():
              'orientation_sigma_deg': LaunchConfiguration('orientation_sigma_deg'),
              'elongator_length_m': LaunchConfiguration('elongator_length_m'),
              'max_tip_error_mm': LaunchConfiguration('max_tip_error_mm'),
+             'startup_timeout_s': 90.0,
+             'max_validation_rms_mm': 1.0,
+             'max_truth_error_mm': 1.5,
+             'max_orientation_error_deg': 1.0,
              'spawn_fixture': True, 'use_sim_time': True,
              'validation_samples': 3, 'max_condition_number': 150.0,
              'max_fit_rms_mm': 3.0},
@@ -95,20 +100,22 @@ def generate_launch_description():
         DeclareLaunchArgument('orientation_sigma_deg', default_value='0.02'),
         DeclareLaunchArgument('elongator_length_m', default_value='0.05',
                               description='ABB TCP&Z,X axis extension length in meters'),
-        DeclareLaunchArgument('max_tip_error_mm', default_value='8.0'),
+        DeclareLaunchArgument('max_tip_error_mm', default_value='1.0'),
         DeclareLaunchArgument('headless', default_value='false'),
         DeclareLaunchArgument('initial_positions_file', default_value=os.path.join(
             calibration_share, 'config', 'tcp_initial_positions.yaml')),
         DeclareLaunchArgument('paused', default_value='false'),
         DeclareLaunchArgument('auto_sample', default_value='true'),
         DeclareLaunchArgument('sampler_only', default_value='false'),
-        DeclareLaunchArgument('sampling_delay', default_value='40.0'),
+        DeclareLaunchArgument('sampling_delay', default_value='0.0'),
+        DeclareLaunchArgument('ros_domain_id', default_value='67'),
+        DeclareLaunchArgument('gz_partition', default_value='tcp_calibration_sim'),
         DeclareLaunchArgument('use_rviz', default_value='true'),
+        SetEnvironmentVariable('ROS_DOMAIN_ID', LaunchConfiguration('ros_domain_id')),
+        SetEnvironmentVariable('GZ_PARTITION', LaunchConfiguration('gz_partition')),
         AppendEnvironmentVariable('GZ_SIM_RESOURCE_PATH', os.path.dirname(calibration_share)),
         original_gazebo_moveit,
         fixture_spawner,
-        # Gazebo spawns the robot and activates the joint-state and trajectory
-        # controllers asynchronously. Give that startup chain time to finish
-        # before MoveIt attempts the seed-pose execution.
+        # The sampler waits for active controllers and fresh state feedback.
         TimerAction(period=LaunchConfiguration('sampling_delay'), actions=[sampler]),
     ])

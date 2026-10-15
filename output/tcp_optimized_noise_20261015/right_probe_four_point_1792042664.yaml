@@ -1,0 +1,32 @@
+version: 1
+arm: right
+tool_id: probe
+parent_frame: R_hand_link
+reference_frame: base_link
+translation_xyz_m: [0.0141737623, 4.54241712e-05, -0.299868962]
+orientation_rpy_rad: [-3.01108531, -0.0827965144, 0.1820099]
+orientation_quaternion_xyzw: [0.9926457677, 0.09329580556, 0.03520652686, -0.06863507063]
+orientation_calibrated: true
+orientation_method: ABB_TCP_Z_X
+method: four_point
+sample_count: 4
+validation_count: 3
+noise: gaussian
+accepted: true
+trajectory_mode: collision_checked_cartesian_pivot
+metrics:
+  fit_rms_mm: 0.2112277822
+  fit_max_mm: 0.28494126
+  validation_rms_mm: 0.3945326613
+  validation_max_mm: 0.4160160316
+  truth_error_mm: 0.8377966036
+  truth_orientation_error_deg: 0.6423739349
+  orientation_holdout_position_rms_mm: 0.3179761702
+  orientation_holdout_position_max_mm: 0.3826000237
+  orientation_holdout_rms_deg: 0.06169530065
+  orientation_holdout_max_deg: 0.08184459818
+  design_condition: 11.17419801
+  planned_pivot_path_max_mm: 0.07358340983
+  observed_pivot_path_max_mm: 0.07553246561
+  rejected_candidates: 0
+  fixture_position_base_m: [0.550263522, -0.225367145, 0.530478199]

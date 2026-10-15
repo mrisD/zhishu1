@@ -21,6 +21,10 @@
           <geometry><mesh filename="package://zhishu_robot_tcp_calibration/models/unit_cone.stl" scale="0.009 0.009 0.03"/></geometry>
           <material name="calibration_tip_gold"><color rgba="1.0 0.7 0.05 1"/></material>
         </visual>
+        <collision name="${side}_needle_tip_collision">
+          <origin xyz="${tx*shaft_fraction} ${ty*shaft_fraction} ${tz*shaft_fraction}" rpy="0 ${needle_pitch} ${needle_yaw}"/>
+          <geometry><mesh filename="package://zhishu_robot_tcp_calibration/models/unit_cone.stl" scale="0.009 0.009 0.03"/></geometry>
+        </collision>
       </link>
       <joint name="${side}_calibration_probe_fixed" type="fixed">
         <parent link="${parent}"/>

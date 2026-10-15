@@ -2,6 +2,9 @@
 // Planner knows the simulated probe offset, but solver only sees flange poses.
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
+#include <moveit/robot_trajectory/robot_trajectory.hpp>
+#include <moveit/trajectory_processing/time_optimal_trajectory_generation.hpp>
+#include <controller_manager_msgs/srv/list_controllers.hpp>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2/time.hpp>
@@ -17,8 +20,10 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <iomanip>
 #include <limits>
+#include <mutex>
 #include <random>
 #include <sstream>
 #include <stdexcept>
@@ -42,11 +47,6 @@ struct Fit {
   Eigen::Matrix3d tcp_rotation = Eigen::Matrix3d::Identity();
   double rms_mm = 0.0, max_mm = 0.0, condition = 0.0;
 };
-
-static Eigen::Vector3d vector3(const std::vector<double>& v) {
-  if (v.size() != 3) throw std::runtime_error("tip_xyz must have 3 values");
-  return Eigen::Vector3d(v[0], v[1], v[2]);
-}
 
 static Sample fromTf(const geometry_msgs::msg::TransformStamped& tf) {
   Sample s;
@@ -194,18 +194,6 @@ int main(int argc, char** argv) {
     RCLCPP_FATAL(logger,"Invalid arguments or use_sim_time!=true; refusing to run outside simulated time");
     rclcpp::shutdown();return 2;
   }
-  std::vector<double> xyz;
-  Eigen::Vector3d truth_rpy;
-  if (tool == "probe") xyz={0.015,0.0,-0.30};
-  else if (arm=="left") xyz={0.010,0.005,-0.36};
-  else xyz={-0.010,-0.005,-0.36};
-  if (tool == "probe") truth_rpy=Eigen::Vector3d(M_PI+0.12,-0.08,0.18);
-  else truth_rpy=Eigen::Vector3d(M_PI-0.10,0.14,-0.22);
-  const Eigen::Vector3d truth=vector3(xyz); // planner ONLY; solver receives no truth
-  const Eigen::Matrix3d truth_R =
-    (Eigen::AngleAxisd(truth_rpy.z(),Eigen::Vector3d::UnitZ()) *
-     Eigen::AngleAxisd(truth_rpy.y(),Eigen::Vector3d::UnitY()) *
-     Eigen::AngleAxisd(truth_rpy.x(),Eigen::Vector3d::UnitX())).toRotationMatrix();
   const std::string flange=arm=="left" ? "L_hand_link" : "R_hand_link";
   const std::string group_name=arm=="left" ? "left_arm" : "right_arm";
 
@@ -214,9 +202,14 @@ int main(int argc, char** argv) {
   auto marker_pub=node->create_publisher<visualization_msgs::msg::MarkerArray>(
     "/tcp_calibration/markers",rclcpp::QoS(1).transient_local().reliable());
   auto ready=std::make_shared<std::atomic<bool>>(false);
-  auto ready_sub=node->create_subscription<std_msgs::msg::Bool>(
-    "/tcp_calibration/fixture_ready",rclcpp::QoS(1).transient_local().reliable(),
-    [ready](const std_msgs::msg::Bool::SharedPtr msg){ready->store(msg->data);});
+  auto request_stamp=std::make_shared<builtin_interfaces::msg::Time>();
+  auto stamp_mutex=std::make_shared<std::mutex>();
+  auto ready_sub=node->create_subscription<geometry_msgs::msg::PoseStamped>(
+    "/tcp_calibration/fixture_ready_pose",rclcpp::QoS(1).transient_local().reliable(),
+    [ready,request_stamp,stamp_mutex](const geometry_msgs::msg::PoseStamped::SharedPtr msg){
+      std::lock_guard<std::mutex> lock(*stamp_mutex);
+      if(msg->header.stamp==*request_stamp) ready->store(true);
+    });
   (void)ready_sub;
   rclcpp::executors::MultiThreadedExecutor exec;
   exec.add_node(node);
@@ -226,15 +219,51 @@ int main(int argc, char** argv) {
     tf2_ros::Buffer tf_buffer(node->get_clock());
     tf_buffer.setUsingDedicatedThread(true);
     tf2_ros::TransformListener tf_listener(tf_buffer,node,false);
+    if(!node->has_parameter("robot_description") ||
+       node->get_parameter("robot_description").as_string().find("gz_ros2_control/GazeboSimSystem")==std::string::npos)
+      throw std::runtime_error("A GazeboSystem robot description is required");
+    auto controllers=node->create_client<controller_manager_msgs::srv::ListControllers>("/controller_manager/list_controllers");
+    const auto startup_deadline=std::chrono::steady_clock::now()+
+      std::chrono::duration<double>(param_d("startup_timeout_s",90.0));
+    bool active=false;
+    RCLCPP_INFO(logger,"Waiting for Gazebo controllers to become active");
+    while(rclcpp::ok() && std::chrono::steady_clock::now()<startup_deadline) {
+      if(!controllers->wait_for_service(1s)) continue;
+      auto future=controllers->async_send_request(std::make_shared<controller_manager_msgs::srv::ListControllers::Request>());
+      if(future.wait_for(2s)!=std::future_status::ready) continue;
+      const auto response=future.get();
+      active=true;
+      for(const auto* name : {"joint_state_broadcaster","body_posture_controller","dual_arm_controller"}) {
+        const auto found=std::find_if(response->controller.begin(),response->controller.end(),
+          [name](const auto& c){return c.name==name && c.state=="active";});
+        active=active && found!=response->controller.end();
+      }
+      if(active) break;
+      std::this_thread::sleep_for(250ms);
+    }
+    if(!active) throw std::runtime_error("Timed out waiting for active simulation controllers");
+    Sample tool_truth;
+    bool got_tool=false;
+    for(int i=0;i<50 && rclcpp::ok();++i) {
+      try {tool_truth=fromTf(tf_buffer.lookupTransform(flange,arm+"_calibration_tip_truth",tf2::TimePointZero));got_tool=true;break;}
+      catch(const tf2::TransformException&) {std::this_thread::sleep_for(100ms);}
+    }
+    if(!got_tool) throw std::runtime_error("The actual simulated probe transform is unavailable");
+    const Eigen::Vector3d truth=tool_truth.p; // planner/evaluation ONLY
+    const Eigen::Matrix3d truth_R=tool_truth.R;
     auto tfpose=[&]() -> Sample {
       return fromTf(tf_buffer.lookupTransform(frame,flange,tf2::TimePointZero,tf2::durationFromSec(2.0)));
     };
     MGI move_group(node,group_name);
+    move_group.setEndEffectorLink(flange);
+    if(!move_group.getCurrentState(5.0)) throw std::runtime_error("No fresh simulation joint state");
     move_group.setPoseReferenceFrame(frame);
     move_group.setPlanningTime(6.0);
     move_group.setNumPlanningAttempts(4);
     move_group.setMaxVelocityScalingFactor(speed);
     move_group.setMaxAccelerationScalingFactor(speed);
+    move_group.setGoalPositionTolerance(0.0001);
+    move_group.setGoalOrientationTolerance(0.001);
     // Pose targets specify flange explicitly; don't rely on an SRDF end-effector.
     const std::string seed_pose=param_s("seed_pose",group_name+"_pose1");
     if(seed_pose!="current") {
@@ -259,6 +288,11 @@ int main(int argc, char** argv) {
     const Eigen::Vector3d fixture=seed.p+seed.R*truth;
     auto fixture_pose=toPose(fixture,Eigen::Matrix3d::Identity(),frame);
     fixture_pose.header.stamp=node->now();
+    {
+      std::lock_guard<std::mutex> lock(*stamp_mutex);
+      *request_stamp=fixture_pose.header.stamp;
+      ready->store(false);
+    }
     pose_pub->publish(fixture_pose);
     if (spawn_fixture) {
       RCLCPP_INFO(logger,"Waiting for Gazebo fixed pivot fixture spawn at [%0.3f %0.3f %0.3f]",
@@ -285,17 +319,69 @@ int main(int argc, char** argv) {
     };
     // For each candidate: plan, execute, let robot settle, verify 3 TF readings.
     std::vector<Sample> train,validate;
+    double max_planned_pivot_error_mm=0.0, max_observed_pivot_error_mm=0.0;
+    int rejected_candidates=0;
+    const auto pivot_move=[&](const Eigen::Matrix3d& desired_r) -> bool {
+      const Sample start=tfpose();
+      const Eigen::Quaterniond q_start(start.R), q_goal(desired_r);
+      const int steps=std::max(2,static_cast<int>(std::ceil(q_start.angularDistance(q_goal)/0.04)));
+      std::vector<geometry_msgs::msg::Pose> waypoints;
+      for(int k=1;k<=steps;++k) {
+        const Eigen::Matrix3d R=q_start.slerp(static_cast<double>(k)/steps,q_goal).toRotationMatrix();
+        waypoints.push_back(toPose(fixture-R*truth,R,frame).pose);
+      }
+      move_group.setStartStateToCurrentState();
+      moveit_msgs::msg::RobotTrajectory trajectory_msg;
+      const double fraction=move_group.computeCartesianPath(waypoints,0.003,trajectory_msg,true);
+      if(fraction<0.999 || trajectory_msg.joint_trajectory.points.size()<2) {
+        RCLCPP_WARN(logger,"Incomplete collision-checked pivot path: %.1f%%",100.0*fraction);
+        return false;
+      }
+      const auto state=move_group.getCurrentState(2.0);
+      if(!state) return false;
+      robot_trajectory::RobotTrajectory trajectory(move_group.getRobotModel(),group_name);
+      trajectory.setRobotTrajectoryMsg(*state,trajectory_msg);
+      trajectory_processing::TimeOptimalTrajectoryGeneration timing(0.00005,0.02,0.00001);
+      if(!timing.computeTimeStamps(trajectory,speed,speed)) return false;
+      double planned_error=0.0;
+      for(size_t i=0;i<trajectory.getWayPointCount();++i) {
+        const auto& waypoint=trajectory.getWayPoint(i);
+        const Eigen::Isometry3d flange_pose=waypoint.getGlobalLinkTransform(frame).inverse()*
+          waypoint.getGlobalLinkTransform(flange);
+        planned_error=std::max(planned_error,1000.0*(flange_pose*truth-fixture).norm());
+        if(i>0) {
+          const auto* group=move_group.getRobotModel()->getJointModelGroup(group_name);
+          if(waypoint.distance(trajectory.getWayPoint(i-1),group)>0.35) return false;
+        }
+      }
+      if(planned_error>0.75) {
+        RCLCPP_WARN(logger,"Reject pivot trajectory: planned tip error %.3f mm",planned_error);
+        return false;
+      }
+      max_planned_pivot_error_mm=std::max(max_planned_pivot_error_mm,planned_error);
+      trajectory.getRobotTrajectoryMsg(trajectory_msg);
+      MGI::Plan plan; plan.trajectory=trajectory_msg;
+      auto execution=std::async(std::launch::async,[&](){return move_group.execute(plan);});
+      bool path_ok=true;
+      while(execution.wait_for(20ms)!=std::future_status::ready) {
+        const Sample measured=tfpose();
+        const double err=1000.0*(measured.p+measured.R*truth-fixture).norm();
+        max_observed_pivot_error_mm=std::max(max_observed_pivot_error_mm,err);
+        if(err>2.0 || !rclcpp::ok()) {
+          path_ok=false;
+          move_group.stop();
+          break;
+        }
+      }
+      const bool executed=static_cast<bool>(execution.get());
+      if(!path_ok) throw std::runtime_error("Pivot motion exceeded the 2 mm continuous tip-error limit");
+      RCLCPP_INFO(logger,"Cartesian pivot: planned max=%.3f mm, observed run max=%.3f mm",
+                  planned_error,max_observed_pivot_error_mm);
+      return executed;
+    };
     auto accept=[&](const Eigen::Matrix3d& desired_r, bool initial, std::vector<Sample>& list) -> bool {
-      const Eigen::Vector3d desired_p=fixture-desired_r*truth;
       if(!initial) {
-        auto target=toPose(desired_p,desired_r,frame);
-        move_group.setStartStateToCurrentState();
-        if(!move_group.setPoseTarget(target,flange)) return false;
-        MGI::Plan plan;
-        const bool planned = static_cast<bool>(move_group.plan(plan));
-        move_group.clearPoseTargets();
-        if(!planned) return false;
-        if(!static_cast<bool>(move_group.execute(plan))) return false;
+        if(!pivot_move(desired_r)) return false;
       }
       std::this_thread::sleep_for(600ms);
       Sample a=tfpose();
@@ -327,8 +413,9 @@ int main(int argc, char** argv) {
          Eigen::AngleAxisd(e.y(),Eigen::Vector3d::UnitY()) *
          Eigen::AngleAxisd(e.z(),Eigen::Vector3d::UnitZ())).toRotationMatrix();
       try {
-        if(!accept(R,i==0,train)) RCLCPP_WARN(logger,"Candidate %zu rejected",i+1);
+        if(!accept(R,i==0,train)) {++rejected_candidates;RCLCPP_WARN(logger,"Candidate %zu rejected",i+1);}
       } catch(const std::exception& e) {
+        if(max_observed_pivot_error_mm>2.0) throw;
         RCLCPP_WARN(logger,"Candidate %zu failed: %s",i+1,e.what());
       }
     }
@@ -348,7 +435,10 @@ int main(int argc, char** argv) {
          Eigen::AngleAxisd(scaled.y(),Eigen::Vector3d::UnitY()) *
          Eigen::AngleAxisd(scaled.z(),Eigen::Vector3d::UnitZ())).toRotationMatrix();
       try { (void)accept(R,false,validate); }
-      catch(const std::exception& e) {RCLCPP_WARN(logger,"Validation candidate failed: %s",e.what());}
+      catch(const std::exception& e) {
+        if(max_observed_pivot_error_mm>2.0) throw;
+        RCLCPP_WARN(logger,"Validation candidate failed: %s",e.what());
+      }
     }
     if((int)validate.size()<validate_count)
       throw std::runtime_error("Insufficient independent validation samples");
@@ -458,6 +548,11 @@ int main(int argc, char** argv) {
     const double orientation_position_rms=std::sqrt(orientation_position_squares/frame_validation.size());
     const double orientation_holdout_rms_deg=std::sqrt(orientation_angle_squares/frame_validation.size());
     const double truth_orientation_error_deg=rotationErrorDeg(fit.tcp_rotation,truth_R);
+    if(validation_rms>param_d("max_validation_rms_mm",1.0) ||
+       truth_error>param_d("max_truth_error_mm",1.5) ||
+       truth_orientation_error_deg>param_d("max_orientation_error_deg",1.0) ||
+       orientation_position_rms>1.0 || orientation_holdout_rms_deg>0.5)
+      throw std::runtime_error("Independent calibration acceptance limits exceeded");
     // Leave the scene at the same physical tip-to-tip pose used to start.
     move_group.setStartStateToCurrentState();
     move_group.setPoseTarget(toPose(seed.p,seed.R,frame),flange);
@@ -492,6 +587,7 @@ int main(int argc, char** argv) {
         << "\nsample_count: " << train.size()
         << "\nvalidation_count: " << validate.size()
         << "\nnoise: " << noise
+        << "\naccepted: true\ntrajectory_mode: collision_checked_cartesian_pivot"
         << "\nmetrics:\n  fit_rms_mm: " <<fit.rms_mm
         << "\n  fit_max_mm: " <<fit.max_mm
         << "\n  validation_rms_mm: " << validation_rms
@@ -503,6 +599,9 @@ int main(int argc, char** argv) {
         << "\n  orientation_holdout_rms_deg: " <<orientation_holdout_rms_deg
         << "\n  orientation_holdout_max_deg: " <<orientation_angle_max
         << "\n  design_condition: " <<fit.condition
+        << "\n  planned_pivot_path_max_mm: " <<max_planned_pivot_error_mm
+        << "\n  observed_pivot_path_max_mm: " <<max_observed_pivot_error_mm
+        << "\n  rejected_candidates: " <<rejected_candidates
         << "\n  fixture_position_base_m: "<<v3(fixture)<<"\n";
     }
     {
@@ -542,6 +641,8 @@ int main(int argc, char** argv) {
         << "- independent frame holdout position RMS (mm): "<<orientation_position_rms<<"\n"
         << "- independent frame holdout orientation RMS (deg): "<<orientation_holdout_rms_deg<<"\n"
         << "- matrix condition: "<<fit.condition<<"\n\n"
+        << "- collision-checked Cartesian pivot path planned/observed max (mm): "
+        <<max_planned_pivot_error_mm<<" / "<<max_observed_pivot_error_mm<<"\n"
         << "Results are not valid for the physical robot without a separate physical calibration.\n";
     }
     visualization_msgs::msg::MarkerArray markers;
