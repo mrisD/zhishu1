@@ -7,6 +7,7 @@ from .commander import ErrorCode
 from .commander import GripperGroup
 from .commander import PoseTarget
 from .commander import Result
+from .pose_math import Offs, RelTool
 
 __all__ = [
     'ArmGroup',
@@ -16,4 +17,6 @@ __all__ = [
     'GripperGroup',
     'PoseTarget',
     'Result',
+    'Offs',
+    'RelTool',
 ]

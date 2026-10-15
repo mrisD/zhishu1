@@ -92,6 +92,8 @@ with Commander() as robot:
 
 ## API
 
+新增 `MoveJ`、`MoveL`、`MoveAbsJ`、`Offs`、`RelTool` 和每条位姿命令的 `tool/wobj` 参数。位置/偏移为米，角度为弧度，四元数 xyzw，不隐式使用 ABB 的毫米/度。普通位姿及新 MoveJ/MoveL 默认 tool0，旧 `move_tcp_pose` 默认仍是夹爪 TCP。详细语义、文件格式和边界见 `zhishu_robot_commander_cpp/SDK_FRAMES.md`。
+
 - `move_named()`：命名姿态。
 - `move_joints()`：单臂 7 轴 / 双臂 14 轴，单位 rad。
 - `move_torso_head_joints()`：头腰部 3 轴，顺序为腰俯仰、头偏航、头俯仰，单位 rad。

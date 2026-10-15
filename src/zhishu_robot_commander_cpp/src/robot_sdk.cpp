@@ -87,7 +87,7 @@ Result RobotSdk::movePose(
   ArmGroup group,
   const geometry_msgs::msg::PoseStamped & target,
   bool cartesian,
-  const std::string & end_effector_link)
+  const std::string & end_effector_link, const MotionFrames & frames)
 {
   if (group == ArmGroup::kBoth) {
     return Result::failure(
@@ -98,11 +98,11 @@ Result RobotSdk::movePose(
   }
   return runSynchronous(
     armOperationName(group, cartesian ? "move_cartesian_pose" : "move_pose"),
-    [group, target, cartesian, end_effector_link](Commander & commander) {
+    [group, target, cartesian, end_effector_link, frames](Commander & commander) {
       if (group == ArmGroup::kLeft) {
-        return commander.moveLeftArmPoseResult(target, cartesian, end_effector_link);
+        return commander.moveLeftArmPoseResult(target, cartesian, end_effector_link, frames);
       }
-      return commander.moveRightArmPoseResult(target, cartesian, end_effector_link);
+      return commander.moveRightArmPoseResult(target, cartesian, end_effector_link, frames);
     });
 }
 
@@ -110,21 +110,22 @@ Result RobotSdk::moveBothPoses(
   const geometry_msgs::msg::PoseStamped & left_target,
   const geometry_msgs::msg::PoseStamped & right_target,
   const std::string & left_end_effector_link,
-  const std::string & right_end_effector_link)
+  const std::string & right_end_effector_link,
+  const MotionFrames & left_frames, const MotionFrames & right_frames)
 {
   return runSynchronous(
     "both_arms.move_poses",
-    [left_target, right_target, left_end_effector_link, right_end_effector_link](
+    [left_target, right_target, left_end_effector_link, right_end_effector_link, left_frames, right_frames](
       Commander & commander) {
       return commander.moveBothArmsPosesResult(
-        left_target, right_target, left_end_effector_link, right_end_effector_link);
+        left_target, right_target, left_end_effector_link, right_end_effector_link, left_frames, right_frames);
     });
 }
 
 Result RobotSdk::moveTcpPose(
   ArmGroup group,
   const geometry_msgs::msg::PoseStamped & target,
-  bool cartesian)
+  bool cartesian, const MotionFrames & frames)
 {
   if (group == ArmGroup::kBoth) {
     return Result::failure(
@@ -135,21 +136,22 @@ Result RobotSdk::moveTcpPose(
   }
   return runSynchronous(
     armOperationName(group, cartesian ? "move_cartesian_tcp_pose" : "move_tcp_pose"),
-    [group, target, cartesian](Commander & commander) {
+    [group, target, cartesian, frames](Commander & commander) {
       return group == ArmGroup::kLeft ?
-             commander.moveLeftTcpPoseResult(target, cartesian) :
-             commander.moveRightTcpPoseResult(target, cartesian);
+             commander.moveLeftTcpPoseResult(target, cartesian, frames) :
+             commander.moveRightTcpPoseResult(target, cartesian, frames);
     });
 }
 
 Result RobotSdk::moveBothTcpPoses(
   const geometry_msgs::msg::PoseStamped & left_target,
-  const geometry_msgs::msg::PoseStamped & right_target)
+  const geometry_msgs::msg::PoseStamped & right_target,
+  const MotionFrames & left_frames, const MotionFrames & right_frames)
 {
   return runSynchronous(
     "both_arms.move_tcp_poses",
-    [left_target, right_target](Commander & commander) {
-      return commander.moveBothTcpPosesResult(left_target, right_target);
+    [left_target, right_target, left_frames, right_frames](Commander & commander) {
+      return commander.moveBothTcpPosesResult(left_target, right_target, left_frames, right_frames);
     });
 }
 
@@ -167,6 +169,38 @@ Result RobotSdk::moveGripper(GripperGroup group, double position)
       return group == GripperGroup::kLeft ?
              commander.moveLeftGripperResult(position) :
              commander.moveRightGripperResult(position);
+    });
+}
+
+Result RobotSdk::coordinateFramesCommand(
+  const std::string & operation, const std::string & path, std::string & yaml)
+{
+  return runSynchronous("coordinate_frames." + operation,
+    [operation, path, &yaml](Commander & commander) {
+      return commander.coordinateFramesCommand(operation, path, yaml);
+    });
+}
+
+Result RobotSdk::MoveJ(ArmGroup arm, const geometry_msgs::msg::PoseStamped & target,
+  const std::string & tool, const std::string & wobj)
+{
+  return movePose(arm, target, false, "", MotionFrames{tool, wobj});
+}
+
+Result RobotSdk::MoveL(ArmGroup arm, const geometry_msgs::msg::PoseStamped & target,
+  const std::string & tool, const std::string & wobj)
+{
+  return movePose(arm, target, true, "", MotionFrames{tool, wobj});
+}
+
+Result RobotSdk::MoveAbsJ(ArmGroup arm, const std::vector<double> & joints_rad,
+  const std::string & tool, const std::string & wobj)
+{
+  const std::string group = arm == ArmGroup::kLeft ? "left" : arm == ArmGroup::kRight ? "right" :
+    arm == ArmGroup::kBoth ? "both" : "invalid";
+  return runSynchronous(group + ".MoveAbsJ",
+    [group, joints_rad, tool, wobj](Commander & commander) {
+      return commander.moveAbsJResult(group, joints_rad, MotionFrames{tool, wobj});
     });
 }
 
@@ -247,7 +281,7 @@ MotionHandle RobotSdk::movePoseAsync(
   ArmGroup group,
   geometry_msgs::msg::PoseStamped target,
   bool cartesian,
-  std::string end_effector_link)
+  std::string end_effector_link, MotionFrames frames)
 {
   if (group == ArmGroup::kBoth) {
     return rejectedHandle(
@@ -266,11 +300,11 @@ MotionHandle RobotSdk::movePoseAsync(
   return submit(
     operation_name,
     [group, target = std::move(target), cartesian,
-      end_effector_link = std::move(end_effector_link)](Commander & commander) {
+      end_effector_link = std::move(end_effector_link), frames = std::move(frames)](Commander & commander) {
       if (group == ArmGroup::kLeft) {
-        return commander.moveLeftArmPoseResult(target, cartesian, end_effector_link);
+        return commander.moveLeftArmPoseResult(target, cartesian, end_effector_link, frames);
       }
-      return commander.moveRightArmPoseResult(target, cartesian, end_effector_link);
+      return commander.moveRightArmPoseResult(target, cartesian, end_effector_link, frames);
     });
 }
 
@@ -278,22 +312,23 @@ MotionHandle RobotSdk::moveBothPosesAsync(
   geometry_msgs::msg::PoseStamped left_target,
   geometry_msgs::msg::PoseStamped right_target,
   std::string left_end_effector_link,
-  std::string right_end_effector_link)
+  std::string right_end_effector_link, MotionFrames left_frames, MotionFrames right_frames)
 {
   return submit(
     "both_arms.move_poses",
     [left_target = std::move(left_target), right_target = std::move(right_target),
       left_end_effector_link = std::move(left_end_effector_link),
-      right_end_effector_link = std::move(right_end_effector_link)](Commander & commander) {
+      right_end_effector_link = std::move(right_end_effector_link),
+      left_frames = std::move(left_frames), right_frames = std::move(right_frames)](Commander & commander) {
       return commander.moveBothArmsPosesResult(
-        left_target, right_target, left_end_effector_link, right_end_effector_link);
+        left_target, right_target, left_end_effector_link, right_end_effector_link, left_frames, right_frames);
     });
 }
 
 MotionHandle RobotSdk::moveTcpPoseAsync(
   ArmGroup group,
   geometry_msgs::msg::PoseStamped target,
-  bool cartesian)
+  bool cartesian, MotionFrames frames)
 {
   if (group == ArmGroup::kBoth) {
     return rejectedHandle(
@@ -311,22 +346,23 @@ MotionHandle RobotSdk::moveTcpPoseAsync(
     group, cartesian ? "move_cartesian_tcp_pose" : "move_tcp_pose");
   return submit(
     operation_name,
-    [group, target = std::move(target), cartesian](Commander & commander) {
+    [group, target = std::move(target), cartesian, frames = std::move(frames)](Commander & commander) {
       return group == ArmGroup::kLeft ?
-             commander.moveLeftTcpPoseResult(target, cartesian) :
-             commander.moveRightTcpPoseResult(target, cartesian);
+             commander.moveLeftTcpPoseResult(target, cartesian, frames) :
+             commander.moveRightTcpPoseResult(target, cartesian, frames);
     });
 }
 
 MotionHandle RobotSdk::moveBothTcpPosesAsync(
   geometry_msgs::msg::PoseStamped left_target,
-  geometry_msgs::msg::PoseStamped right_target)
+  geometry_msgs::msg::PoseStamped right_target, MotionFrames left_frames, MotionFrames right_frames)
 {
   return submit(
     "both_arms.move_tcp_poses",
     [left_target = std::move(left_target),
-      right_target = std::move(right_target)](Commander & commander) {
-      return commander.moveBothTcpPosesResult(left_target, right_target);
+      right_target = std::move(right_target), left_frames = std::move(left_frames),
+      right_frames = std::move(right_frames)](Commander & commander) {
+      return commander.moveBothTcpPosesResult(left_target, right_target, left_frames, right_frames);
     });
 }
 

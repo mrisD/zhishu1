@@ -11,6 +11,7 @@ from typing import Iterable, Optional, Union
 import uuid
 
 from zhishu_robot_interfaces.msg import CommanderStatus
+from zhishu_robot_interfaces.srv import CoordinateFrames, MoveCartesian, MoveAbsJ
 from geometry_msgs.msg import PoseArray, PoseStamped
 import rclpy
 from rclpy.context import Context
@@ -104,14 +105,9 @@ class PoseTarget:
         if not self.frame_id.strip():
             raise ValueError('frame_id must not be empty')
 
-        quaternion_norm = math.sqrt(
-            self.qx * self.qx
-            + self.qy * self.qy
-            + self.qz * self.qz
-            + self.qw * self.qw
-        )
-        if quaternion_norm <= 1e-12:
-            raise ValueError('pose quaternion must not be zero')
+        quaternion_norm = math.hypot(self.qx, self.qy, self.qz, self.qw)
+        if not math.isfinite(quaternion_norm) or quaternion_norm <= 1e-12:
+            raise ValueError('pose quaternion must have a finite nonzero norm')
 
         message = PoseStamped()
         message.header.frame_id = self.frame_id
@@ -130,6 +126,7 @@ class _PendingCommand:
     expected_status: str
     result: Optional[Result] = None
     timed_out: bool = False
+    response: object = None
 
 
 PoseLike = Union[PoseTarget, PoseStamped]
@@ -234,6 +231,11 @@ class Commander:
             self._status_callback,
             10,
         )
+        self._coordinate_client = self._node.create_client(
+            CoordinateFrames, self._topic('coordinate_frames'))
+        self._cartesian_client = self._node.create_client(
+            MoveCartesian, self._topic('move_cartesian'))
+        self._abs_joint_client = self._node.create_client(MoveAbsJ, self._topic('move_abs_j'))
 
         self._executor = SingleThreadedExecutor(context=self._context)
         self._executor.add_node(self._node)
@@ -346,29 +348,29 @@ class Commander:
         target: PoseLike,
         *,
         cartesian: bool = False,
+        tool: Optional[str] = None,
+        wobj: str = 'wobj0',
         timeout: Optional[float] = None,
     ) -> Result:
         arm = self._coerce_arm(group)
         if arm not in (ArmGroup.LEFT, ArmGroup.RIGHT):
             return self._invalid('move_pose group must be left or right')
-        try:
-            message = self._pose_message(target)
-        except (TypeError, ValueError) as exc:
-            return self._invalid(str(exc))
-        suffix = 'cartesian_pose_command' if cartesian else 'pose_command'
-        command = f'{self._arm_prefix(arm)}/{suffix}'
-        return self._send(command, message, timeout=timeout)
+        return self._framed_motion(arm, target, None, False, cartesian,
+                                   tool, None, wobj, 'wobj0', timeout)
 
     def move_both_poses(
         self,
         left_target: PoseLike,
         right_target: PoseLike,
         *,
+        left_tool: Optional[str] = None,
+        right_tool: Optional[str] = None,
+        left_wobj: str = 'wobj0',
+        right_wobj: str = 'wobj0',
         timeout: Optional[float] = None,
     ) -> Result:
-        return self._move_both_pose_messages(
-            'both_arms/pose_command', left_target, right_target, timeout
-        )
+        return self._framed_motion(ArmGroup.BOTH, left_target, right_target, False, False,
+                                   left_tool, right_tool, left_wobj, right_wobj, timeout)
 
     def move_tcp_pose(
         self,
@@ -376,29 +378,167 @@ class Commander:
         target: PoseLike,
         *,
         cartesian: bool = False,
+        tool: Optional[str] = None,
+        wobj: str = 'wobj0',
         timeout: Optional[float] = None,
     ) -> Result:
         arm = self._coerce_arm(group)
         if arm not in (ArmGroup.LEFT, ArmGroup.RIGHT):
             return self._invalid('move_tcp_pose group must be left or right')
-        try:
-            message = self._pose_message(target)
-        except (TypeError, ValueError) as exc:
-            return self._invalid(str(exc))
-        suffix = 'cartesian_tcp_pose_command' if cartesian else 'tcp_pose_command'
-        command = f'{self._arm_prefix(arm)}/{suffix}'
-        return self._send(command, message, timeout=timeout)
+        return self._framed_motion(arm, target, None, True, cartesian,
+                                   tool, None, wobj, 'wobj0', timeout)
 
     def move_both_tcp_poses(
         self,
         left_target: PoseLike,
         right_target: PoseLike,
         *,
+        left_tool: Optional[str] = None,
+        right_tool: Optional[str] = None,
+        left_wobj: str = 'wobj0',
+        right_wobj: str = 'wobj0',
         timeout: Optional[float] = None,
     ) -> Result:
-        return self._move_both_pose_messages(
-            'both_arms/tcp_pose_command', left_target, right_target, timeout
-        )
+        return self._framed_motion(ArmGroup.BOTH, left_target, right_target, True, False,
+                                   left_tool, right_tool, left_wobj, right_wobj, timeout)
+
+    def load_coordinate_frames(self, path: str, *, timeout=None) -> Result:
+        """Load a complete registry from a path on the commander server."""
+        return self._coordinate_command('load', path, timeout)[0]
+
+    def MoveJ(self, group, target, *, tool='tool0', wobj='wobj0', timeout=None) -> Result:
+        """Joint-space planned motion to a tool pose; TCP path need not be straight."""
+        return self.move_pose(group, target, tool=tool, wobj=wobj, cartesian=False, timeout=timeout)
+
+    def MoveL(self, group, target, *, tool='tool0', wobj='wobj0', timeout=None) -> Result:
+        """Straight motion of the selected tool TCP to a pose (metres, quaternion xyzw)."""
+        return self.move_pose(group, target, tool=tool, wobj=wobj, cartesian=True, timeout=timeout)
+
+    def MoveAbsJ(self, group, joints_rad, *, tool='tool0', wobj='wobj0', timeout=None) -> Result:
+        """Absolute joints in radians; tool/wobj are checked but do not shift joints."""
+        arm = self._coerce_arm(group)
+        if arm is None:
+            return self._invalid('MoveAbsJ group must be left/right/both')
+        try:
+            values = self._validated_values(joints_rad, 14 if arm == ArmGroup.BOTH else 7, 'MoveAbsJ joints_rad')
+            request = MoveAbsJ.Request(group=arm.value, joints=values,
+                                       tool=self._coordinate_name(tool), wobj=self._coordinate_name(wobj))
+        except (TypeError, ValueError) as exc:
+            return self._invalid(str(exc))
+        return self._call_service(self._abs_joint_client, request, 'MoveAbsJ', timeout)[0]
+
+    @staticmethod
+    def Offs(point, dx_m, dy_m, dz_m):
+        from .pose_math import Offs
+        return Offs(point, dx_m, dy_m, dz_m)
+
+    @staticmethod
+    def RelTool(point, dx_m, dy_m, dz_m, rx_rad=0., ry_rad=0., rz_rad=0.):
+        from .pose_math import RelTool
+        return RelTool(point, dx_m, dy_m, dz_m, rx_rad, ry_rad, rz_rad)
+
+    move_j = MoveJ
+    move_l = MoveL
+    move_abs_j = MoveAbsJ
+
+    def save_coordinate_frames(self, path: str, *, timeout=None) -> Result:
+        """Save current definitions, refusing to overwrite an existing file."""
+        return self._coordinate_command('save', path, timeout)[0]
+
+    def get_coordinate_frames(self, *, timeout=None) -> tuple[Result, str]:
+        """Return (result, YAML); built-ins are implicit, never mutable."""
+        result, response = self._coordinate_command('list', '', timeout)
+        return result, response.frames_yaml if response is not None else ''
+
+    def _coordinate_command(self, operation, path, timeout):
+        if not isinstance(path, str) or (operation != 'list' and not path.strip()):
+            return self._invalid('coordinate file path must not be empty'), None
+        request = CoordinateFrames.Request(operation=operation, file_path=path)
+        return self._call_service(self._coordinate_client, request,
+                                  'coordinate_frames/' + operation, timeout)
+
+    @staticmethod
+    def _coordinate_name(value, *, optional=False):
+        if value is None and optional:
+            return ''
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError('explicit tool/wobj name must not be empty')
+        return value.strip()
+
+    def _framed_motion(self, arm, first, second, tcp, cartesian,
+                       first_tool, second_tool, first_wobj, second_wobj, timeout):
+        try:
+            request = MoveCartesian.Request(group=arm.value, tcp=bool(tcp), cartesian=bool(cartesian))
+            target = self._pose_message(first)
+            tool = self._coordinate_name(first_tool, optional=True)
+            wobj = self._coordinate_name(first_wobj)
+            if arm == ArmGroup.RIGHT:
+                request.right_target, request.right_tool, request.right_wobj = target, tool, wobj
+            else:
+                request.left_target, request.left_tool, request.left_wobj = target, tool, wobj
+            if arm == ArmGroup.BOTH:
+                request.right_target = self._pose_message(second)
+                request.right_tool = self._coordinate_name(second_tool, optional=True)
+                request.right_wobj = self._coordinate_name(second_wobj)
+        except (TypeError, ValueError) as exc:
+            return self._invalid(str(exc))
+        return self._call_service(self._cartesian_client, request, 'move_cartesian', timeout)[0]
+
+    def _call_service(self, client, request, command, timeout):
+        if self._closed:
+            return self._not_ready('Commander is closed', command), None
+        try:
+            seconds = self._timeout_or_default(timeout, self._default_timeout)
+        except ValueError as exc:
+            return self._invalid(str(exc), command), None
+        if not client.wait_for_service(timeout_sec=self._discovery_timeout):
+            return self._not_ready('Commander service is not available', command), None
+        pending = _PendingCommand('service/' + command)
+        with self._condition:
+            if self._pending is not None:
+                return Result(False, ErrorCode.BUSY, 'another command is still in progress',
+                              command=command, error_name='BUSY'), None
+            self._pending = pending
+        if isinstance(request, (MoveCartesian.Request, MoveAbsJ.Request)):
+            request.deadline_unix_ms = int((time.time() + seconds) * 1000)
+
+        def finished(future):
+            try:
+                response = future.result()
+                code = ErrorCode(response.error_code)
+                result = Result(response.success, code, response.message,
+                                getattr(response, 'native_code', 0), command, code.name)
+            except Exception as exc:
+                response = None
+                result = Result(False, ErrorCode.INTERNAL_ERROR, str(exc), command=command)
+            with self._condition:
+                pending.result, pending.response = result, response
+                if pending.timed_out and self._pending is pending:
+                    self._last_late_result = result
+                    self._pending = None
+                self._condition.notify_all()
+        try:
+            client.call_async(request).add_done_callback(finished)
+        except Exception as exc:
+            with self._condition:
+                if self._pending is pending:
+                    self._pending = None
+            return Result(False, ErrorCode.INTERNAL_ERROR, str(exc), command=command), None
+        deadline = time.monotonic() + seconds
+        with self._condition:
+            while pending.result is None and not self._closed:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    pending.timed_out = True
+                    return Result(False, ErrorCode.TIMEOUT,
+                                  'service may still be running; further commands blocked until its result',
+                                  command=command, error_name='TIMEOUT'), None
+                self._condition.wait(remaining)
+            if self._pending is pending:
+                self._pending = None
+            if pending.result is None:
+                return self._not_ready('Commander closed while waiting', command), None
+            return pending.result, pending.response
 
     def move_gripper(
         self,
@@ -724,9 +864,9 @@ class Commander:
             raise ValueError('pose values must be finite')
         if not target.header.frame_id.strip():
             raise ValueError('pose frame_id must not be empty')
-        quaternion_norm = math.sqrt(sum(value * value for value in values[3:]))
-        if quaternion_norm <= 1e-12:
-            raise ValueError('pose quaternion must not be zero')
+        quaternion_norm = math.hypot(*values[3:])
+        if not math.isfinite(quaternion_norm) or quaternion_norm <= 1e-12:
+            raise ValueError('pose quaternion must have a finite nonzero norm')
         return target
 
     @staticmethod

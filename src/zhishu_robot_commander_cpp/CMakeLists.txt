@@ -17,6 +17,10 @@ find_package(moveit_msgs REQUIRED)
 find_package(zhishu_robot_interfaces REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(yaml-cpp REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(moveit_core REQUIRED)
 
 set(CMAKE_WARN_DEPRECATED OFF)
 find_package(moveit_ros_planning_interface REQUIRED)
@@ -24,6 +28,8 @@ unset(CMAKE_WARN_DEPRECATED)
 
 add_library(${PROJECT_NAME} SHARED
   src/commander.cpp
+  src/coordinate_frames.cpp
+  src/pose_math.cpp
   src/motion_handle.cpp
   src/result.cpp
   src/robot_sdk.cpp
@@ -38,8 +44,9 @@ ament_target_dependencies(${PROJECT_NAME}
   geometry_msgs
   moveit_msgs
   moveit_ros_planning_interface
+  tf2 tf2_ros moveit_core
 )
-target_link_libraries(${PROJECT_NAME} Threads::Threads Eigen3::Eigen)
+target_link_libraries(${PROJECT_NAME} Threads::Threads Eigen3::Eigen yaml-cpp)
 target_compile_definitions(${PROJECT_NAME} PRIVATE SILENCE_DEPRECATION_WARNINGS)
 
 add_executable(commander_node src/commander_node.cpp)
@@ -89,10 +96,18 @@ install(
   DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
-install(FILES README.md CHANGELOG.rst DESTINATION share/${PROJECT_NAME})
+install(FILES README.md CHANGELOG.rst SDK_FRAMES.md DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_coordinate_frames test/test_coordinate_frames.cpp)
+  if(TARGET test_coordinate_frames)
+    target_link_libraries(test_coordinate_frames ${PROJECT_NAME} Eigen3::Eigen)
+  endif()
+  ament_add_gtest(test_pose_math test/test_pose_math.cpp)
+  if(TARGET test_pose_math)
+    target_link_libraries(test_pose_math ${PROJECT_NAME} Eigen3::Eigen)
+  endif()
 
   ament_add_gtest(test_sdk_types test/test_sdk_types.cpp)
   if(TARGET test_sdk_types)
@@ -119,6 +134,7 @@ ament_export_dependencies(
   geometry_msgs
   moveit_msgs
   moveit_ros_planning_interface
+  Eigen3 yaml-cpp tf2 tf2_ros moveit_core
 )
 
 ament_package()

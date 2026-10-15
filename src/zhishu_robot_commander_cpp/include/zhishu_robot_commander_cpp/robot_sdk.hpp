@@ -15,6 +15,7 @@
 
 #include "zhishu_robot_commander_cpp/commander.hpp"
 #include "zhishu_robot_commander_cpp/motion_handle.hpp"
+#include "zhishu_robot_commander_cpp/pose_math.hpp"
 
 namespace zhishu_robot_commander_cpp
 {
@@ -72,19 +73,38 @@ public:
     ArmGroup group,
     const geometry_msgs::msg::PoseStamped & target,
     bool cartesian = false,
-    const std::string & end_effector_link = "");
+    const std::string & end_effector_link = "", const MotionFrames & frames = {});
   Result moveBothPoses(
     const geometry_msgs::msg::PoseStamped & left_target,
     const geometry_msgs::msg::PoseStamped & right_target,
     const std::string & left_end_effector_link = "",
-    const std::string & right_end_effector_link = "");
+    const std::string & right_end_effector_link = "",
+    const MotionFrames & left_frames = {}, const MotionFrames & right_frames = {});
   Result moveTcpPose(
     ArmGroup group,
     const geometry_msgs::msg::PoseStamped & target,
-    bool cartesian = false);
+    bool cartesian = false, const MotionFrames & frames = {});
   Result moveBothTcpPoses(
     const geometry_msgs::msg::PoseStamped & left_target,
-    const geometry_msgs::msg::PoseStamped & right_target);
+    const geometry_msgs::msg::PoseStamped & right_target,
+    const MotionFrames & left_frames = {}, const MotionFrames & right_frames = {});
+  Result coordinateFramesCommand(
+    const std::string & operation, const std::string & path, std::string & yaml);
+  // ABB-style operation names; ROS/SI units, not RAPID units or syntax.
+  Result MoveJ(ArmGroup arm, const geometry_msgs::msg::PoseStamped & target,
+    const std::string & tool = "tool0", const std::string & wobj = "wobj0");
+  Result MoveL(ArmGroup arm, const geometry_msgs::msg::PoseStamped & target,
+    const std::string & tool = "tool0", const std::string & wobj = "wobj0");
+  Result MoveAbsJ(ArmGroup arm, const std::vector<double> & joints_rad,
+    const std::string & tool = "tool0", const std::string & wobj = "wobj0");
+  static geometry_msgs::msg::PoseStamped Offs(const geometry_msgs::msg::PoseStamped & point,
+    double dx_m, double dy_m, double dz_m) {
+    return zhishu_robot_commander_cpp::Offs(point, dx_m, dy_m, dz_m);
+  }
+  static geometry_msgs::msg::PoseStamped RelTool(const geometry_msgs::msg::PoseStamped & point,
+    double dx_m, double dy_m, double dz_m, double rx_rad = 0., double ry_rad = 0., double rz_rad = 0.) {
+    return zhishu_robot_commander_cpp::RelTool(point, dx_m, dy_m, dz_m, rx_rad, ry_rad, rz_rad);
+  }
   Result moveGripper(GripperGroup group, double position);
   Result moveBothGrippers(double left_position, double right_position);
   Result openGripper(GripperGroup group);
@@ -98,19 +118,21 @@ public:
     ArmGroup group,
     geometry_msgs::msg::PoseStamped target,
     bool cartesian = false,
-    std::string end_effector_link = "");
+    std::string end_effector_link = "", MotionFrames frames = {});
   MotionHandle moveBothPosesAsync(
     geometry_msgs::msg::PoseStamped left_target,
     geometry_msgs::msg::PoseStamped right_target,
     std::string left_end_effector_link = "",
-    std::string right_end_effector_link = "");
+    std::string right_end_effector_link = "",
+    MotionFrames left_frames = {}, MotionFrames right_frames = {});
   MotionHandle moveTcpPoseAsync(
     ArmGroup group,
     geometry_msgs::msg::PoseStamped target,
-    bool cartesian = false);
+    bool cartesian = false, MotionFrames frames = {});
   MotionHandle moveBothTcpPosesAsync(
     geometry_msgs::msg::PoseStamped left_target,
-    geometry_msgs::msg::PoseStamped right_target);
+    geometry_msgs::msg::PoseStamped right_target,
+    MotionFrames left_frames = {}, MotionFrames right_frames = {});
   MotionHandle moveGripperAsync(GripperGroup group, double position);
   MotionHandle moveBothGrippersAsync(double left_position, double right_position);
   MotionHandle openGripperAsync(GripperGroup group);

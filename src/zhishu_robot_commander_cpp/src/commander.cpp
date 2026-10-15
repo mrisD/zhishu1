@@ -1,6 +1,9 @@
 #include "zhishu_robot_commander_cpp/commander.hpp"
 
 #include <moveit_msgs/msg/robot_trajectory.hpp>
+#include <moveit/robot_trajectory/robot_trajectory.hpp>
+#include <moveit/trajectory_processing/time_optimal_trajectory_generation.hpp>
+#include <tf2/exceptions.h>
 
 #include <Eigen/Geometry>
 
@@ -141,6 +144,11 @@ Commander::Commander(const rclcpp::Node::SharedPtr & node, const Options & optio
     throw std::invalid_argument("Commander requires a valid rclcpp node");
   }
   validateOptions(options_);
+  if (!options_.coordinate_frames_file.empty()) {
+    coordinate_frames_.loadFile(options_.coordinate_frames_file);
+  }
+  tf_buffer_ = std::make_shared<tf2_ros::Buffer>(node_->get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, node_, true);
 
   left_arm_ = std::make_unique<MoveGroupInterface>(node_, options_.left_arm_group);
   right_arm_ = std::make_unique<MoveGroupInterface>(node_, options_.right_arm_group);
@@ -220,46 +228,49 @@ bool Commander::moveTorsoHeadJoints(const std::vector<double> & joints)
 bool Commander::moveLeftArmPose(
   const geometry_msgs::msg::PoseStamped & target,
   bool cartesian,
-  const std::string & end_effector_link)
+  const std::string & end_effector_link, const MotionFrames & frames)
 {
-  return moveLeftArmPoseResult(target, cartesian, end_effector_link).ok();
+  return moveLeftArmPoseResult(target, cartesian, end_effector_link, frames).ok();
 }
 
 bool Commander::moveRightArmPose(
   const geometry_msgs::msg::PoseStamped & target,
   bool cartesian,
-  const std::string & end_effector_link)
+  const std::string & end_effector_link, const MotionFrames & frames)
 {
-  return moveRightArmPoseResult(target, cartesian, end_effector_link).ok();
+  return moveRightArmPoseResult(target, cartesian, end_effector_link, frames).ok();
 }
 
 bool Commander::moveBothArmsPoses(
   const geometry_msgs::msg::PoseStamped & left_target,
   const geometry_msgs::msg::PoseStamped & right_target,
   const std::string & left_end_effector_link,
-  const std::string & right_end_effector_link)
+  const std::string & right_end_effector_link,
+  const MotionFrames & left_frames, const MotionFrames & right_frames)
 {
   return moveBothArmsPosesResult(
-    left_target, right_target, left_end_effector_link, right_end_effector_link).ok();
+    left_target, right_target, left_end_effector_link, right_end_effector_link,
+    left_frames, right_frames).ok();
 }
 
 bool Commander::moveLeftTcpPose(
-  const geometry_msgs::msg::PoseStamped & target, bool cartesian)
+  const geometry_msgs::msg::PoseStamped & target, bool cartesian, const MotionFrames & frames)
 {
-  return moveLeftTcpPoseResult(target, cartesian).ok();
+  return moveLeftTcpPoseResult(target, cartesian, frames).ok();
 }
 
 bool Commander::moveRightTcpPose(
-  const geometry_msgs::msg::PoseStamped & target, bool cartesian)
+  const geometry_msgs::msg::PoseStamped & target, bool cartesian, const MotionFrames & frames)
 {
-  return moveRightTcpPoseResult(target, cartesian).ok();
+  return moveRightTcpPoseResult(target, cartesian, frames).ok();
 }
 
 bool Commander::moveBothTcpPoses(
   const geometry_msgs::msg::PoseStamped & left_target,
-  const geometry_msgs::msg::PoseStamped & right_target)
+  const geometry_msgs::msg::PoseStamped & right_target,
+  const MotionFrames & left_frames, const MotionFrames & right_frames)
 {
-  return moveBothTcpPosesResult(left_target, right_target).ok();
+  return moveBothTcpPosesResult(left_target, right_target, left_frames, right_frames).ok();
 }
 
 bool Commander::moveLeftGripper(double position)
@@ -358,30 +369,41 @@ Result Commander::moveTorsoHeadJointsResult(const std::vector<double> & joints)
 Result Commander::moveLeftArmPoseResult(
   const geometry_msgs::msg::PoseStamped & target,
   bool cartesian,
-  const std::string & end_effector_link)
+  const std::string & end_effector_link, const MotionFrames & frames)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
   const auto & link = end_effector_link.empty() ?
     options_.left_end_effector_link : end_effector_link;
-  return movePose(*left_arm_, target, cartesian, link, "left arm");
+  geometry_msgs::msg::PoseStamped converted;
+  Eigen::Isometry3d offset;
+  const auto result = coordinateTargetToPlanningTarget(
+    *left_arm_, target, link, "left", frames, false, "left arm", converted, offset);
+  if (!result) {return result;}
+  return movePose(*left_arm_, converted, cartesian, link, "left arm", offset);
 }
 
 Result Commander::moveRightArmPoseResult(
   const geometry_msgs::msg::PoseStamped & target,
   bool cartesian,
-  const std::string & end_effector_link)
+  const std::string & end_effector_link, const MotionFrames & frames)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
   const auto & link = end_effector_link.empty() ?
     options_.right_end_effector_link : end_effector_link;
-  return movePose(*right_arm_, target, cartesian, link, "right arm");
+  geometry_msgs::msg::PoseStamped converted;
+  Eigen::Isometry3d offset;
+  const auto result = coordinateTargetToPlanningTarget(
+    *right_arm_, target, link, "right", frames, false, "right arm", converted, offset);
+  if (!result) {return result;}
+  return movePose(*right_arm_, converted, cartesian, link, "right arm", offset);
 }
 
 Result Commander::moveBothArmsPosesResult(
   const geometry_msgs::msg::PoseStamped & left_target,
   const geometry_msgs::msg::PoseStamped & right_target,
   const std::string & left_end_effector_link,
-  const std::string & right_end_effector_link)
+  const std::string & right_end_effector_link,
+  const MotionFrames & left_frames, const MotionFrames & right_frames)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
   if (!isFinitePose(left_target) || !isFinitePose(right_target)) {
@@ -394,10 +416,21 @@ Result Commander::moveBothArmsPosesResult(
   const auto right_link = right_end_effector_link.empty() ?
     options_.right_end_effector_link : right_end_effector_link;
 
+  geometry_msgs::msg::PoseStamped left_converted, right_converted;
+  Eigen::Isometry3d offset;
+  auto conversion = coordinateTargetToPlanningTarget(
+    *both_arms_, left_target, left_link, "left", left_frames, false,
+    "left arm", left_converted, offset);
+  if (!conversion) {return conversion;}
+  conversion = coordinateTargetToPlanningTarget(
+    *both_arms_, right_target, right_link, "right", right_frames, false,
+    "right arm", right_converted, offset);
+  if (!conversion) {return conversion;}
+
   both_arms_->setStartStateToCurrentState();
   both_arms_->clearPoseTargets();
-  if (!both_arms_->setPoseTarget(normalizedPose(left_target), left_link) ||
-    !both_arms_->setPoseTarget(normalizedPose(right_target), right_link))
+  if (!both_arms_->setPoseTarget(left_converted, left_link) ||
+    !both_arms_->setPoseTarget(right_converted, right_link))
   {
     RCLCPP_ERROR(node_->get_logger(), "Rejected one or both dual-arm pose targets");
     both_arms_->clearPoseTargets();
@@ -410,40 +443,43 @@ Result Commander::moveBothArmsPosesResult(
 }
 
 Result Commander::moveLeftTcpPoseResult(
-  const geometry_msgs::msg::PoseStamped & target, bool cartesian)
+  const geometry_msgs::msg::PoseStamped & target, bool cartesian, const MotionFrames & frames)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
   geometry_msgs::msg::PoseStamped planning_target;
-  const auto conversion = tcpTargetToPlanningTarget(
-    *left_arm_, target, options_.left_end_effector_link, options_.left_tcp_link,
-    "left gripper TCP", planning_target);
+  Eigen::Isometry3d offset;
+  const auto conversion = coordinateTargetToPlanningTarget(
+    *left_arm_, target, options_.left_end_effector_link, "left", frames, true,
+    "left tool TCP", planning_target, offset);
   if (!conversion) {
     return conversion;
   }
   return movePose(
     *left_arm_, planning_target, cartesian, options_.left_end_effector_link,
-    "left gripper TCP");
+    "left tool TCP", offset);
 }
 
 Result Commander::moveRightTcpPoseResult(
-  const geometry_msgs::msg::PoseStamped & target, bool cartesian)
+  const geometry_msgs::msg::PoseStamped & target, bool cartesian, const MotionFrames & frames)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
   geometry_msgs::msg::PoseStamped planning_target;
-  const auto conversion = tcpTargetToPlanningTarget(
-    *right_arm_, target, options_.right_end_effector_link, options_.right_tcp_link,
-    "right gripper TCP", planning_target);
+  Eigen::Isometry3d offset;
+  const auto conversion = coordinateTargetToPlanningTarget(
+    *right_arm_, target, options_.right_end_effector_link, "right", frames, true,
+    "right tool TCP", planning_target, offset);
   if (!conversion) {
     return conversion;
   }
   return movePose(
     *right_arm_, planning_target, cartesian, options_.right_end_effector_link,
-    "right gripper TCP");
+    "right tool TCP", offset);
 }
 
 Result Commander::moveBothTcpPosesResult(
   const geometry_msgs::msg::PoseStamped & left_target,
-  const geometry_msgs::msg::PoseStamped & right_target)
+  const geometry_msgs::msg::PoseStamped & right_target,
+  const MotionFrames & left_frames, const MotionFrames & right_frames)
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
   if (!isFinitePose(left_target) || !isFinitePose(right_target)) {
@@ -453,15 +489,16 @@ Result Commander::moveBothTcpPosesResult(
 
   geometry_msgs::msg::PoseStamped left_planning_target;
   geometry_msgs::msg::PoseStamped right_planning_target;
-  auto conversion = tcpTargetToPlanningTarget(
-    *both_arms_, left_target, options_.left_end_effector_link, options_.left_tcp_link,
-    "left gripper TCP", left_planning_target);
+  Eigen::Isometry3d offset;
+  auto conversion = coordinateTargetToPlanningTarget(
+    *both_arms_, left_target, options_.left_end_effector_link, "left", left_frames, true,
+    "left tool TCP", left_planning_target, offset);
   if (!conversion) {
     return conversion;
   }
-  conversion = tcpTargetToPlanningTarget(
-    *both_arms_, right_target, options_.right_end_effector_link, options_.right_tcp_link,
-    "right gripper TCP", right_planning_target);
+  conversion = coordinateTargetToPlanningTarget(
+    *both_arms_, right_target, options_.right_end_effector_link, "right", right_frames, true,
+    "right tool TCP", right_planning_target, offset);
   if (!conversion) {
     return conversion;
   }
@@ -723,7 +760,10 @@ Result Commander::moveJoints(
       targets[kTorsoHeadJointNames[index]] = joints[index];
     }
   } else if (expected_size == kSingleArmJointCount) {
-    const auto & names = label == "left arm" ? left_joint_names : right_joint_names;
+    if (group.getName() != options_.left_arm_group && group.getName() != options_.right_arm_group) {
+      return Result::failure(ErrorCode::kInvalidArgument, "single-arm joint target requires a left/right planning group");
+    }
+    const auto & names = group.getName() == options_.left_arm_group ? left_joint_names : right_joint_names;
     for (std::size_t index = 0; index < names.size(); ++index) {
       targets[names[index]] = joints[index];
     }
@@ -748,7 +788,7 @@ Result Commander::movePose(
   const geometry_msgs::msg::PoseStamped & target,
   bool cartesian,
   const std::string & end_effector_link,
-  const std::string & label)
+  const std::string & label, const Eigen::Isometry3d & flange_T_tool)
 {
   if (!isFinitePose(target)) {
     RCLCPP_ERROR(node_->get_logger(), "%s pose target contains NaN or infinity", label.c_str());
@@ -782,7 +822,25 @@ Result Commander::movePose(
   }
 
   moveit_msgs::msg::RobotTrajectory trajectory;
-  const std::vector<geometry_msgs::msg::Pose> waypoints{normalized_target.pose};
+  const auto state = group.getCurrentState(2.0);
+  if (!state) {return Result::failure(ErrorCode::kNotReady, "current state unavailable");}
+  const auto * link = state->getLinkModel(end_effector_link);
+  if (!link) {return Result::failure(ErrorCode::kInvalidArgument, "unknown planning link");}
+  // Coordinates are already resolved into this frame; never discard a source
+  // frame before conversion. The path itself is straight at the selected TCP.
+  group.setPoseReferenceFrame(group.getPlanningFrame());
+  const Eigen::Isometry3d start_flange = state->getGlobalLinkTransform(link);
+  const Eigen::Isometry3d end_flange = poseToEigen(normalized_target.pose);
+  std::vector<geometry_msgs::msg::Pose> waypoints;
+  try {
+    for (const auto & p : CoordinateFrames::toolLine(
+        start_flange, end_flange, flange_T_tool, options_.cartesian_eef_step))
+    {
+      waypoints.push_back(eigenToPose(p));
+    }
+  } catch (const std::exception & e) {
+    return Result::failure(ErrorCode::kInvalidArgument, e.what());
+  }
   const double fraction = group.computeCartesianPath(
     waypoints,
     options_.cartesian_eef_step,
@@ -798,6 +856,34 @@ Result Commander::movePose(
       " is below required " + std::to_string(options_.minimum_cartesian_fraction));
   }
 
+  // Conservative retiming and FK verification prevent time-parameterization
+  // blending from silently changing an offset-tool path or accepting a partial end.
+  robot_trajectory::RobotTrajectory timed(group.getRobotModel(), group.getName());
+  timed.setRobotTrajectoryMsg(*state, trajectory);
+  trajectory_processing::TimeOptimalTrajectoryGeneration timing(.00005, .02, .00001);
+  if (timed.empty() || !timing.computeTimeStamps(
+      timed, options_.velocity_scaling, options_.acceleration_scaling))
+  {
+    return Result::failure(ErrorCode::kPlanningFailed, "Cartesian trajectory retiming failed");
+  }
+  const Eigen::Isometry3d start_tcp = start_flange * flange_T_tool;
+  const Eigen::Isometry3d end_tcp = end_flange * flange_T_tool;
+  const Eigen::Vector3d segment = end_tcp.translation() - start_tcp.translation();
+  for (std::size_t i = 0; i < timed.getWayPointCount(); ++i) {
+    const Eigen::Isometry3d actual = timed.getWayPoint(i).getGlobalLinkTransform(link) * flange_T_tool;
+    const double alpha = segment.squaredNorm() < 1e-16 ? 0. : std::clamp(
+      (actual.translation() - start_tcp.translation()).dot(segment) / segment.squaredNorm(), 0., 1.);
+    if ((actual.translation() - (start_tcp.translation() + alpha * segment)).norm() > .00075) {
+      return Result::failure(ErrorCode::kPlanningFailed, "retimed tool path deviates more than 0.75 mm");
+    }
+  }
+  const Eigen::Isometry3d actual_end = timed.getLastWayPoint().getGlobalLinkTransform(link) * flange_T_tool;
+  if ((actual_end.translation() - end_tcp.translation()).norm() > .0005 ||
+    Eigen::Quaterniond(actual_end.rotation()).angularDistance(Eigen::Quaterniond(end_tcp.rotation())) > .002)
+  {
+    return Result::failure(ErrorCode::kPlanningFailed, "Cartesian path does not reach the complete tool target");
+  }
+  timed.getRobotTrajectoryMsg(trajectory);
   const auto result = group.execute(trajectory);
   if (!succeeded(result)) {
     RCLCPP_ERROR(node_->get_logger(), "%s Cartesian trajectory execution failed", label.c_str());
@@ -833,47 +919,150 @@ Result Commander::planAndExecute(MoveGroupInterface & group, const std::string &
   return Result::success("completed " + label);
 }
 
-Result Commander::tcpTargetToPlanningTarget(
+Result Commander::coordinateTargetToPlanningTarget(
   MoveGroupInterface & group,
   const geometry_msgs::msg::PoseStamped & tcp_target,
   const std::string & planning_link,
-  const std::string & tcp_link,
+  const std::string & arm, const MotionFrames & frames, bool tcp_default,
   const std::string & label,
-  geometry_msgs::msg::PoseStamped & planning_target)
+  geometry_msgs::msg::PoseStamped & planning_target, Eigen::Isometry3d & flange_T_tool)
 {
   if (!isFinitePose(tcp_target)) {
     return Result::failure(
       ErrorCode::kInvalidArgument, label + " target contains NaN or infinity");
   }
 
+  const std::string default_tcp = arm == "left" ? options_.left_tcp_link : options_.right_tcp_link;
+  const std::string flange = arm == "left" ? options_.left_end_effector_link : options_.right_end_effector_link;
+  const std::string tool_name = frames.tool.empty() ? (tcp_default ? default_tcp : "tool0") : frames.tool;
+  const std::string wobj_name = frames.wobj.empty() ? "wobj0" : frames.wobj;
+  Eigen::Isometry3d base_T_object;
+  try {
+    base_T_object = coordinate_frames_.workobject(wobj_name);
+    if (tool_name != default_tcp) {flange_T_tool = coordinate_frames_.tool(arm, tool_name);}
+    if (wobj_name != "wobj0" && !tcp_target.header.frame_id.empty() &&
+      tcp_target.header.frame_id != "base_link" && tcp_target.header.frame_id != wobj_name)
+    {
+      throw std::invalid_argument("target frame_id conflicts with explicit workobject: " + wobj_name);
+    }
+  } catch (const std::exception & e) {
+    return Result::failure(ErrorCode::kInvalidArgument, e.what());
+  }
   const auto state = group.getCurrentState(2.0);
   if (!state) {
     return Result::failure(
       ErrorCode::kNotReady, "cannot read current robot state for " + label);
   }
   const auto * planning_link_model = state->getLinkModel(planning_link);
-  const auto * tcp_link_model = state->getLinkModel(tcp_link);
-  if (planning_link_model == nullptr || tcp_link_model == nullptr) {
+  const auto * flange_model = state->getLinkModel(flange);
+  if (planning_link_model == nullptr || flange_model == nullptr) {
     return Result::failure(
-      ErrorCode::kInvalidArgument,
-      "invalid planning/TCP link for " + label + ": " + planning_link + " -> " + tcp_link);
+      ErrorCode::kInvalidArgument, "invalid planning link for " + label + ": " + planning_link);
   }
+  const auto fixed_root = [](const moveit::core::LinkModel * link) {
+      while (link && link->getParentJointModel() &&
+        link->getParentJointModel()->getType() == moveit::core::JointModel::FIXED)
+      {
+        link = link->getParentLinkModel();
+      }
+      return link;
+    };
+  if (fixed_root(planning_link_model) != fixed_root(flange_model)) {
+    return Result::failure(ErrorCode::kInvalidArgument, "planning link must be rigidly attached to the arm flange");
+  }
+  if (tool_name == default_tcp) {
+    const auto * tcp = state->getLinkModel(default_tcp);
+    if (!tcp || fixed_root(tcp) != fixed_root(flange_model))
+    {
+      return Result::failure(ErrorCode::kInvalidArgument, "configured gripper TCP is not fixed to the flange");
+    }
+    flange_T_tool = state->getGlobalLinkTransform(planning_link_model).inverse() * state->getGlobalLinkTransform(tcp);
+  } else {
+    // A legacy IK-link override must not redefine tool0: it still denotes
+    // L_hand_link/R_hand_link, not the arbitrary overridden link.
+    flange_T_tool = state->getGlobalLinkTransform(planning_link_model).inverse() *
+      state->getGlobalLinkTransform(flange_model) * flange_T_tool;
+  }
+  try {
+    const auto reference = [&](const std::string & frame) -> Eigen::Isometry3d {
+        if (frame == group.getPlanningFrame()) {return Eigen::Isometry3d::Identity();}
+        const auto * model_link = state->getLinkModel(frame);
+        if (model_link) {return state->getGlobalLinkTransform(model_link);}
+        const auto t = tf_buffer_->lookupTransform(
+          group.getPlanningFrame(), frame, rclcpp::Time(tcp_target.header.stamp),
+          rclcpp::Duration::from_seconds(.5)).transform;
+        geometry_msgs::msg::Pose pose;
+        pose.position.x = t.translation.x; pose.position.y = t.translation.y; pose.position.z = t.translation.z;
+        pose.orientation = t.rotation;
+        return poseToEigen(pose);
+      };
+    // Named wobj coordinates are relative to base_link. For legacy wobj0
+    // messages, an explicit PoseStamped frame_id is still transformed, not lost.
+    const std::string source = wobj_name == "wobj0" && !tcp_target.header.frame_id.empty() &&
+      tcp_target.header.frame_id != "wobj0" ? tcp_target.header.frame_id : "base_link";
+    planning_target = normalizedPose(tcp_target);
+    planning_target.header.frame_id = group.getPlanningFrame();
+    planning_target.pose = eigenToPose(CoordinateFrames::flangeTarget(
+      reference(source) * base_T_object, poseToEigen(normalizedPose(tcp_target).pose), flange_T_tool));
+    if (!isFinitePose(planning_target)) {
+      return Result::failure(ErrorCode::kInvalidArgument, "coordinate conversion produced an invalid or overflowing pose");
+    }
+  } catch (const tf2::TransformException & e) {
+    return Result::failure(ErrorCode::kInvalidArgument, std::string("reference frame unavailable: ") + e.what());
+  }
+  return Result::success(label + " resolved with tool=" + tool_name + " wobj=" + wobj_name);
+}
 
-  const Eigen::Isometry3d model_to_planning =
-    state->getGlobalLinkTransform(planning_link_model);
-  const Eigen::Isometry3d model_to_tcp =
-    state->getGlobalLinkTransform(tcp_link_model);
-  const Eigen::Isometry3d planning_to_tcp =
-    model_to_planning.inverse() * model_to_tcp;
+Result Commander::coordinateFramesCommand(
+  const std::string & operation, const std::string & file_path, std::string & yaml)
+{
+  std::unique_lock<std::mutex> lock(command_mutex_, std::try_to_lock);
+  if (!lock.owns_lock()) {return Result::failure(ErrorCode::kBusy, "motion in progress; coordinate registry unchanged");}
+  try {
+    if (operation == "load") {
+      CoordinateFrames candidate;
+      candidate.loadFile(file_path);
+      // Built-in model TCP names may be customized in Options; keep them reserved.
+      for (const auto & arm : {"left", "right"}) {
+        const auto name = std::string(arm) == "left" ? options_.left_tcp_link : options_.right_tcp_link;
+        bool collision = false;
+        try {(void)candidate.tool(arm, name); collision = true;} catch (const std::invalid_argument &) {}
+        if (collision) {throw std::invalid_argument("coordinate file shadows configured gripper TCP: " + name);}
+      }
+      coordinate_frames_ = std::move(candidate);
+    } else if (operation == "save") {
+      coordinate_frames_.saveFile(file_path);
+    } else if (operation != "list") {
+      throw std::invalid_argument("coordinate operation must be load, save or list");
+    }
+    yaml = coordinate_frames_.toYaml();
+    return Result::success("coordinate registry " + operation + " complete (built-ins: tool0, wobj0, configured gripper TCPs)");
+  } catch (const std::exception & e) {
+    return Result::failure(ErrorCode::kInvalidArgument, e.what());
+  }
+}
 
-  const auto normalized_tcp_target = normalizedPose(tcp_target);
-  const Eigen::Isometry3d frame_to_tcp = poseToEigen(normalized_tcp_target.pose);
-  const Eigen::Isometry3d frame_to_planning = frame_to_tcp * planning_to_tcp.inverse();
-
-  planning_target = normalized_tcp_target;
-  planning_target.pose = eigenToPose(frame_to_planning);
-  return Result::success(
-    label + " converted from " + tcp_link + " to IK tip " + planning_link);
+Result Commander::moveAbsJResult(
+  const std::string & arm, const std::vector<double> & joints_rad, const MotionFrames & frames)
+{
+  std::lock_guard<std::mutex> lock(command_mutex_);
+  if (arm != "left" && arm != "right" && arm != "both") {
+    return Result::failure(ErrorCode::kInvalidArgument, "MoveAbsJ group must be left/right/both");
+  }
+  try {
+    (void)coordinate_frames_.workobject(frames.wobj.empty() ? "wobj0" : frames.wobj);
+    const std::string tool = frames.tool.empty() ? "tool0" : frames.tool;
+    for (const auto & side : {"left", "right"}) {
+      if (arm != "both" && arm != side) {continue;}
+      const auto & gripper = std::string(side) == "left" ? options_.left_tcp_link : options_.right_tcp_link;
+      if (tool != gripper) {(void)coordinate_frames_.tool(side, tool);}
+    }
+  } catch (const std::exception & e) {
+    return Result::failure(ErrorCode::kInvalidArgument, e.what());
+  }
+  if (arm == "both") {return moveJoints(*both_arms_, joints_rad, kDualArmJointCount, "MoveAbsJ both arms");}
+  return moveJoints(arm == "left" ? *left_arm_ : *right_arm_, joints_rad,
+    kSingleArmJointCount, "MoveAbsJ " + arm);
 }
 
 Result Commander::validateGripperPosition(double position, const std::string & label) const
@@ -894,7 +1083,9 @@ bool Commander::isFinitePose(const geometry_msgs::msg::PoseStamped & pose)
 {
   const auto & position = pose.pose.position;
   const auto & orientation = pose.pose.orientation;
-  return std::isfinite(position.x) && std::isfinite(position.y) &&
+  const double norm = std::hypot(std::hypot(orientation.x, orientation.y),
+    std::hypot(orientation.z, orientation.w));
+  return std::isfinite(norm) && norm > 1e-9 && std::isfinite(position.x) && std::isfinite(position.y) &&
          std::isfinite(position.z) && std::isfinite(orientation.x) &&
          std::isfinite(orientation.y) && std::isfinite(orientation.z) &&
          std::isfinite(orientation.w);
@@ -905,7 +1096,7 @@ geometry_msgs::msg::PoseStamped Commander::normalizedPose(
 {
   auto result = pose;
   auto & q = result.pose.orientation;
-  const double norm = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+  const double norm = std::hypot(std::hypot(q.x, q.y), std::hypot(q.z, q.w));
   if (norm < 1e-9) {
     q.x = 0.0;
     q.y = 0.0;

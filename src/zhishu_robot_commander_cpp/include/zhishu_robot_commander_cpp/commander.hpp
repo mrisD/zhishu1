@@ -4,6 +4,8 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <memory>
 #include <mutex>
@@ -11,6 +13,7 @@
 #include <vector>
 
 #include "zhishu_robot_commander_cpp/result.hpp"
+#include "zhishu_robot_commander_cpp/coordinate_frames.hpp"
 
 namespace zhishu_robot_commander_cpp
 {
@@ -33,6 +36,7 @@ public:
     std::string right_end_effector_link{"R_hand_link"};
     std::string left_tcp_link{"left_gripper_tcp"};
     std::string right_tcp_link{"right_gripper_tcp"};
+    std::string coordinate_frames_file;
     double velocity_scaling{0.30};
     double acceleration_scaling{0.30};
     double planning_time{5.0};
@@ -64,26 +68,30 @@ public:
   bool moveLeftArmPose(
     const geometry_msgs::msg::PoseStamped & target,
     bool cartesian = false,
-    const std::string & end_effector_link = "");
+    const std::string & end_effector_link = "", const MotionFrames & frames = {});
   bool moveRightArmPose(
     const geometry_msgs::msg::PoseStamped & target,
     bool cartesian = false,
-    const std::string & end_effector_link = "");
+    const std::string & end_effector_link = "", const MotionFrames & frames = {});
   bool moveBothArmsPoses(
     const geometry_msgs::msg::PoseStamped & left_target,
     const geometry_msgs::msg::PoseStamped & right_target,
     const std::string & left_end_effector_link = "",
-    const std::string & right_end_effector_link = "");
+    const std::string & right_end_effector_link = "",
+    const MotionFrames & left_frames = {}, const MotionFrames & right_frames = {});
 
   // True gripper-TCP targets. These are converted to the configured arm IK
   // tip (L_hand_link/R_hand_link) through the rigid transform in RobotModel.
   bool moveLeftTcpPose(
-    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false);
+    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false,
+    const MotionFrames & frames = {});
   bool moveRightTcpPose(
-    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false);
+    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false,
+    const MotionFrames & frames = {});
   bool moveBothTcpPoses(
     const geometry_msgs::msg::PoseStamped & left_target,
-    const geometry_msgs::msg::PoseStamped & right_target);
+    const geometry_msgs::msg::PoseStamped & right_target,
+    const MotionFrames & left_frames = {}, const MotionFrames & right_frames = {});
 
   bool moveLeftGripper(double position);
   bool moveRightGripper(double position);
@@ -110,24 +118,35 @@ public:
   Result moveLeftArmPoseResult(
     const geometry_msgs::msg::PoseStamped & target,
     bool cartesian = false,
-    const std::string & end_effector_link = "");
+    const std::string & end_effector_link = "", const MotionFrames & frames = {});
   Result moveRightArmPoseResult(
     const geometry_msgs::msg::PoseStamped & target,
     bool cartesian = false,
-    const std::string & end_effector_link = "");
+    const std::string & end_effector_link = "", const MotionFrames & frames = {});
   Result moveBothArmsPosesResult(
     const geometry_msgs::msg::PoseStamped & left_target,
     const geometry_msgs::msg::PoseStamped & right_target,
     const std::string & left_end_effector_link = "",
-    const std::string & right_end_effector_link = "");
+    const std::string & right_end_effector_link = "",
+    const MotionFrames & left_frames = {}, const MotionFrames & right_frames = {});
 
   Result moveLeftTcpPoseResult(
-    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false);
+    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false,
+    const MotionFrames & frames = {});
   Result moveRightTcpPoseResult(
-    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false);
+    const geometry_msgs::msg::PoseStamped & target, bool cartesian = false,
+    const MotionFrames & frames = {});
   Result moveBothTcpPosesResult(
     const geometry_msgs::msg::PoseStamped & left_target,
-    const geometry_msgs::msg::PoseStamped & right_target);
+    const geometry_msgs::msg::PoseStamped & right_target,
+    const MotionFrames & left_frames = {}, const MotionFrames & right_frames = {});
+
+  // Management never changes a global active selection; frames are per motion.
+  Result coordinateFramesCommand(
+    const std::string & operation, const std::string & file_path, std::string & yaml);
+  Result moveAbsJResult(
+    const std::string & arm, const std::vector<double> & joints_rad,
+    const MotionFrames & frames = {"tool0", "wobj0"});
 
   Result moveLeftGripperResult(double position);
   Result moveRightGripperResult(double position);
@@ -167,15 +186,16 @@ private:
     const geometry_msgs::msg::PoseStamped & target,
     bool cartesian,
     const std::string & end_effector_link,
-    const std::string & label);
+    const std::string & label,
+    const Eigen::Isometry3d & flange_T_tool = Eigen::Isometry3d::Identity());
   Result planAndExecute(MoveGroupInterface & group, const std::string & label);
-  Result tcpTargetToPlanningTarget(
+  Result coordinateTargetToPlanningTarget(
     MoveGroupInterface & group,
     const geometry_msgs::msg::PoseStamped & tcp_target,
     const std::string & planning_link,
-    const std::string & tcp_link,
+    const std::string & arm, const MotionFrames & frames, bool tcp_default,
     const std::string & label,
-    geometry_msgs::msg::PoseStamped & planning_target);
+    geometry_msgs::msg::PoseStamped & planning_target, Eigen::Isometry3d & flange_T_tool);
   Result validateGripperPosition(double position, const std::string & label) const;
   static bool isFinitePose(const geometry_msgs::msg::PoseStamped & pose);
   static geometry_msgs::msg::PoseStamped normalizedPose(
@@ -183,6 +203,9 @@ private:
 
   rclcpp::Node::SharedPtr node_;
   Options options_;
+  CoordinateFrames coordinate_frames_;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
   std::unique_ptr<MoveGroupInterface> left_arm_;
   std::unique_ptr<MoveGroupInterface> right_arm_;

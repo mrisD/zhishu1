@@ -1,0 +1,9 @@
+# Configuration only; load replaces the registry atomically, save never overwrites.
+# operation: list, load, save. Paths refer to the commander server filesystem.
+string operation
+string file_path
+---
+bool success
+int32 error_code
+string message
+string frames_yaml

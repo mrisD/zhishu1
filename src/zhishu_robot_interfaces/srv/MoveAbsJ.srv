@@ -1,0 +1,12 @@
+# Absolute joint targets, radians: 7 joints per arm or left[7]+right[7] for both.
+# tool/wobj are validated but never transform absolute joint values.
+string group
+float64[] joints
+string tool
+string wobj
+uint64 deadline_unix_ms
+---
+bool success
+int32 error_code
+int32 native_code
+string message

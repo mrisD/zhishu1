@@ -1,0 +1,19 @@
+# group: left, right, both. Both-arm Cartesian paths are intentionally rejected.
+string group
+geometry_msgs/PoseStamped left_target
+geometry_msgs/PoseStamped right_target
+# Empty tool: tool0 for pose APIs, configured gripper TCP for tcp=true.
+string left_tool
+string right_tool
+# Empty wobj means wobj0. No persistent selection or fallback on unknown names.
+string left_wobj
+string right_wobj
+bool tcp
+bool cartesian
+# Optional wall-clock deadline for rejecting expired queued commands (0 disables).
+uint64 deadline_unix_ms
+---
+bool success
+int32 error_code
+int32 native_code
+string message

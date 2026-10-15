@@ -5,6 +5,7 @@ zhishu_robot_commander:
       right_end_effector_link: R_hand_link
       left_tcp_link: left_gripper_tcp
       right_tcp_link: right_gripper_tcp
+      coordinate_frames_file: ""
       velocity_scaling: 0.30
       acceleration_scaling: 0.30
       planning_time: 5.0

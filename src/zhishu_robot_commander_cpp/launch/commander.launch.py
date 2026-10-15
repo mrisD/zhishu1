@@ -47,12 +47,14 @@ def generate_launch_description():
             moveit_config.joint_limits,
             commander_yaml,
             {"use_sim_time": use_sim_time},
+            {"commander.coordinate_frames_file": LaunchConfiguration("coordinate_frames_file")},
         ],
     )
 
     return LaunchDescription(
         [
             DeclareLaunchArgument("use_sim_time", default_value="false"),
+            DeclareLaunchArgument("coordinate_frames_file", default_value=""),
             DeclareLaunchArgument(
                 "use_fake_hardware",
                 default_value="false",

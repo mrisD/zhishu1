@@ -1,6 +1,9 @@
 #include "zhishu_robot_commander_cpp/commander.hpp"
 
 #include <zhishu_robot_interfaces/msg/commander_status.hpp>
+#include <zhishu_robot_interfaces/srv/coordinate_frames.hpp>
+#include <zhishu_robot_interfaces/srv/move_cartesian.hpp>
+#include <zhishu_robot_interfaces/srv/move_abs_j.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <std_msgs/msg/empty.hpp>
@@ -9,6 +12,7 @@
 #include <std_msgs/msg/string.hpp>
 
 #include <cstdint>
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <string>
@@ -38,6 +42,7 @@ public:
     const std::shared_ptr<Commander> & commander)
   : node_(node), commander_(commander)
   {
+    motion_callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     // Keep the original String status topic source-compatible for existing
     // guohua_ws consumers. New SDK clients use the structured companion topic.
     status_pub_ = node_->create_publisher<std_msgs::msg::String>("~/status", 10);
@@ -45,22 +50,79 @@ public:
       node_->create_publisher<zhishu_robot_interfaces::msg::CommanderStatus>(
       "~/status_structured", 10);
 
-    left_joint_sub_ = node_->create_subscription<std_msgs::msg::Float64MultiArray>(
+    frames_callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+    frames_service_ = node_->create_service<zhishu_robot_interfaces::srv::CoordinateFrames>(
+      "~/coordinate_frames",
+      [this](const std::shared_ptr<zhishu_robot_interfaces::srv::CoordinateFrames::Request> request,
+        std::shared_ptr<zhishu_robot_interfaces::srv::CoordinateFrames::Response> response) {
+        const auto result = commander_->coordinateFramesCommand(
+          request->operation, request->file_path, response->frames_yaml);
+        response->success = result.ok();
+        response->error_code = static_cast<int>(result.code);
+        response->message = result.message;
+      }, rclcpp::ServicesQoS(), frames_callback_group_);
+    framed_motion_service_ = node_->create_service<zhishu_robot_interfaces::srv::MoveCartesian>(
+      "~/move_cartesian",
+      [this](const std::shared_ptr<zhishu_robot_interfaces::srv::MoveCartesian::Request> request,
+        std::shared_ptr<zhishu_robot_interfaces::srv::MoveCartesian::Response> response) {
+        Result result;
+        const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch()).count();
+        const MotionFrames left{request->left_tool, request->left_wobj};
+        const MotionFrames right{request->right_tool, request->right_wobj};
+        if (request->deadline_unix_ms && static_cast<std::uint64_t>(now) > request->deadline_unix_ms) {
+          result = Result::failure(ErrorCode::kTimeout, "queued motion expired; no motion started");
+        } else if (request->group == "left") {
+          result = request->tcp ? commander_->moveLeftTcpPoseResult(
+            request->left_target, request->cartesian, left) : commander_->moveLeftArmPoseResult(
+            request->left_target, request->cartesian, "", left);
+        } else if (request->group == "right") {
+          result = request->tcp ? commander_->moveRightTcpPoseResult(
+            request->right_target, request->cartesian, right) : commander_->moveRightArmPoseResult(
+            request->right_target, request->cartesian, "", right);
+        } else if (request->group == "both" && !request->cartesian) {
+          result = request->tcp ? commander_->moveBothTcpPosesResult(
+            request->left_target, request->right_target, left, right) : commander_->moveBothArmsPosesResult(
+            request->left_target, request->right_target, "", "", left, right);
+        } else {
+          result = Result::failure(ErrorCode::kInvalidArgument, "group must be left/right/both; dual Cartesian paths are unsupported");
+        }
+        response->success = result.ok();
+        response->error_code = static_cast<int>(result.code);
+        response->native_code = result.native_code;
+        response->message = result.message;
+      }, rclcpp::ServicesQoS(), motion_callback_group_);
+    abs_joint_service_ = node_->create_service<zhishu_robot_interfaces::srv::MoveAbsJ>(
+      "~/move_abs_j",
+      [this](const std::shared_ptr<zhishu_robot_interfaces::srv::MoveAbsJ::Request> request,
+        std::shared_ptr<zhishu_robot_interfaces::srv::MoveAbsJ::Response> response) {
+        const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch()).count();
+        const auto result = request->deadline_unix_ms && static_cast<std::uint64_t>(now) > request->deadline_unix_ms ?
+          Result::failure(ErrorCode::kTimeout, "queued MoveAbsJ expired; no motion started") :
+          commander_->moveAbsJResult(request->group, request->joints, MotionFrames{request->tool, request->wobj});
+        response->success = result.ok();
+        response->error_code = static_cast<int>(result.code);
+        response->native_code = result.native_code;
+        response->message = result.message;
+      }, rclcpp::ServicesQoS(), motion_callback_group_);
+
+    left_joint_sub_ = createMotionSubscription<std_msgs::msg::Float64MultiArray>(
       "~/left_arm/joint_command", 10,
       [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
         publishResult("left_arm/joint_command", commander_->moveLeftArmJointsResult(msg->data));
       });
-    right_joint_sub_ = node_->create_subscription<std_msgs::msg::Float64MultiArray>(
+    right_joint_sub_ = createMotionSubscription<std_msgs::msg::Float64MultiArray>(
       "~/right_arm/joint_command", 10,
       [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
         publishResult("right_arm/joint_command", commander_->moveRightArmJointsResult(msg->data));
       });
-    both_joint_sub_ = node_->create_subscription<std_msgs::msg::Float64MultiArray>(
+    both_joint_sub_ = createMotionSubscription<std_msgs::msg::Float64MultiArray>(
       "~/both_arms/joint_command", 10,
       [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
         publishResult("both_arms/joint_command", commander_->moveBothArmsJointsResult(msg->data));
       });
-    torso_head_joint_sub_ = node_->create_subscription<std_msgs::msg::Float64MultiArray>(
+    torso_head_joint_sub_ = createMotionSubscription<std_msgs::msg::Float64MultiArray>(
       "~/torso_head/joint_command", 10,
       [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
         publishResult(
@@ -68,17 +130,17 @@ public:
       });
 
     // Legacy arm-tip pose commands: targets refer to L_hand_link / R_hand_link by default.
-    left_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+    left_pose_sub_ = createMotionSubscription<geometry_msgs::msg::PoseStamped>(
       "~/left_arm/pose_command", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         publishResult("left_arm/pose_command", commander_->moveLeftArmPoseResult(*msg, false));
       });
-    right_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+    right_pose_sub_ = createMotionSubscription<geometry_msgs::msg::PoseStamped>(
       "~/right_arm/pose_command", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         publishResult("right_arm/pose_command", commander_->moveRightArmPoseResult(*msg, false));
       });
-    both_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(
+    both_pose_sub_ = createMotionSubscription<geometry_msgs::msg::PoseArray>(
       "~/both_arms/pose_command", 10,
       [this](const geometry_msgs::msg::PoseArray::SharedPtr msg) {
         if (msg->poses.size() != 2) {
@@ -94,13 +156,13 @@ public:
           "both_arms/pose_command",
           commander_->moveBothArmsPosesResult(targets.first, targets.second));
       });
-    left_cartesian_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+    left_cartesian_sub_ = createMotionSubscription<geometry_msgs::msg::PoseStamped>(
       "~/left_arm/cartesian_pose_command", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         publishResult(
           "left_arm/cartesian_pose_command", commander_->moveLeftArmPoseResult(*msg, true));
       });
-    right_cartesian_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+    right_cartesian_sub_ = createMotionSubscription<geometry_msgs::msg::PoseStamped>(
       "~/right_arm/cartesian_pose_command", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         publishResult(
@@ -109,17 +171,17 @@ public:
 
     // True gripper-TCP commands. Commander converts TCP targets to the arm IK tips using
     // the fixed transforms from MoveIt's RobotModel, so no 145 mm offset is hard-coded here.
-    left_tcp_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+    left_tcp_pose_sub_ = createMotionSubscription<geometry_msgs::msg::PoseStamped>(
       "~/left_arm/tcp_pose_command", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         publishResult("left_arm/tcp_pose_command", commander_->moveLeftTcpPoseResult(*msg, false));
       });
-    right_tcp_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+    right_tcp_pose_sub_ = createMotionSubscription<geometry_msgs::msg::PoseStamped>(
       "~/right_arm/tcp_pose_command", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         publishResult("right_arm/tcp_pose_command", commander_->moveRightTcpPoseResult(*msg, false));
       });
-    both_tcp_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(
+    both_tcp_pose_sub_ = createMotionSubscription<geometry_msgs::msg::PoseArray>(
       "~/both_arms/tcp_pose_command", 10,
       [this](const geometry_msgs::msg::PoseArray::SharedPtr msg) {
         if (msg->poses.size() != 2) {
@@ -135,13 +197,13 @@ public:
           "both_arms/tcp_pose_command",
           commander_->moveBothTcpPosesResult(targets.first, targets.second));
       });
-    left_cartesian_tcp_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+    left_cartesian_tcp_sub_ = createMotionSubscription<geometry_msgs::msg::PoseStamped>(
       "~/left_arm/cartesian_tcp_pose_command", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         publishResult(
           "left_arm/cartesian_tcp_pose_command", commander_->moveLeftTcpPoseResult(*msg, true));
       });
-    right_cartesian_tcp_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+    right_cartesian_tcp_sub_ = createMotionSubscription<geometry_msgs::msg::PoseStamped>(
       "~/right_arm/cartesian_tcp_pose_command", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         publishResult(
@@ -165,17 +227,17 @@ public:
       "torso_head/named_target",
       [this](const std::string & name) {return commander_->moveTorsoHeadNamedResult(name);});
 
-    left_gripper_sub_ = node_->create_subscription<std_msgs::msg::Float64>(
+    left_gripper_sub_ = createMotionSubscription<std_msgs::msg::Float64>(
       "~/left_gripper/command", 10,
       [this](const std_msgs::msg::Float64::SharedPtr msg) {
         publishResult("left_gripper/command", commander_->moveLeftGripperResult(msg->data));
       });
-    right_gripper_sub_ = node_->create_subscription<std_msgs::msg::Float64>(
+    right_gripper_sub_ = createMotionSubscription<std_msgs::msg::Float64>(
       "~/right_gripper/command", 10,
       [this](const std_msgs::msg::Float64::SharedPtr msg) {
         publishResult("right_gripper/command", commander_->moveRightGripperResult(msg->data));
       });
-    both_grippers_sub_ = node_->create_subscription<std_msgs::msg::Float64MultiArray>(
+    both_grippers_sub_ = createMotionSubscription<std_msgs::msg::Float64MultiArray>(
       "~/both_grippers/command", 10,
       [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
         if (msg->data.size() != 2) {
@@ -191,7 +253,7 @@ public:
           commander_->moveBothGrippersResult(msg->data[0], msg->data[1]));
       });
 
-    gripper_named_sub_ = node_->create_subscription<std_msgs::msg::String>(
+    gripper_named_sub_ = createMotionSubscription<std_msgs::msg::String>(
       "~/grippers/named_command", 10,
       [this](const std_msgs::msg::String::SharedPtr msg) {
         Result result;
@@ -231,6 +293,15 @@ public:
   }
 
 private:
+  template<typename MessageT, typename CallbackT>
+  typename rclcpp::Subscription<MessageT>::SharedPtr createMotionSubscription(
+    const std::string & topic, std::size_t depth, CallbackT && callback)
+  {
+    rclcpp::SubscriptionOptions options;
+    options.callback_group = motion_callback_group_;
+    return node_->create_subscription<MessageT>(topic, depth,
+      std::forward<CallbackT>(callback), options);
+  }
   using NamedCallback = std::function<Result(const std::string &)>;
 
   static std::pair<geometry_msgs::msg::PoseStamped, geometry_msgs::msg::PoseStamped>
@@ -250,7 +321,7 @@ private:
     const std::string & command,
     NamedCallback callback)
   {
-    return node_->create_subscription<std_msgs::msg::String>(
+    return createMotionSubscription<std_msgs::msg::String>(
       topic, 10,
       [this, command, callback = std::move(callback)](
         const std_msgs::msg::String::SharedPtr msg) {
@@ -279,6 +350,11 @@ private:
   }
 
   rclcpp::Node::SharedPtr node_;
+  rclcpp::CallbackGroup::SharedPtr frames_callback_group_;
+  rclcpp::CallbackGroup::SharedPtr motion_callback_group_;
+  rclcpp::Service<zhishu_robot_interfaces::srv::CoordinateFrames>::SharedPtr frames_service_;
+  rclcpp::Service<zhishu_robot_interfaces::srv::MoveCartesian>::SharedPtr framed_motion_service_;
+  rclcpp::Service<zhishu_robot_interfaces::srv::MoveAbsJ>::SharedPtr abs_joint_service_;
   std::shared_ptr<Commander> commander_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
   rclcpp::Publisher<zhishu_robot_interfaces::msg::CommanderStatus>::SharedPtr
@@ -335,6 +411,8 @@ int main(int argc, char ** argv)
       node, "commander.left_tcp_link", "left_gripper_tcp");
     options.right_tcp_link = zhishu_robot_commander_cpp::getOrDeclareParameter<std::string>(
       node, "commander.right_tcp_link", "right_gripper_tcp");
+    options.coordinate_frames_file = zhishu_robot_commander_cpp::getOrDeclareParameter<std::string>(
+      node, "commander.coordinate_frames_file", "");
     options.velocity_scaling = zhishu_robot_commander_cpp::getOrDeclareParameter<double>(
       node, "commander.velocity_scaling", 0.30);
     options.acceleration_scaling = zhishu_robot_commander_cpp::getOrDeclareParameter<double>(
