@@ -27,6 +27,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(ros_gz_interfaces REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
+find_package(geometric_shapes REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
@@ -118,7 +119,9 @@ target_include_directories(pallet_bin_15kg_transfer BEFORE PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
+target_compile_features(pallet_bin_15kg_transfer PRIVATE cxx_std_17)
 ament_target_dependencies(pallet_bin_15kg_transfer
+  geometric_shapes
   rclcpp_action
   sensor_msgs
   ros_gz_interfaces
@@ -166,5 +169,22 @@ install (
   DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_column_clearance test/test_column_clearance.cpp)
+  target_include_directories(test_column_clearance PRIVATE include)
+  ament_target_dependencies(test_column_clearance moveit_core)
+  ament_add_gtest(test_process_admittance test/test_process_admittance.cpp)
+  target_include_directories(test_process_admittance PRIVATE include)
+  target_compile_features(test_process_admittance PRIVATE cxx_std_17)
+  ament_add_gtest(test_floor_admittance test/test_floor_admittance.cpp)
+  target_include_directories(test_floor_admittance PRIVATE include)
+  target_compile_features(test_floor_admittance PRIVATE cxx_std_17)
+  ament_add_gtest(test_cartesian_microstep test/test_cartesian_microstep.cpp)
+  target_include_directories(test_cartesian_microstep BEFORE PRIVATE compat_include include)
+  target_compile_features(test_cartesian_microstep PRIVATE cxx_std_17)
+  ament_target_dependencies(test_cartesian_microstep moveit_core moveit_ros_planning moveit_task_constructor_core)
+endif()
 
 ament_package()

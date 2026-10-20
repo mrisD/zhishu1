@@ -1,0 +1,11 @@
+# 成功接近轨迹优先复用
+
+用户要求将通过的候选作为默认，并对后续同类情况复用。当前九箱运行的第三次empty approach候选没有保存CDR，局部MTC任务退出后无法从文字日志重建，不能声称已经恢复原轨迹。
+
+实现位于pallet_bin_15kg_transfer.cpp的approachCacheContext、loadPreferredApproach、savePreferredApproach和planAndMaybeExecute。只对全流程导纳的empty long-finger coordinated approach启用。成功执行后，轨迹和适用上下文以单文件bundle原子保存，默认目录output/pallet_safe_approach_cache，按箱号区分；设置safe_approach_cache_dir为空可禁用。
+
+命中要求版本、实测目标、底盘位姿、模型/配置参数、当前世界及ACM严格一致，起点关节另以25微米（移动关节）或0.0005弧度（旋转关节）检查。缓存读取失败或条件不匹配，只能在执行前回退正常规划。采用当前规划场景重查完整插值的环境碰撞、关节界限、工具自碰撞与200mm桌边要求；后续仍使用导纳反馈及速度/力/力矩保护。任何缓存执行失败直接停止，禁止回退重放运动。
+
+输入还拒绝非空attached、未知/重复关节、非有限位置、无效时间、无实际轨迹和多自由度轨迹。版本上下文和原子bundle防止不同代轨迹/上下文混用。
+
+精确场景比较有意保守，微小数值变化可能导致不命中。只有出现PREFERRED_APPROACH_USING_VALIDATED_DEFAULT日志才能证明实际复用；PREFERRED_APPROACH_SAVED只代表保存。没有在运行中的完整九箱验证里替换控制二进制：本次为独立构建审核，缓存命中与真实执行还需后续启动验证，不能把它算作当前九箱已使用的功能。

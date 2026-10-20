@@ -140,6 +140,53 @@ Gazebo 测试中，箱体实际抬升 `0.1985 m`，最大横向偏移 `0.00057 m
 
 ## 箱体共同运动命令
 
+### 复用九箱场景，仅测试首箱
+
+九箱场景的目标为 `pallet_box_r0_c0`，不是单箱世界的 `carry_box`。
+先用 `pallet_bin_15kg_transfer.launch.py` 的 `admittance_handoff:=true`、
+`full_transfer_box_index:=0`、`validate_all_nine:=false`、
+`keep_all_source_rows:=true` 完成首箱抓持。看到 `ADMITTANCE_HANDOFF_READY`
+后，MTC 不再执行底盘搬运和放置。整个过程保留其余八箱。
+
+所有命令必须使用场景相同的 `ROS_DOMAIN_ID` 和 `GZ_PARTITION`。
+九箱世界需加载 `gz-sim-forcetorque-system`，并确认两个腕部力话题有数据。
+可在已经运行的世界加载：
+
+```bash
+gz service -s /world/pallet_bin_15kg/entity/system/add \
+  --reqtype gz.msgs.EntityPlugin_V --reptype gz.msgs.Boolean --timeout 5000 \
+  --req 'plugins { name: "gz::sim::systems::ForceTorque" filename: "gz-sim-forcetorque-system" }'
+ros2 launch zhishu_robot_admittance pallet_first_box_admittance.launch.py
+```
+
+导纳节点默认禁用。待 MTC 已停止、首箱抓稳后，加载并配置左右臂控制器，
+严格切换 `dual_arm_controller` 到 `left_arm_controller` 和
+`right_arm_controller`，再将两侧 Servo 的 `switch_command_type` 设为 1。
+不要同时激活双臂轨迹控制器和两个单臂控制器。
+
+仅双臂、50 mm、5 mm/s 的竖直导纳测试：
+
+```bash
+ros2 run zhishu_robot_admittance run_admittance_validation --ros-args \
+  -p world_name:=pallet_bin_15kg -p model_name:=pallet_box_r0_c0 \
+  -p linear_distance_m:=0.050 -p arm_linear_distance_m:=0.050 \
+  -p linear_speed_mps:=0.005 -p linear_axis:=z \
+  -p stop_on_measured_distance:=true -p linear_distance_tolerance_m:=0.002 \
+  -p output_path:=/tmp/pallet_first_box_admittance.json
+```
+
+验收测量真实 Gazebo 箱体位移、横向偏差、姿态、TCP 间距与停止漂移。
+这段测试不执行第二个箱子，也不代表完成到收料箱的全程搬运。
+
+自动完成交接和导纳验收可运行工作区脚本
+`scripts/test_pallet_first_box_admittance.py --scene-log <场景日志> --output-dir <结果目录>`。
+它等待首箱的 `ADMITTANCE_HANDOFF_READY`，加载双 Servo、严格切换控制器，
+执行仅双臂导纳抬升，请求 50 mm、参考速度 5 mm/s，根据箱体实测位移停止，
+按 ±2 mm 验收，保留 Servo 的奇异性、限位和碰撞保护。
+验收结束后禁用导纳，保留 Gazebo 场景和导纳节点。仿真服务与 `gz sim -g`
+显示窗口应分开启动，避免显示窗口退出影响仿真。仿真计时使用 `/clock`，
+允许低于实时速度运行；连续 5 秒没有时钟进展才按仿真停止退出。
+
 参考速度必须使用 `base_link` 坐标系。下面命令让箱体以 `0.015 m/s` 向上运动；
 停止发布 0.25 秒后，参考速度会自动归零：
 
@@ -169,6 +216,51 @@ ros2 service call /dual_arm_admittance/enable std_srvs/srv/SetBool "{data: false
 
 ## 参数调整
 
+### 只用腕部六维力估测箱底反作用力
+
+首箱放置默认使用大箱中心 `bin_target_x:=1.03`、Y=`-1.55 m`。
+底盘停靠 X 同步调整为 `bin_target_x - 0.48`，保持经过验证的相对抓取距离，
+避免仅移动放置目标导致腕关节达到限位。居中目标对应停靠 X=`0.55 m`。
+
+可用 `scripts/record_pallet_wrist_forces.py --scene-log <场景日志> --output-dir <记录目录>`
+连续保存两腕原始六维数据。控制器同时在持箱、插入完成、承重转移、支撑确认、
+开始松爪（夹爪位置首次小于 0.04 m）及接近全开（两侧均小于 0.001 m）输出
+`WRIST_FT_STAGE`，包含两腕采样时间、六维读数、夹爪位置和估测支撑力。
+导出的 `key_stage_forces.csv` 力单位为 N、力矩为 N·m，数值位于各自传感器
+局部坐标系，不能直接把左右原始 Fz 或力模长相加来当作箱重。
+
+九箱世界不再包含 `tote_bottom_contact` 箱体接触测力传感器。
+`estimate_bottom_reaction` 将两腕测得的三轴力旋转到世界坐标系，补偿
+两侧夹爪总计 0.56 kg 的自重，按低速准静态力平衡计算：
+
+```text
+N_est = (m_box + m_tools) * g + F_left_world_z + F_right_world_z
+```
+
+Gazebo 腕部传感器报告负载对手腕的力，不能把两个力的模长相加。
+默认箱重 15 kg、每侧工具 0.28 kg；悬空静止时 `N_est ≈ 0 N`，
+箱体完全受支撑且夹爪卸载时约为 `147.15 N`。
+该估计器独立于导纳去皮，**不能在持箱时去皮后再估计绝对支撑力**。
+它检查六轴数据有限性、两腕同步、TF 和底盘姿态新鲜度，并以 2 Hz 低通滤波。
+输出 `/pallet_bin/estimated_bottom_reaction` 的 `force.z`，坐标系为 `world`；
+其他分量不表示已估计出接触力矩。
+
+`pallet_bin_15kg_transfer.launch.py` 的新场景自动启动估计器。复用已有场景时可单独启动：
+
+```bash
+ros2 run zhishu_robot_admittance estimate_bottom_reaction --ros-args -p use_sim_time:=true
+```
+
+`seatToteOnBinFloor` 使用这个估计，近底板阶段按虚拟阻尼
+`D*v = 147.15 - N_est` 生成下压微步，单步不超过 0.25 mm。
+放爪前要求支撑至少 90% 箱重、估计新鲜，并同时满足底部高度、平放姿态和
+闭爪检查。原始接触力话题不参与控制。
+
+这是准静态估计：加速阶段的惯性力可能产生短暂负值；不做非负截断来掩盖这些误差。
+腕力本身只能给出环境总竖直支撑，结合底板几何与碰撞余量推断箱底支撑，
+不能独立分辨侧壁摩擦与底板法向力。模型质量和传感器符号必须与实际系统一致。
+验收时加 `-p require_reaction_estimate:=true` 可要求估计流持续有效，并记录估计范围。
+
 参数文件为 `config/admittance.yaml`：
 
 - `mass`：虚拟质量，越大响应越慢；
@@ -186,3 +278,54 @@ ros2 service call /dual_arm_admittance/enable std_srvs/srv/SetBool "{data: false
 
 真实机械臂第一次使用时应从较大的虚拟质量、阻尼和较低速度上限开始。必须保留
 急停、关节限位、碰撞检测和传感器超时保护；不要在未夹稳箱体时启用导纳运动。
+
+### 居中放箱的桌面接触修正（2026-10-16）
+
+目的地桌子规划模型与 Gazebo 一致：桌面加四条桌腿，不再使用桌面下方的实心体。
+`destination_table` 对全机器人恢复碰撞检查，包含腰部。居中停靠前协调抬腰到至少
+0.28 m，放置阶段保持该高度，避免升降连杆下沿压在 0.55 m 桌面上。
+`recover_table_clearance:=true` 仅用于已经检查过的 0.24–0.28 m 腰部接触状态：
+保持实际左右 TCP 位姿、闭爪和底盘位置，单调向上脱离到 0.28 m，随后恢复腰部与桌面检查。
+底部导纳微调使用当前 FK 姿态仅作竖直平移，不重建名义抓取姿态。
+
+复用现场时必须使用与现场一致的夹指长度；本次九箱场景为
+`tote_finger_length:=0.36`，不能沿用通用 launch 的 0.20 m 默认值。
+现场恢复完成后箱子中心误差 0.735 mm，完整状态碰撞检查通过，腰部桌面间隙约
+30.56 mm。松爪前估测反作用 243.26 N，仍有约 96.11 N 向下预载；松爪后为
+147.15 N。尚需优化预载；不要通过提高 300 N 上限掩盖冲击。
+完整恢复读数与限制见 `output/pallet_center_wrist_20261016/table_clearance/report.md`。
+进桌前预防逻辑编译通过，但尚未从托盘起点完整重跑。
+
+### 首箱完整流程：必须先侧拉
+
+一键测试保留九个物理箱子，只操作第一个：**右手侧拉约 120 mm → 重新定位 →
+双手抓取抬升 → 搬运至大箱正中间 → 腕力导纳落座 → 卸夹紧预载 → 验证承重 → 松爪回撤**。
+
+```bash
+cd /home/dky666/zhul/codex_guohua_ws
+python3 scripts/run_pallet_first_box_wrist_placement.py \
+  --output-dir output/first_box_wrist_placement_new --domain-id 182
+```
+
+该脚本生成新场景，统一 360 mm 夹指和 300 mm TCP 偏置，使用工作区已有的
+Gazebo 控制兼容 overlay，并打开 Gazebo 窗口。结束后场景保持打开，Ctrl+C 关闭。
+`--output-dir` 必须为尚不存在的目录；并行场景应选择不同 `--domain-id`。
+
+落座现在使用**双向**竖直导纳：支撑不足时向下微调，压力过大时向上卸力；
+接触附近单步最多 50 µm。检测底板接触后先将夹爪从受载夹紧位置小幅退至
+0.053 m，完成卸预载。只有支撑估计位于箱重的 90%–110%（132.435–161.865 N）、
+箱心距底板目标不超过 1.5 mm、倾斜不超过 0.5°、反馈新鲜且稳定后才允许完全松爪。
+保留原有 [-30, 300] N 力保护，不提高上限。
+
+运动前核对规划 TCP 与现场 TF，尺寸不匹配时停止。独立桌面监测不依赖规划的
+碰撞放行矩阵，使用实测底盘姿态和全部机器人碰撞几何核对桌面、四条桌腿。
+数据包括 `wrist_force_trace.jsonl`、`key_stage_forces.csv` 和 `table_clearance_summary.json`。
+完整场景可用 `scripts/finalize_pallet_first_box_wrist_placement.py --output-dir <目录>`
+在相同 `GZ_PARTITION` 环境下核对实际九箱位姿和释放顺序。
+
+微步执行还需要避免时间参数化过滤：落箱专用 TOTG 的 `min_angle_change` 使用
+`1e-9 rad`，保留几十微米对应的关节变化；默认 `0.001 rad` 会把这类轨迹缩为单点。
+局部数值逆解核对 TCP 残差不超过 0.1 µm，专项测试覆盖 25 µm 下移、向上卸力、
+2 mm 自由下降及微小关节轨迹保留。程序拒绝没有实际运动段的落箱轨迹。
+导纳位置参考在世界坐标中累积，避免受载跟踪误差抵消每次小步；累计指令压入量
+限制在预计底板位置以下最多 0.5 mm，腕力估计过期则保持闭爪停止。

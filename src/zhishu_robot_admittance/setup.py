@@ -25,6 +25,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
+            "estimate_bottom_reaction = zhishu_robot_admittance.reaction_estimator:main",
             "dual_arm_admittance_controller = "
             "zhishu_robot_admittance.admittance_controller:main",
             "activate_admittance_controllers = "

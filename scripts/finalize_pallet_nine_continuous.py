@@ -25,10 +25,10 @@ def main():
         raise RuntimeError('Nine transfers did not complete in the requested order')
     if not sequence['single_continuous_scene'] or sequence['scene_restarts'] != 0 or sequence['recording_restarts'] != 0 or sequence['resumed'] or sequence['stitched']:
         raise RuntimeError('Recording is not a single uninterrupted execution')
-    if not recording['passed'] or recording['initial_completed_transfers'] != 0 or recording['recorded_completed_transfers'] != 9 or not recording['clean_video']:
-        raise RuntimeError('Recording lacks nine newly completed transfers or clean pixels')
-    if (recording['video_width'], recording['video_height']) != (960,540):
-        raise RuntimeError('Recording dimensions contain unexpected caption bars')
+    if not recording['passed'] or recording['initial_completed_transfers'] != 0 or recording['recorded_completed_transfers'] != 9 or recording['clean_video']:
+        raise RuntimeError('Recording lacks nine newly completed transfers or live telemetry overlay')
+    if (recording['video_width'], recording['video_height']) != (960,650):
+        raise RuntimeError('Recording dimensions do not contain the requested telemetry overlay')
     if recording['fps'] != 30 or recording.get('sampling_time') != 'simulation':
         raise RuntimeError('Expected 30 fps output sampled by simulation timestamps')
     scene_log = (source / 'scene.log').read_text()
@@ -45,7 +45,8 @@ def main():
     boxes = []
     for cycle, index in enumerate(ORDER):
         log = (source / f'box_{index}.log').read_text()
-        for required in ('Complete transfer finished', 'Floor support verified BEFORE opening',
+        for required in ('Complete transfer finished', 'Floor seating step 1:',
+                         'Floor support verified BEFORE opening using wrist F/T estimate',
                          'Physical large-bin placement verified', 'return both arms home: execution completed'):
             if required not in log:
                 raise RuntimeError(f'Box {index} lacks {required}')
@@ -58,7 +59,9 @@ def main():
         if not clearance or min(clearance) < 0.003 - 1e-6:
             raise RuntimeError(f'Box {index} lacks accepted body-clearance evidence')
         floor = re.search(r'Floor support verified BEFORE opening: z=([\d.]+) tilt=([\d.]+) deg reaction=([\d.]+) N',log)
+        admittance_steps = len(re.findall(r'Floor seating step \d+:', log))
         boxes.append({'index':index, 'target':f'pallet_box_r{index//3}_c{index%3}',
+                      'wrist_force_admittance_verified':True, 'floor_admittance_steps':admittance_steps,
                       'empty_return_verified':returned, 'minimum_planned_tool_body_clearance_m':min(clearance),
                       'floor_before_open':dict(zip(('box_center_z_m','tilt_deg','reaction_n'),map(float,floor.groups())))})
     out.mkdir(parents=True, exist_ok=False)
@@ -75,13 +78,14 @@ def main():
         videos.append(video)
     result = {'passed':True, 'source':str(source), 'order':ORDER, 'row_order':['第一排','第三排','中间排'],
               'single_continuous_scene':True, 'resumed':False, 'stitched':False, 'caption_cards':False,
+              'telemetry_overlay':True,
               'all_nine_initially_physical':True, 'newly_recorded_transfers':9, 'boxes':boxes, 'videos':videos,
               'receiving_bin_clearance':sequence['receiving_bin_clearance']}
     (out/'validation_result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     rows = '\n'.join(f"| {b['target']} | {b['minimum_planned_tool_body_clearance_m']*1000:.1f} mm | {b['floor_before_open']['reaction_n']:.1f} N |" for b in boxes)
-    readme = f'''# 九箱连续搬运纯画面录像
+    readme = f'''# 九箱连续搬运与实时传感器数据录像
 
-顺序：第一排 → 第三排 → 中间排。单个 Gazebo场景、单个录制器，从九箱初始状态完整运行；无续录、无源箱/机器人重建、无视频拼接、无黑色说明画面或字幕栏。
+顺序：第一排 → 第三排 → 中间排。单个 Gazebo场景、单个录制器，从九箱初始状态完整运行；无续录、无源箱/机器人重建、无视频拼接。画面下方实时显示腰部俯仰角、升降台高度、左右腕部力模长及 XYZ 分量。
 
 - [8倍速视频]({out}/nine_boxes_continuous_clean_8x.mp4)
 - [原速视频]({out}/nine_boxes_continuous_clean_original.mp4)

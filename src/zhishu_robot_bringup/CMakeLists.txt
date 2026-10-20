@@ -8,12 +8,13 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 install(
-  DIRECTORY scripts launch 
+  DIRECTORY scripts launch config
   DESTINATION share/${PROJECT_NAME}
 )
 
 install(
   PROGRAMS
+    scripts/rviz_with_fixes.sh
     scripts/reset_left_arm_fault.sh
     scripts/reset_right_arm_fault.sh
     scripts/reset_dual_arms_fault.sh

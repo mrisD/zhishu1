@@ -9,7 +9,6 @@
 #include <geometry_msgs/msg/wrench_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
-#include <ros_gz_interfaces/msg/contacts.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 #include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 
@@ -34,10 +33,19 @@
 #include <tf2/utils.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include "zhishu_robot_mtc_pick_place/floor_admittance.hpp"
+#include "zhishu_robot_mtc_pick_place/process_admittance.hpp"
+#include "zhishu_robot_mtc_pick_place/cartesian_microstep.hpp"
 
 #include <Eigen/Geometry>
+#include <geometric_shapes/shape_operations.h>
+#include "zhishu_robot_mtc_pick_place/column_clearance.hpp"
 
 #include <future>
+#include <fstream>
+#include <iomanip>
+#include <rclcpp/serialization.hpp>
 #include <algorithm>
 #include <atomic>
 #include <array>
@@ -110,7 +118,11 @@ public:
 
     declare_if_missing("execute", true);
     declare_if_missing("resume_after_pick", false);
+    declare_if_missing("admittance_handoff", false);
+    declare_if_missing("process_admittance", false);
+    declare_if_missing("process_debug_dir", std::string{});
     declare_if_missing("resume_floor_seating", false);
+    declare_if_missing("recover_table_clearance", false);
     declare_if_missing("validate_all_nine", false);
     declare_if_missing("full_transfer_box_index", 0);
     declare_if_missing("cleared_first_row_count", 0);
@@ -188,6 +200,8 @@ public:
     declare_if_missing("base_max_angular", 0.45);
     declare_if_missing("empty_base_max_linear", 0.0);
     declare_if_missing("empty_base_max_angular", 0.0);
+    declare_if_missing("empty_base_linear_acceleration", 0.0);
+    declare_if_missing("empty_base_angular_acceleration", 0.0);
     declare_if_missing("base_linear_acceleration", 0.30);
     declare_if_missing("base_angular_acceleration", 0.60);
     declare_if_missing("base_position_tolerance", 0.004);
@@ -210,7 +224,9 @@ public:
     declare_if_missing("carry_waist_pitch", -0.10);
     declare_if_missing("carry_center_height", 0.96);
     declare_if_missing("place_waist_lift", 0.14);
-    declare_if_missing("place_waist_pitch", -0.20);
+    declare_if_missing("place_waist_pitch", -0.70);
+    declare_if_missing("place_floor_waist_pitch", -0.80);
+    declare_if_missing("place_carry_reach", 0.65);
     declare_if_missing("waist_motion_seconds", 2.5);
 
     declare_if_missing("handle_half_span", 0.195);
@@ -225,10 +241,10 @@ public:
     declare_if_missing("carry_lift", 0.10);
     declare_if_missing("hold_seconds", 3.0);
     declare_if_missing("place_approach_clearance", 0.30);
-    declare_if_missing("place_center_height", 0.96);
+    declare_if_missing("place_center_height", 0.956);
     declare_if_missing("source_release_drop", 0.010);
     declare_if_missing("bin_release_drop", 0.050);
-    declare_if_missing("place_on_floor_before_release", false);
+    declare_if_missing("place_on_floor_before_release", true);
 
     declare_if_missing("left_tcp_roll", -1.57079632679);
     declare_if_missing("left_tcp_pitch", 0.0);
@@ -241,12 +257,18 @@ public:
     // physical handle span (the default remains centred).
     declare_if_missing("grasp_x_offset", 0.0);
     declare_if_missing("place_grasp_x_offset", 0.0);
-    declare_if_missing("bin_target_x", 0.98);
+    declare_if_missing("bin_target_x", 1.03);
+    declare_if_missing("bin_dock_x", 0.345);
+    declare_if_missing("column_clearance_check_only", false);
+    declare_if_missing("placement_ik_sweep", false);
+    declare_if_missing("column_table_clearance", 0.200);
+    declare_if_missing("column_table_margin", 0.005);
     declare_if_missing("swap_arm_grasps", false);
     declare_if_missing("dual_ik_attempts", 100);
     declare_if_missing("dual_ik_timeout", 0.50);
 
     cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+    process_arm_pub_ = create_publisher<trajectory_msgs::msg::JointTrajectory>("/dual_arm_controller/joint_trajectory",10);
     body_pub_ = create_publisher<trajectory_msgs::msg::JointTrajectory>(
       "/body_posture_controller/joint_trajectory", 10);
 
@@ -257,6 +279,11 @@ public:
         odom_pose_.x = msg->pose.pose.position.x;
         odom_pose_.y = msg->pose.pose.position.y;
         odom_pose_.yaw = tf2::getYaw(msg->pose.pose.orientation);
+        odom_transform_.translation() = Eigen::Vector3d(
+          msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z);
+        const auto& q = msg->pose.pose.orientation;
+        odom_transform_.linear() = Eigen::Quaterniond(q.w, q.x, q.y, q.z).normalized().toRotationMatrix();
+        odom_received_ = std::chrono::steady_clock::now();
         odom_ready_ = true;
       });
     base_pose_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -285,12 +312,29 @@ public:
           if (msg->name[i] == "gripper_left_finger_joint") measured_grippers_[1] = msg->position[i];
         }
         waist_received_ = std::chrono::steady_clock::now();
+        if (floor_support_verified_ && !release_started_ &&
+            std::min(measured_grippers_[0], measured_grippers_[1]) < 0.04) {
+          release_started_ = true;
+          logWristDetailsLocked("release_start");
+        }
+        if (release_started_ && !release_fully_open_ &&
+            std::max(measured_grippers_[0], measured_grippers_[1]) < 0.001) {
+          release_fully_open_ = true;
+          logWristDetailsLocked("fully_open");
+        }
       });
 
+    if(get_parameter("process_admittance").as_bool() && !get_parameter("process_debug_dir").as_string().empty()) {
+      wrist_trace_.open(get_parameter("process_debug_dir").as_string()+"/wrist_trace_box_"+
+        std::to_string(get_parameter("full_transfer_box_index").as_int())+".csv");
+      wrist_trace_<<"time,stage,left_stamp,right_stamp,left_fx,left_fy,left_fz,left_tx,left_ty,left_tz,right_fx,right_fy,right_fz,right_tx,right_ty,right_tz,left_norm,right_norm,bottom_reaction,left_jaw,right_jaw\n";
+      wrist_trace_<<std::setprecision(12);
+    }
     left_wrench_sub_ = create_subscription<geometry_msgs::msg::WrenchStamped>(
       "/left_wrist_ft", 50,
       [this](const geometry_msgs::msg::WrenchStamped::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(data_mutex_);
+        left_wrench_message_ = *msg;
         left_force_norm_ = forceNorm(*msg);
         left_force_ready_ = true;
       });
@@ -298,8 +342,23 @@ public:
       "/right_wrist_ft", 50,
       [this](const geometry_msgs::msg::WrenchStamped::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(data_mutex_);
+        right_wrench_message_ = *msg;
         right_force_norm_ = forceNorm(*msg);
         right_force_ready_ = true;
+        if(wrist_trace_.is_open() && left_force_ready_) {
+          const double time=rclcpp::Time(msg->header.stamp).seconds();
+          if(time-wrist_trace_last_>=.02) {
+            wrist_trace_<<time<<","<<process_stage_<<","<<rclcpp::Time(left_wrench_message_.header.stamp).seconds()<<","<<time;
+            for(const auto* sample:{&left_wrench_message_,&right_wrench_message_}) {
+              const auto& w=sample->wrench;
+              wrist_trace_<<","<<w.force.x<<","<<w.force.y<<","<<w.force.z<<","<<w.torque.x<<","<<w.torque.y<<","<<w.torque.z;
+            }
+            wrist_trace_<<","<<left_force_norm_<<","<<right_force_norm_<<","<<estimated_bottom_reaction_
+              <<","<<measured_grippers_[0]<<","<<measured_grippers_[1]<<"\n";
+            wrist_trace_last_=time;
+            if(++wrist_trace_rows_%50==0) wrist_trace_.flush();
+          }
+        }
       });
 
     target_pose_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -329,32 +388,15 @@ public:
         measured_boxes_received_["pallet_box_r" + std::to_string(get_parameter("full_transfer_box_index").as_int() / 3) + "_c" + std::to_string(get_parameter("full_transfer_box_index").as_int() % 3)] = std::chrono::steady_clock::now();
       });
 
-    floor_contacts_sub_ = create_subscription<ros_gz_interfaces::msg::Contacts>(
-      "/pallet_bin/tote_bottom_contacts", 10,
-      [this](const ros_gz_interfaces::msg::Contacts::SharedPtr msg) {
-        bool active = false;
-        double force = 0.0;
-        for (const auto& contact : msg->contacts) {
-          const auto& a = contact.collision1.name;
-          const auto& b = contact.collision2.name;
-          const auto tote_bottom = [this](const std::string& name) {
-            return name.find("pallet_box_r" + std::to_string(get_parameter("full_transfer_box_index").as_int() / 3) + "_c" + std::to_string(get_parameter("full_transfer_box_index").as_int() % 3)) != std::string::npos &&
-                   name.find("bottom") != std::string::npos;
-          };
-          const auto bin_bottom = [](const std::string& name) {
-            return name.find("large_bin") != std::string::npos &&
-                   name.find("bottom") != std::string::npos;
-          };
-          if ((tote_bottom(a) && bin_bottom(b)) || (tote_bottom(b) && bin_bottom(a))) {
-            active = true;
-            for (const auto& wrench : contact.wrenches)
-              force += std::abs(wrench.body_1_wrench.force.z);
-          }
-        }
+    estimated_reaction_sub_ = create_subscription<geometry_msgs::msg::WrenchStamped>(
+      "/pallet_bin/estimated_bottom_reaction", 10,
+      [this](const geometry_msgs::msg::WrenchStamped::SharedPtr msg) {
+        const double force = msg->wrench.force.z;
+        if (msg->header.frame_id != "world" || !std::isfinite(force)) return;
         std::lock_guard<std::mutex> lock(data_mutex_);
-        floor_contact_active_ = active;
-        floor_contact_force_ = force;
-        floor_contact_received_ = std::chrono::steady_clock::now();
+        estimated_bottom_reaction_ = force;
+        reaction_estimate_ready_ = true;
+        reaction_estimate_received_ = std::chrono::steady_clock::now();
       });
 
     // Coordinates are derived from baifang.stp using:
@@ -373,6 +415,15 @@ public:
 
   void run()
   {
+    if (get_parameter("column_table_clearance").as_double() < 0.200 ||
+        get_parameter("column_table_margin").as_double() < 0.0)
+      throw std::runtime_error("Column/table horizontal clearance must be at least 200 mm");
+    mtc::Task geometry_task;
+    geometry_task.loadRobotModel(shared_from_this());
+    initializeColumnGeometry(geometry_task.getRobotModel());
+    model_tf_ = std::make_unique<tf2_ros::Buffer>(get_clock());
+    model_tf_->setUsingDedicatedThread(true);  // main spinner populates TF while run() plans
+    model_tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*model_tf_, shared_from_this(), false);
     const bool resume_after_pick = get_parameter("resume_after_pick").as_bool();
     if (get_parameter("resume_floor_seating").as_bool() &&
         (!resume_after_pick || !get_parameter("place_on_floor_before_release").as_bool()))
@@ -398,7 +449,38 @@ public:
     }
     waitForOdom();
     waitForCurrentRobotState();
+    if (get_parameter("placement_ik_sweep").as_bool()) {
+      runPlacementSweep();
+      return;
+    }
     addEnvironmentToPlanningScene();
+
+    if (get_parameter("column_clearance_check_only").as_bool()) {
+      if (std::max(measured_grippers_[0], measured_grippers_[1]) > 0.001)
+        throw std::runtime_error("Clearance-only check requires empty open grippers");
+      if (!goToBinDock()) throw std::runtime_error("Clearance-only check: protected docking failed");
+      for (const double pitch : {-0.10, -0.20}) {
+        setWaist(0.28, pitch);
+        const auto state = measuredColumnState();
+        const auto world = measuredWorldBase();
+        if (!columnClear(state, world, true)) throw std::runtime_error("Measured clearance check failed");
+        for (const auto& item : column_points_)
+          RCLCPP_INFO(get_logger(), "COLUMN_CLEARANCE_MEASURED pitch=%.3f link=%s horizontal_lower_bound=%.6f m",
+            pitch, item.first.c_str(), pallet_placement::horizontalTableGap(item.second,
+              world * state.getGlobalLinkTransform(item.first)));
+      }
+      RCLCPP_INFO(get_logger(), "COLUMN_CLEARANCE_CHECK_SUCCESS: empty robot only; no box was moved");
+      return;
+    }
+
+    if (get_parameter("full_transfer_box_index").as_int() >= 0 &&
+        !get_parameter("navigation_check_only").as_bool() &&
+        !get_parameter("return_empty_only").as_bool() &&
+        !get_parameter("side_push_execute").as_bool() &&
+        !get_parameter("front_pull_execute").as_bool() &&
+        !get_parameter("admittance_handoff").as_bool() &&
+        get_parameter("execute").as_bool() && !resume_after_pick)
+      checkPlacementReach();
 
     if (get_parameter("navigation_check_only").as_bool()) {
       if (!goToBinDock()) throw std::runtime_error("Navigation check: bin approach failed");
@@ -461,7 +543,7 @@ public:
             geometry_msgs::msg::Twist cmd;
             cmd.linear.x = clamp(1.8 * (dx * std::cos(base.yaw) + dy * std::sin(base.yaw)), -0.08, 0.08);
             cmd.angular.z = clamp(2.0 * normalizeAngle(dock.yaw - base.yaw), -0.12, 0.12);
-            cmd_vel_pub_->publish(cmd);
+            publishGuardedBaseCommand(cmd);
           } catch (const std::exception&) {}
           rate.sleep();
         }
@@ -620,6 +702,7 @@ public:
           throw std::runtime_error("Return recovery requires open jaws and seated destination tote");
       }
       returnEmptyToPallet();
+      finalizeWristTrace();
       RCLCPP_INFO(get_logger(), "Complete transfer finished: empty-return recovery after previously verified physical placement");
       return;
     }
@@ -662,8 +745,15 @@ public:
         throw std::runtime_error("Failed to dock for perimeter pre-extraction");
       }
       addEnvironmentToPlanningScene();
-      if (get_parameter("strict_tool_body_guard").as_bool() || get_parameter("rear_side_pull").as_bool() ||
-          ((box.row == 0 || box.row == get_parameter("source_row_only").as_int()) && box.col > 0)) {
+      const bool lateral_front_column =
+        (box.row == 0 || box.row == get_parameter("source_row_only").as_int()) && box.col > 0;
+      // At the rear dock the untouched tote is laterally offset before its
+      // side pull. A bilateral pregrasp is unreachable for the opposite arm.
+      // Keep both arms home while setting the checked hook waist posture;
+      // prepare the bilateral grasp only after the real pull centres the tote.
+      const bool single_arm_preparation = get_parameter("process_admittance").as_bool() || lateral_front_column ||
+        get_parameter("rear_side_pull").as_bool();
+      if (get_parameter("strict_tool_body_guard").as_bool() && !single_arm_preparation) {
         prepareEmptyGrasp(box,
           get_parameter("pre_extract_waist_lift").as_double(),
           get_parameter("pre_extract_waist_pitch").as_double(), execute);
@@ -809,18 +899,27 @@ public:
 
     const bool resume_floor = get_parameter("resume_floor_seating").as_bool();
     if (execute && !resume_floor) {
-      if (!runCoordinatedPosture(box.id, get_parameter("carry_waist_lift").as_double(),
+      if (!runCoordinatedPosture(box.id,
+                                 currentOdom().y < -1.2 ? std::max(0.28, get_parameter("carry_waist_lift").as_double()) : get_parameter("carry_waist_lift").as_double(),
                                  get_parameter("carry_waist_pitch").as_double(),
                                  get_parameter("carry_center_height").as_double()))
         throw std::runtime_error("Coordinated level carry posture failed");
-      setWaist(get_parameter("carry_waist_lift").as_double(),
+      setWaist(currentOdom().y < -1.2 ? std::max(0.28, get_parameter("carry_waist_lift").as_double()) : get_parameter("carry_waist_lift").as_double(),
                get_parameter("carry_waist_pitch").as_double());
       rclcpp::sleep_for(std::chrono::milliseconds(500));
       std::lock_guard<std::mutex> lock(data_mutex_);
-      if (!measured_base_pose_ || std::chrono::steady_clock::now() - measured_base_received_ >
-          std::chrono::seconds(1))
+      const auto now = std::chrono::steady_clock::now();
+      const bool model_pose_fresh = measured_base_pose_ && now - measured_base_received_ <
+        std::chrono::seconds(1);
+      const bool odometry_fresh = odom_ready_ && now - odom_received_ < std::chrono::seconds(1);
+      if (!model_pose_fresh && !odometry_fresh)
         throw std::runtime_error("Cannot carry without fresh physical base pose");
-      if (std::abs(measured_base_pitch_) > 5.0 * kPi / 180.0 || std::abs(measured_base_roll_) > 3.0 * kPi / 180.0)
+      const auto& base_transform = model_pose_fresh ? measured_base_transform_ : odom_transform_;
+      const auto pitch = model_pose_fresh ? measured_base_pitch_ :
+        std::asin(std::clamp(-base_transform.linear()(2, 0), -1.0, 1.0));
+      const auto roll = model_pose_fresh ? measured_base_roll_ :
+        std::atan2(base_transform.linear()(2, 1), base_transform.linear()(2, 2));
+      if (std::abs(pitch) > 5.0 * kPi / 180.0 || std::abs(roll) > 3.0 * kPi / 180.0)
         throw std::runtime_error("Physical base pitch exceeds 5 degrees: restore support before carrying");
       auto found = measured_boxes_.find(box.id);
       // A resumed scene contains the current carried height, not the original
@@ -838,20 +937,30 @@ public:
       return;
     }
 
+    if (get_parameter("admittance_handoff").as_bool()) {
+      RCLCPP_INFO(get_logger(), "ADMITTANCE_HANDOFF_READY %s: held tote; base carry/place skipped", box.id.c_str());
+      return;
+    }
     rclcpp::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::duration<double>(get_parameter("hold_seconds").as_double())));
-    logWristLoad(box.id + " before base carry");
+    logWristLoad(box.id + (resume_floor ? " floor recovery hold" : " before base carry"));
 
     const auto dock_pose = currentOdom();
     const bool resume_at_bin = resume_after_pick &&
-      std::hypot(dock_pose.x - 0.50, dock_pose.y + 1.55) < 0.05 &&
+      std::hypot(dock_pose.x - get_parameter("bin_dock_x").as_double(), dock_pose.y + 1.55) < 0.01 &&
       std::abs(normalizeAngle(dock_pose.yaw)) < 0.05;
     if (resume_at_bin) RCLCPP_INFO(get_logger(), "Diagnostic resume already at bin; keep current dock");
+    // Horizontal body/table clearance is enforced independently of lift height.
+    if (!resume_floor && !resume_at_bin && !runCoordinatedPosture(
+          box.id, std::max(0.28, get_parameter("carry_waist_lift").as_double()),
+          get_parameter("carry_waist_pitch").as_double(),
+          get_parameter("carry_center_height").as_double()))
+      throw std::runtime_error("Could not establish tabletop clearance before bin docking");
     if (!resume_floor && !resume_at_bin && !goToBinDock()) {
       throw std::runtime_error("Failed to dock at large bin");
     }
     addEnvironmentToPlanningScene();
-    if (!resume_floor && !runCoordinatedPosture(box.id, get_parameter("place_waist_lift").as_double(),
+    if (!resume_floor && !runCoordinatedPosture(box.id, std::max(0.28, get_parameter("place_waist_lift").as_double()),
                                get_parameter("place_waist_pitch").as_double(),
                                get_parameter("place_center_height").as_double()))
       throw std::runtime_error("Coordinated level place posture failed");
@@ -863,8 +972,7 @@ public:
     const double settled_z = 0.55 + 0.012 + 0.5 * 0.148;
     const bool seat_first = get_parameter("place_on_floor_before_release").as_bool();
     const double release_z = settled_z + (seat_first ? 0.020 : get_parameter("bin_release_drop").as_double());
-    // Near-side interior position: with a 300 mm tote and 450 mm bin, a
-    // 50 mm offset still leaves 25 mm nominal outer-envelope clearance.
+    // Centre the tote in the large bin; retain bounds for explicit tuning.
     const double bin_target_x = get_parameter("bin_target_x").as_double();
     if (bin_target_x < 0.965 || bin_target_x > 1.095)
       throw std::runtime_error("Requested bin target violates interior clearance");
@@ -876,6 +984,8 @@ public:
       throw std::runtime_error("Large-bin insertion failed for " + box.id);
     }
     if (seat_first) {
+      if (get_parameter("recover_table_clearance").as_bool()) recoverTableClearance(box.id);
+      logWristLoad("insertion_complete_before_floor_contact");
       seatToteOnBinFloor(box.id, bin_target_x, settled_z);
       const auto seated_target = worldPointInBase(bin_target_x, -1.55, settled_z, currentOdom());
       if (!runPlaceTask(box.id, seated_target,
@@ -925,6 +1035,7 @@ public:
       attached_box_id_.clear();
       returnEmptyToPallet();
     }
+    finalizeWristTrace();
     RCLCPP_INFO(
       get_logger(),
       "Complete transfer finished. The physical Gazebo tote was carried by contact/gripper closure; "
@@ -932,6 +1043,20 @@ public:
   }
 
 private:
+  void finalizeWristTrace()
+  {
+    // The subscriber writes under this same mutex. Close before publishing
+    // completion so the external audit sees a complete immutable CSV.
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    if (wrist_trace_.is_open()) {
+      wrist_trace_.flush();
+      if (!wrist_trace_) throw std::runtime_error("Could not flush wrist trace");
+      wrist_trace_.close();
+      if (wrist_trace_.fail()) throw std::runtime_error("Could not close wrist trace");
+      RCLCPP_INFO(get_logger(), "WRIST_TRACE_FINALIZED rows=%zu", wrist_trace_rows_);
+    }
+  }
+
   void returnEmptyToPallet()
   {
     RCLCPP_INFO(get_logger(), "Returning empty robot to pallet before destination clearance");
@@ -1127,6 +1252,10 @@ private:
           return false;
         }
       }
+      if (!columnClear(measuredColumnState(), measuredWorldBase(), true)) {
+        cmd_vel_pub_->publish(geometry_msgs::msg::Twist{});
+        return false;
+      }
       const auto current = currentOdom();
       accumulated_yaw += std::abs(normalizeAngle(current.yaw - previous_yaw));
       previous_yaw = current.yaw;
@@ -1256,8 +1385,12 @@ private:
       }
       const auto command_time = std::chrono::steady_clock::now();
       const double dt = std::min(0.10, std::chrono::duration<double>(command_time - previous_time).count());
-      const double linear_step = get_parameter("base_linear_acceleration").as_double() * dt;
-      const double angular_step = get_parameter("base_angular_acceleration").as_double() * dt;
+      const double empty_linear_accel=get_parameter("empty_base_linear_acceleration").as_double();
+      const double empty_angular_accel=get_parameter("empty_base_angular_acceleration").as_double();
+      const double linear_step=(empty && empty_linear_accel>0?empty_linear_accel:
+        get_parameter("base_linear_acceleration").as_double())*dt;
+      const double angular_step=(empty && empty_angular_accel>0?empty_angular_accel:
+        get_parameter("base_angular_acceleration").as_double())*dt;
       cmd.linear.x = clamp(cmd.linear.x, previous_cmd.linear.x - linear_step, previous_cmd.linear.x + linear_step);
       cmd.angular.z = clamp(cmd.angular.z, previous_cmd.angular.z - angular_step, previous_cmd.angular.z + angular_step);
       if (command_time - diagnostic_time > std::chrono::seconds(2)) {
@@ -1268,7 +1401,7 @@ private:
       }
       previous_cmd = cmd;
       previous_time = command_time;
-      cmd_vel_pub_->publish(cmd);
+      if (!publishGuardedBaseCommand(cmd)) return false;
       rate.sleep();
     }
 
@@ -1376,8 +1509,23 @@ private:
   {
     // Go around the extraction deck, whose footprint occupies
     // x=[0.384,1.634], y=[-1.010,-0.600]. Keep the column outside the table.
-    constexpr double dock_x = 0.50;
+    // Keep the lifting stage edge >= 200 mm from the table edge.
+    // The pitching upper torso remains subject to full 3D collision checks.
+    const double dock_x = get_parameter("bin_dock_x").as_double();
     constexpr double dock_y = -1.55;
+    const auto current = currentOdom();
+    RCLCPP_INFO(get_logger(), "BIN_CENTER_DOCK target_x=%.3f dock_x=%.3f required_column_gap=%.3f",
+                get_parameter("bin_target_x").as_double(), dock_x,
+                get_parameter("column_table_clearance").as_double());
+    auto dock_transform = measuredWorldBase();
+    dock_transform.translation().x() = dock_x;
+    dock_transform.translation().y() = dock_y;
+    dock_transform.linear() = Eigen::Matrix3d::Identity();
+    if (!columnClear(measuredColumnState(), dock_transform, true)) return false;
+    if (std::hypot(current.x - dock_x, current.y - dock_y) < 0.25 &&
+        std::abs(normalizeAngle(current.yaw)) < 0.03) {
+      return driveToPose(Pose2D{dock_x, dock_y, 0.0});
+    }
     const int source_row = get_parameter("full_transfer_box_index").as_int() / 3;
     if (source_row == 2) {
       // A back-row pickup starts behind the pallet. Reach the bin corridor by
@@ -1394,18 +1542,34 @@ private:
         !driveToPose(Pose2D{0.0, dock_y, -0.5 * kPi}, 0.015, 0.03)) {
       return false;
     }
+    // Finish yaw alignment before approaching the edge. Turning while moving
+    // toward the dock sweeps the torso's side into the clearance reserve.
+    if (!driveToPose(Pose2D{0.0, dock_y, 0.0}, 0.015, 0.03)) return false;
     return driveToPose(Pose2D{dock_x, dock_y, 0.0});
   }
 
   void setWaist(double lift, double pitch)
   {
-    lift = clamp(lift, 0.005, 0.26);  // keep away from the lower hard stop
+    lift = clamp(lift, 0.005, 0.29);  // keep away from the lower hard stop
     // Reject out-of-range commands instead of silently testing a different pose.
     mtc::Task bounds_task;
     bounds_task.loadRobotModel(shared_from_this());
     const auto& pitch_bounds = bounds_task.getRobotModel()->getVariableBounds("waist_pitch_joint");
     if (pitch < pitch_bounds.min_position_ || pitch > pitch_bounds.max_position_)
       throw std::runtime_error("Requested waist pitch exceeds the robot model limits");
+    auto proposed = measuredColumnState();
+    const auto start = proposed;
+    proposed.setVariablePosition("waist_up_down_joint", lift);
+    proposed.setVariablePosition("waist_pitch_joint", pitch);
+    proposed.update();
+    const auto world_from_base = measuredWorldBase();
+    for (int i = 0; i <= 100; ++i) {
+      auto sample = start;
+      start.interpolate(proposed, i / 100.0, sample);
+      sample.update();
+      if (!columnClear(sample, world_from_base, true))
+        throw std::runtime_error("Waist motion would violate the 200 mm horizontal table clearance");
+    }
     trajectory_msgs::msg::JointTrajectory trajectory;
     trajectory.joint_names = {
       "waist_up_down_joint", "waist_pitch_joint", "head_yaw_joint", "head_pitch_joint"};
@@ -1616,8 +1780,11 @@ private:
     table.header.frame_id = "base_footprint";
     table.id = "destination_table";
     table.operation = moveit_msgs::msg::CollisionObject::ADD;
-    // Conservative solid volume below the 0.55 m tabletop.
-    appendWorldBox(table, 0.75, 0.95, 0.55, 1.03, -1.55, 0.275, 0.0, base);
+    // Match Gazebo: tabletop and four legs, with open space beneath.
+    appendWorldBox(table, 0.75, 0.95, 0.05, 1.03, -1.55, 0.525, 0.0, base);
+    for (double dx : {-0.31, 0.31})
+      for (double dy : {-0.41, 0.41})
+        appendWorldBox(table, 0.06, 0.06, 0.50, 1.03 + dx, -1.55 + dy, 0.25, 0.0, base);
     objects.push_back(table);
 
     moveit_msgs::msg::CollisionObject bin;
@@ -2105,6 +2272,236 @@ private:
     for (const auto& a : left_tools) for (const auto& b : right_tools) apply(a, b);
   }
 
+  void runPlacementSweep()
+  {
+    try {
+      checkPlacementReach();
+      RCLCPP_INFO(get_logger(), "CONFIGURED_PLACEMENT_PREFLIGHT_PASSED: no motion or world-scene changes");
+      return;
+    } catch (const std::exception& error) {
+      RCLCPP_INFO(get_logger(), "Configured placement profile rejected before sweep: %s", error.what());
+    }
+    set_parameter(rclcpp::Parameter("dual_ik_attempts", 60));
+    set_parameter(rclcpp::Parameter("dual_ik_timeout", 0.01));
+    for (double clearance : {0.300, 0.275}) {
+      for (double start_pitch : {-0.80, -0.90, -1.00, -0.70, -0.60, -0.55}) {
+        for (double end_pitch : {-0.80, -0.90, -1.00, -0.70, -0.65, -0.60}) {
+          auto seed = currentSeed(column_model_);
+          seed.setVariablePosition("waist_up_down_joint", 0.28);
+          seed.setVariablePosition("left_gripper_left_finger_joint", 0.055);
+          seed.setVariablePosition("gripper_left_finger_joint", 0.055);
+          bool valid = true;
+          int sample = 0;
+          try {
+            for (; sample <= 12; ++sample) {
+              const double t = sample / 12.0;
+              seed.setVariablePosition("waist_pitch_joint", (1-t)*start_pitch+t*end_pitch);
+              seed.update();
+              const std::array<double,3> center{
+                get_parameter("bin_target_x").as_double()-get_parameter("bin_dock_x").as_double(),
+                0.0, .636-measuredWorldBase().translation().z()+(1-t)*(.020+clearance)};
+              geometry_msgs::msg::Pose l,r;
+              graspTargetsWithOffsets(center, 0.0, get_parameter("handle_z_offset").as_double(),
+                get_parameter("place_grasp_x_offset").as_double(), l, r);
+              const auto goal=solveDualArmGoal(l,r,seed,column_model_);
+              for (const auto& joint:goal) seed.setVariablePosition(joint.first,joint.second);
+              seed.update();
+            }
+          } catch (const std::exception& error) { valid=false; RCLCPP_INFO(get_logger(), "PLACEMENT_SWEEP_REASON %s", error.what()); }
+          RCLCPP_INFO(get_logger(), "PLACEMENT_SWEEP clearance=%.3f start_pitch=%.3f floor_pitch=%.3f valid=%d samples=%d",
+            clearance,start_pitch,end_pitch,valid,sample);
+          if (valid) {
+            RCLCPP_INFO(get_logger(), "PLACEMENT_SWEEP_SUCCESS clearance=%.3f start_pitch=%.3f floor_pitch=%.3f",
+              clearance,start_pitch,end_pitch);
+            return;
+          }
+        }
+      }
+    }
+    throw std::runtime_error("Placement sweep found no bounded tool/body-clear descent; no box moved");
+  }
+
+  void checkPlacementReach() const
+  {
+    moveit::core::RobotState state(column_model_);
+    state.setToDefaultValues();
+    state.setVariablePosition("waist_up_down_joint", std::max(0.28, get_parameter("place_waist_lift").as_double()));
+    state.setVariablePosition("waist_pitch_joint", get_parameter("place_floor_waist_pitch").as_double());
+    state.update();
+    const double base_z = measuredWorldBase().translation().z();
+    const std::array<double, 3> center{
+      // Cover small physical docking/base-height errors before lifting a tote.
+      get_parameter("bin_target_x").as_double() - get_parameter("bin_dock_x").as_double() + 0.005, 0.0,
+      0.638 - base_z};
+    geometry_msgs::msg::Pose left, right;
+    graspTargetsWithOffsets(center, 0.0, get_parameter("handle_z_offset").as_double(),
+      get_parameter("place_grasp_x_offset").as_double(), left, right);
+    for (const auto& side : {std::string("left"), std::string("right")}) {
+      const std::string hand = side == "left" ? "L_hand_link" : "R_hand_link";
+      const auto* shoulder = column_model_->getLinkModel(side + "_shoulder_pitch_link");
+      const auto* link = column_model_->getLinkModel(hand);
+      double maximum = 0;
+      while (link && link != shoulder) {
+        maximum += link->getJointOriginTransform().translation().norm();
+        link = link->getParentLinkModel();
+      }
+      if (!link) throw std::runtime_error("Cannot establish arm reach bound");
+      const auto hand_to_tcp = state.getGlobalLinkTransform(hand).inverse() *
+                               state.getGlobalLinkTransform(side + "_gripper_tcp");
+      const Eigen::Isometry3d target = poseToEigen(side == "left" ? left : right) * hand_to_tcp.inverse();
+      const double required = (target.translation() - state.getGlobalLinkTransform(shoulder).translation()).norm();
+      RCLCPP_INFO(get_logger(), "PLACEMENT_REACH_CHECK side=%s required=%.6f chain_upper_bound=%.6f",
+                  side.c_str(), required, maximum);
+      if (required > maximum + 1e-6)
+        throw std::runtime_error("Placement grip is unreachable at the protected 200 mm dock; revise the grip/posture before picking any box");
+    }
+    // Establish actual IK feasibility for the entire approach/descent before
+    // touching a tote. A chain-length bound alone misses wrist limit failures.
+    auto seed = state;
+    seed.setVariablePosition("left_gripper_left_finger_joint", 0.055);
+    seed.setVariablePosition("gripper_left_finger_joint", 0.055);
+    for (int i = 0; i <= 16; ++i) {
+      const double t = i / 16.0;
+      const double pitch = (1-t)*get_parameter("place_waist_pitch").as_double() +
+                           t*get_parameter("place_floor_waist_pitch").as_double();
+      seed.setVariablePosition("waist_pitch_joint", pitch);
+      seed.update();
+      auto intermediate = center;
+      intermediate[2] += (1-t)*(get_parameter("place_approach_clearance").as_double() + 0.020);
+      geometry_msgs::msg::Pose l, r;
+      graspTargetsWithOffsets(intermediate, 0.0, get_parameter("handle_z_offset").as_double(),
+        get_parameter("place_grasp_x_offset").as_double(), l, r);
+      const auto goal = solveDualArmGoal(l, r, seed, column_model_);
+      for (const auto& item : goal) seed.setVariablePosition(item.first, item.second);
+      seed.update();
+    }
+    // Check the loaded torso transition as well as the far-bin descent.
+    for (int i = 0; i <= 16; ++i) {
+      const double t=i/16.0;
+      seed.setVariablePosition("waist_pitch_joint", (1-t)*get_parameter("carry_waist_pitch").as_double()+t*get_parameter("place_waist_pitch").as_double());
+      seed.update();
+      std::array<double,3> held{.45+t*(get_parameter("place_carry_reach").as_double()-.45),0,
+        (1-t)*get_parameter("carry_center_height").as_double()+t*get_parameter("place_center_height").as_double()-base_z};
+      geometry_msgs::msg::Pose l,r;
+      graspTargetsWithOffsets(held,0,get_parameter("handle_z_offset").as_double(),get_parameter("grasp_x_offset").as_double(),l,r);
+      const auto goal=solveDualArmGoal(l,r,seed,column_model_);
+      for (const auto& item:goal) seed.setVariablePosition(item.first,item.second);
+      seed.update();
+    }
+    RCLCPP_INFO(get_logger(), "PLACEMENT_IK_PREFLIGHT_PASSED samples=34: loaded torso transition and bin descent checked before side pull");
+  }
+
+  void initializeColumnGeometry(const moveit::core::RobotModelConstPtr& model)
+  {
+    column_model_ = model;
+    for (const auto& name : {"waist_up_down_link", "waist_pitch_link"}) {
+      const auto* link = model->getLinkModel(name);
+      if (!link || link->getVisualMeshFilename().empty())
+        throw std::runtime_error("Missing upright visual geometry");
+      std::unique_ptr<shapes::Mesh> mesh(shapes::createMeshFromResource(
+        link->getVisualMeshFilename(), link->getVisualMeshScale()));
+      if (!mesh || mesh->vertex_count == 0) throw std::runtime_error("Cannot load upright mesh");
+      Eigen::Vector3d low = Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity());
+      Eigen::Vector3d high = -low;
+      for (unsigned int i = 0; i < mesh->vertex_count; ++i) {
+        const Eigen::Vector3d v(mesh->vertices[3*i], mesh->vertices[3*i+1], mesh->vertices[3*i+2]);
+        low = low.cwiseMin(v); high = high.cwiseMax(v);
+      }
+      auto& points = column_points_[name];
+      for (const auto& p : pallet_placement::envelopeCorners(low, high))
+        points.push_back(link->getVisualMeshOrigin() * p);
+      if (std::string(name) == "waist_up_down_link") lift_stage_visible_points_ = points;
+      for (std::size_t i = 0; i < link->getShapes().size(); ++i) {
+        const auto& shape = link->getShapes()[i];
+        if (shape->type != shapes::BOX) throw std::runtime_error("Unsupported upright collision geometry");
+        const auto* box = static_cast<const shapes::Box*>(shape.get());
+        const Eigen::Vector3d half(box->size[0]/2, box->size[1]/2, box->size[2]/2);
+        for (const auto& p : pallet_placement::envelopeCorners(-half, half))
+          points.push_back(link->getCollisionOriginTransforms()[i] * p);
+      }
+    }
+  }
+
+  Eigen::Isometry3d measuredWorldBase() const
+  {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    const auto now = std::chrono::steady_clock::now();
+    if (measured_base_pose_ && now - measured_base_received_ <= std::chrono::milliseconds(500))
+      return measured_base_transform_;
+    if (odom_ready_ && now - odom_received_ <= std::chrono::milliseconds(500)) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+        "Using fresh wheel odometry for the table-edge guard; model-pose bridge is stale");
+      return odom_transform_;
+    }
+    throw std::runtime_error("Column guard requires a fresh measured base pose or wheel odometry");
+  }
+
+  moveit::core::RobotState measuredColumnState() const
+  {
+    moveit::core::RobotState state(column_model_);
+    state.setToDefaultValues();
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    if (std::chrono::steady_clock::now() - waist_received_ > std::chrono::milliseconds(500))
+      throw std::runtime_error("Column guard requires fresh measured joints");
+    state.setVariablePosition("waist_up_down_joint", measured_waist_[0]);
+    state.setVariablePosition("waist_pitch_joint", measured_waist_[1]);
+    state.update();
+    return state;
+  }
+
+  bool columnClear(const moveit::core::RobotState& state,
+                   const Eigen::Isometry3d& world_from_base, bool report = false) const
+  {
+    const double required = get_parameter("column_table_clearance").as_double() +
+                            get_parameter("column_table_margin").as_double();
+    // User-specified 200 mm applies to the lifting stage edge. The pitching
+    // torso and arms retain ordinary full 3D collision checks.
+    const auto item = column_points_.find("waist_up_down_link");
+    if (item == column_points_.end()) return false;
+    {
+      const double gap = pallet_placement::horizontalTableGap(lift_stage_visible_points_,
+        world_from_base * state.getGlobalLinkTransform(item->first));
+      if (!std::isfinite(gap) || gap < required) {
+        if (report) RCLCPP_ERROR(get_logger(), "LIFT_STAGE_TABLE_GUARD link=%s horizontal_gap=%.6f required=%.6f",
+                                item->first.c_str(), gap, required);
+        return false;
+      }
+    }
+    return !column_points_.empty();
+  }
+
+  bool publishGuardedBaseCommand(const geometry_msgs::msg::Twist& cmd)
+  {
+    // Half a second of preview plus the configured reserve protects against latency
+    // and stopping travel; use the full measured chassis orientation.
+    try {
+      auto world = measuredWorldBase();
+      const auto state = measuredColumnState();
+      for (int i = 0; i <= 10; ++i) {
+        auto predicted = world;
+        const double t = .05 * i;
+        const double yaw = currentOdom().yaw;
+        predicted.translation().x() += t * cmd.linear.x * std::cos(yaw);
+        predicted.translation().y() += t * cmd.linear.x * std::sin(yaw);
+        predicted.linear() = Eigen::AngleAxisd(t * cmd.angular.z, Eigen::Vector3d::UnitZ()).toRotationMatrix() * world.linear();
+        if (!columnClear(state, predicted, true)) {
+          cmd_vel_pub_->publish(geometry_msgs::msg::Twist{});
+          return false;
+        }
+      }
+    } catch (const std::exception& error) {
+      RCLCPP_ERROR(get_logger(), "COLUMN_TABLE_GUARD stopped base: %s", error.what());
+      cmd_vel_pub_->publish(geometry_msgs::msg::Twist{});
+      return false;
+    }
+    try { updateCarryAdmittance(); } catch(const std::exception& error) {
+      cmd_vel_pub_->publish(geometry_msgs::msg::Twist{});
+      RCLCPP_ERROR(get_logger(),"PROCESS_ADMITTANCE_CARRY_STOP %s",error.what()); return false;
+    }
+    cmd_vel_pub_->publish(cmd);
+    return true;
+  }
+
   void enforceBodyToolCollisions(mtc::stages::ModifyPlanningScene& stage) const
   {
     forEachToolBodyPair([&](const std::string& tool, const std::string& body) {
@@ -2141,6 +2538,14 @@ private:
     const bool safe = !result.collision && result.distance >= get_parameter("tool_body_clearance").as_double() + planning_margin;
     if (!safe && report) {
       RCLCPP_ERROR(get_logger(), "TOOL_BODY_GUARD rejected clearance=%.6f m collision=%d", result.distance, result.collision);
+      collision_detection::DistanceRequest distance_request;
+      distance_request.acm = &matrix;
+      collision_detection::DistanceResult distance_result;
+      scene.getCollisionEnv()->distanceSelf(distance_request, distance_result, robot_only);
+      RCLCPP_ERROR(get_logger(), "TOOL_BODY_GUARD nearest pair %s <-> %s distance=%.6f m",
+        distance_result.minimum_distance.link_names[0].c_str(),
+        distance_result.minimum_distance.link_names[1].c_str(),
+        distance_result.minimum_distance.distance);
       for (const auto& contact : result.contacts)
         RCLCPP_ERROR(get_logger(), "TOOL_BODY_GUARD contact %s <-> %s",
           contact.first.first.c_str(), contact.first.second.c_str());
@@ -2151,7 +2556,8 @@ private:
   bool validateToolBodySolution(mtc::Task& task,
     const moveit_task_constructor_msgs::msg::Solution& solution, const std::string& label) const
   {
-    if (!get_parameter("strict_tool_body_guard").as_bool()) return true;
+    const bool strict_tools = get_parameter("strict_tool_body_guard").as_bool();
+    const auto world_from_base = measuredWorldBase();
     planning_scene::PlanningScene scene(task.getRobotModel());
     if (!scene.setPlanningSceneMsg(solution.start_scene)) return false;
     const auto matrix = toolBodyMatrix(task.getRobotModel());
@@ -2174,7 +2580,8 @@ private:
           auto interpolated = state;
           state.interpolate(goal, sample / static_cast<double>(subdivisions), interpolated);
           interpolated.update();
-          if (!toolBodyClear(scene, interpolated, matrix, minimum, true)) return false;
+          if (!columnClear(interpolated, world_from_base, true)) return false;
+          if (strict_tools && !toolBodyClear(scene, interpolated, matrix, minimum, true)) return false;
           ++samples;
         }
         state = goal;
@@ -2200,6 +2607,7 @@ private:
     // Reapply the existing SRDF fixed torso-camera exemption: task scene
     // diffs can otherwise lose this already-configured assembly pair.
     contact->allowCollisions("camera_link", "waist_up_down_link", true);
+    contact->allowCollisions("destination_table", false);
     enforceBodyToolCollisions(*contact);
     task.add(std::move(contact));
   }
@@ -2448,7 +2856,7 @@ private:
     // object/table collision should prevent us from testing the arm motion.
     allow_pregrasp_clearance->allowCollisions(object_id, true);
     allow_pregrasp_clearance->allowCollisions("source_pallet", true);
-    allow_pregrasp_clearance->allowCollisions("destination_table", true);
+    allow_pregrasp_clearance->allowCollisions("destination_table", false);
     allow_pregrasp_clearance->allowCollisions("large_bin", true);
     // After r0_c0 is pulled out, the neighbouring r0_c1 tote is the actual
     // 2--4 mm boundary of the left-hand approach.  Keep those neighbours
@@ -2603,7 +3011,12 @@ private:
     task.add(std::move(to_grasp));
 
     const double handle_thickness = get_parameter("handle_thickness").as_double();
-    const double q = 0.5 * (0.12 - handle_thickness) + 0.002;
+    // The 2 mm position overdrive used by the baseline produces excessive
+    // internal load at the long wrist lever during slow attached lifting.
+    // Retain positive contact preload, with the force-yield overlay able to
+    // relieve another 0.2 mm; floor unloading still has its separate guard.
+    const double preload=get_parameter("process_admittance").as_bool()?0.0005:0.002;
+    const double q = 0.5 * (0.12 - handle_thickness) + preload;
     auto close = std::make_unique<mtc::stages::MoveTo>("close both grippers on handles", joint);
     close->setGroup("both_grippers");
     close->setGoal(std::map<std::string, double>{
@@ -3355,6 +3768,9 @@ private:
     // all table/bin and tote contacts remain separately checked.
     allow_waist_clearance->allowCollisions("waist_pitch_link", true);
     allow_waist_clearance->allowCollisions("waist_up_down_link", true);
+    for (const auto& fixture : {"destination_table", "large_bin", "large_bin_floor"})
+      allow_waist_clearance->allowCollisions(fixture,
+        std::vector<std::string>{"waist_pitch_link", "waist_up_down_link"}, false);
     enforceBodyToolCollisions(*allow_waist_clearance);
     task.add(std::move(allow_waist_clearance));
 
@@ -3398,7 +3814,12 @@ private:
     }
 
     constexpr int steps = 8;
+    const double approach_pitch = seed.getVariablePosition("waist_pitch_joint");
+    const double floor_pitch = get_parameter("place_floor_waist_pitch").as_double();
     for (int i = 1; move_to_target && i <= steps; ++i) {
+      seed.setVariablePosition("waist_pitch_joint", approach_pitch +
+        (floor_pitch-approach_pitch)*i/steps);
+      seed.update();
       const double dz = approach_clearance *
         (1.0 - static_cast<double>(i) / static_cast<double>(steps));
       geometry_msgs::msg::Pose left, right;
@@ -3413,8 +3834,11 @@ private:
       seed.update();
       auto move = std::make_unique<mtc::stages::MoveTo>(
         "vertical insertion " + std::to_string(i) + "/" + std::to_string(steps), joint);
-      move->setGroup("both_arms");
-      move->setGoal(goal);
+      move->setGroup("pallet_upper_body");
+      auto coordinated_goal = goal;
+      coordinated_goal["waist_up_down_joint"] = seed.getVariablePosition("waist_up_down_joint");
+      coordinated_goal["waist_pitch_joint"] = seed.getVariablePosition("waist_pitch_joint");
+      move->setGoal(coordinated_goal);
       task.add(std::move(move));
     }
 
@@ -3435,7 +3859,11 @@ private:
     detach->detachObject(object_id, "left_gripper_tcp");
     task.add(std::move(detach));
 
+    const double retreat_start_pitch = seed.getVariablePosition("waist_pitch_joint");
     for (int i = 1; i <= steps; ++i) {
+      seed.setVariablePosition("waist_pitch_joint", retreat_start_pitch +
+        (get_parameter("place_waist_pitch").as_double()-retreat_start_pitch)*i/steps);
+      seed.update();
       geometry_msgs::msg::Pose left_retreat, right_retreat;
       graspTargetsWithOffsets(target_center, approach_clearance * i / steps,
         carriedHandleOffset(),
@@ -3445,8 +3873,11 @@ private:
       seed.update();
       auto retreat = std::make_unique<mtc::stages::MoveTo>(
         "vertical retreat after release " + std::to_string(i), joint);
-      retreat->setGroup("both_arms");
-      retreat->setGoal(goal);
+      retreat->setGroup("pallet_upper_body");
+      auto coordinated_goal = goal;
+      coordinated_goal["waist_up_down_joint"] = seed.getVariablePosition("waist_up_down_joint");
+      coordinated_goal["waist_pitch_joint"] = seed.getVariablePosition("waist_pitch_joint");
+      retreat->setGoal(coordinated_goal);
       task.add(std::move(retreat));
     }
 
@@ -3661,6 +4092,428 @@ private:
     return true;
   }
 
+  std::array<double,6> processWrench(const moveit::core::RobotState& state)
+  {
+    geometry_msgs::msg::WrenchStamped left,right;
+    {
+      std::lock_guard<std::mutex> lock(data_mutex_);
+      if (!left_force_ready_ || !right_force_ready_)
+        throw std::runtime_error("Process admittance requires both wrist sensors");
+      left=left_wrench_message_; right=right_wrench_message_;
+    }
+    const double now=get_clock()->now().seconds();
+    const double lt=rclcpp::Time(left.header.stamp).seconds(), rt=rclcpp::Time(right.header.stamp).seconds();
+    if (now-lt>.15 || now-rt>.15 || lt-now>.02 || rt-now>.02 || std::abs(lt-rt)>.04)
+      throw std::runtime_error("Process admittance stopped: stale or skewed wrist feedback");
+    Eigen::Vector3d force=Eigen::Vector3d::Zero(), torque=Eigen::Vector3d::Zero();
+    const Eigen::Vector3d center=.5*(state.getGlobalLinkTransform("left_gripper_tcp").translation()+
+      state.getGlobalLinkTransform("right_gripper_tcp").translation());
+    for (const auto& pair : {std::pair{left,"L_hand_link"},std::pair{right,"R_hand_link"}}) {
+      const auto& w=pair.first.wrench; const auto& transform=state.getGlobalLinkTransform(pair.second);
+      const Eigen::Vector3d f=transform.rotation()*Eigen::Vector3d(w.force.x,w.force.y,w.force.z);
+      const Eigen::Vector3d t=transform.rotation()*Eigen::Vector3d(w.torque.x,w.torque.y,w.torque.z);
+      if (!f.allFinite() || !t.allFinite() || f.norm()>450.0 || t.norm()>100.0) {
+        RCLCPP_ERROR(get_logger(),"PROCESS_ADMITTANCE_WRENCH_STOP sensor=%s force_norm=%.4f torque_norm=%.4f raw=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f]",
+          pair.second,f.norm(),t.norm(),w.force.x,w.force.y,w.force.z,w.torque.x,w.torque.y,w.torque.z);
+        throw std::runtime_error("Process admittance stopped: invalid or excessive wrist wrench");
+      }
+      force+=f; torque+=t+(transform.translation()-center).cross(f);
+    }
+    return {force.x(),force.y(),force.z(),torque.x(),torque.y(),torque.z()};
+  }
+
+  void offsetProcessStateExact(moveit::core::RobotState& state,
+    const std::vector<std::string>& names, const pallet_placement::ProcessAdmittance& law)
+  {
+    Eigen::Vector3d translation(law.position[0],law.position[1],law.position[2]);
+    Eigen::Vector3d rotation(law.position[3],law.position[4],law.position[5]);
+    const Eigen::Vector3d center=.5*(state.getGlobalLinkTransform("left_gripper_tcp").translation()+
+      state.getGlobalLinkTransform("right_gripper_tcp").translation());
+    Eigen::Matrix3d common_rotation=Eigen::Matrix3d::Identity();
+    if(rotation.norm()>1e-12)
+      common_rotation=Eigen::AngleAxisd(rotation.norm(),rotation.normalized()).toRotationMatrix();
+    for (const auto& side : {std::pair{"left_arm","left_gripper_tcp"},std::pair{"right_arm","right_gripper_tcp"}}) {
+      const auto* group=state.getRobotModel()->getJointModelGroup(side.first);
+      bool active=false;
+      for (const auto& joint : group->getVariableNames())
+        active=active || std::find(names.begin(),names.end(),joint)!=names.end();
+      if (!active) continue;
+      auto target=state.getGlobalLinkTransform(side.second);
+      target.translation()=center+common_rotation*(target.translation()-center)+translation;
+      target.linear()=common_rotation*target.rotation();
+      pallet_placement::refineTcpPose(state,group,side.second,target);
+      state.update();
+    }
+  }
+
+  double offsetProcessState(moveit::core::RobotState& state,
+    const std::vector<std::string>& names, const pallet_placement::ProcessAdmittance& law,
+    const planning_scene::PlanningScene* collision_scene=nullptr)
+  {
+    // Uniformly shrink the shared rigid transform at a kinematic or collision boundary.
+    // Never apply independent left/right approximations to a held tote.
+    const auto nominal=state;
+    for(int attempt=0;attempt<8;++attempt) {
+      auto feasible=law; const double scale=std::ldexp(1.0,-attempt);
+      for(double& value:feasible.position) value*=scale;
+      auto candidate=nominal;
+      try {
+        offsetProcessStateExact(candidate,names,feasible);
+        bool bounded=true;
+        for(const auto& name:names)
+          bounded=bounded && pallet_placement::admittanceCorrectionSafe(
+            nominal.getVariablePosition(name),candidate.getVariablePosition(name));
+        if(!bounded) continue;
+        if(collision_scene && collision_scene->isStateColliding(candidate)) continue;
+        state=candidate; return scale;
+      } catch(const std::runtime_error&) {}
+    }
+    // Zero is the feasible tangent at a fully constrained joint boundary.
+    state=nominal;
+    RCLCPP_WARN_THROTTLE(get_logger(),*get_clock(),5000,
+      "PROCESS_ADMITTANCE_PROJECTED_ZERO kinematic/joint-step/collision constraint; nominal path still checked");
+    return 0.0;
+  }
+
+  void updateCarryAdmittance()
+  {
+    if (!get_parameter("process_admittance").as_bool()) return;
+    std::lock_guard<std::mutex> hold_lock(process_mutex_);
+    if(process_arm_active_.load()) return;
+    const double time=get_clock()->now().seconds();
+    if (time-carry_last_update_<.20) return;
+    // Column-only state intentionally leaves arm joints at model defaults;
+    // it must never be used as a manipulation command/reference.
+    auto actual=currentSeed(column_model_);
+    if (!carry_nominal_) {
+      carry_nominal_=std::make_unique<moveit::core::RobotState>(actual);
+      carry_reference_=processWrench(actual); carry_law_={};
+      { std::lock_guard<std::mutex> lock(data_mutex_); process_stage_="base_carry"; }
+      RCLCPP_INFO(get_logger(),"PROCESS_ADMITTANCE_CARRY_BEGIN incremental_common_6d");
+    }
+    const auto measured=processWrench(actual);
+    std::array<double,6> residual{};
+    for(int i=0;i<6;++i) residual[i]=measured[i]-carry_reference_[i];
+    carry_law_.advance(residual,.20);
+    auto target=*carry_nominal_;
+    const auto* group=target.getRobotModel()->getJointModelGroup("both_arms");
+    const auto names=group->getVariableNames();
+    offsetProcessState(target,names,carry_law_);
+    planning_scene::PlanningScene guard(target.getRobotModel());
+    double clearance=std::numeric_limits<double>::max();
+    if(!toolBodyClear(guard,target,toolBodyMatrix(target.getRobotModel()),clearance,true) ||
+       !columnClear(target,measuredWorldBase(),true))
+      throw std::runtime_error("Carry admittance correction rejected by body/table guard");
+    trajectory_msgs::msg::JointTrajectory command; command.joint_names=names;
+    trajectory_msgs::msg::JointTrajectoryPoint point;
+    for(const auto& name:names) {
+      const auto& bounds=target.getRobotModel()->getVariableBounds(name);
+      const double velocity=bounds.velocity_bounded_?bounds.max_velocity_:1.0;
+      if(!pallet_placement::carryStepSafe(actual.getVariablePosition(name),target.getVariablePosition(name),velocity,.25))
+        throw std::runtime_error("Carry admittance rejected a joint jump: "+name);
+      point.positions.push_back(target.getVariablePosition(name));
+    }
+    point.time_from_start=rclcpp::Duration::from_seconds(.25); command.points.push_back(point);
+    process_arm_pub_->publish(command); carry_last_update_=time;
+    if (++carry_cycles_%50==0) RCLCPP_INFO(get_logger(),"PROCESS_ADMITTANCE_CARRY_SAMPLE cycles=%zu offset_z=%.7f",carry_cycles_,carry_law_.position[2]);
+  }
+
+  moveit::core::MoveItErrorCode executeProcessAdmittance(
+    const moveit_task_constructor_msgs::msg::Solution& solution,
+    const moveit::core::RobotModelConstPtr& model, const std::string& label)
+  {
+    { std::lock_guard<std::mutex> lock(data_mutex_); process_stage_=label; }
+    process_arm_active_.store(true);
+    struct ActiveGuard { std::atomic_bool& flag; ~ActiveGuard(){flag.store(false);} } active_guard{process_arm_active_};
+    { std::lock_guard<std::mutex> lock(process_mutex_); carry_nominal_.reset(); }
+    // Floor unloading already uses the dedicated measured-support loop. Do not
+    // superimpose a second vertical compliance loop on it or on jaw release.
+    if (label.rfind("slow floor seating ",0)==0 || label.find("release")!=std::string::npos)
+      return executeContinuousSolution(solution,model);
+    planning_scene::PlanningScene scene(model);
+    if (!scene.setPlanningSceneMsg(solution.start_scene))
+      throw std::runtime_error("Cannot initialize process-admittance collision scene");
+    auto initial_actual=currentSeed(model);
+    auto initial_scene_state=scene.getCurrentState();
+    initial_scene_state.setVariablePositions(initial_actual.getVariablePositions());
+    initial_scene_state.update(); scene.setCurrentState(initial_scene_state);
+    const auto baseline=processWrench(initial_actual);
+    pallet_placement::ProcessAdmittance law, grip_law;
+    std::size_t cycles=0, corrected_points=0, projected_points=0; double largest=0;
+    RCLCPP_INFO(get_logger(),"PROCESS_ADMITTANCE_BEGIN stage=%s mode=incremental_common_6d sample_seconds=0.25",label.c_str());
+    logWristLoad(label+" process_begin");
+    for (const auto& original : solution.sub_trajectory) {
+      auto path=original.trajectory.joint_trajectory;
+      if (!path.points.empty() && rclcpp::Duration(path.points.back().time_from_start).seconds()<=0) {
+        std::vector<double> times;
+        std::vector<std::vector<double>> positions;
+        for (const auto& point:path.points) {
+          times.push_back(rclcpp::Duration(point.time_from_start).seconds());
+          positions.push_back(point.positions);
+        }
+        if (!pallet_placement::stationaryZeroDuration(times,positions) ||
+            positions.front().size()!=path.joint_names.size())
+          throw std::runtime_error("Nonstationary zero-duration process trajectory rejected");
+        const auto actual=currentSeed(model);
+        double error=0;
+        for (std::size_t j=0;j<path.joint_names.size();++j)
+          error=std::max(error,std::abs(actual.getVariablePosition(path.joint_names[j])-positions.front()[j]));
+        if (error<=1e-6) {
+          // MoveTo can emit a zero-time path when the gripper is already at
+          // its goal. Preserve its scene diff without sending a motion goal.
+          RCLCPP_INFO(get_logger(),"PROCESS_ADMITTANCE_STATIONARY_NOOP stage=%s joints=%zu measured_error=%.9f",
+            label.c_str(),path.joint_names.size(),error);
+          path.points.clear();
+        }
+      }
+      if (path.points.empty()) {
+        moveit_task_constructor_msgs::msg::Solution only;
+        scene.getPlanningSceneMsg(only.start_scene);
+        auto change=original;
+        change.trajectory.joint_trajectory=path;
+        change.scene_diff.robot_state.joint_state=sensor_msgs::msg::JointState{};
+        change.scene_diff.robot_state.is_diff=true;
+        only.sub_trajectory.push_back(change);
+        const auto status=executeContinuousSolution(only,model);
+        if (!status) return status;
+        scene.setPlanningSceneDiffMsg(change.scene_diff);
+        continue;
+      }
+      if (!original.trajectory.multi_dof_joint_trajectory.points.empty())
+        throw std::runtime_error("Multi-DOF trajectory unsupported by process admittance");
+      const auto measured_entry=currentSeed(model);
+      double entry_error=0.0;
+      for(std::size_t j=0;j<path.joint_names.size();++j)
+        entry_error=std::max(entry_error,std::abs(measured_entry.getVariablePosition(path.joint_names[j])-path.points.front().positions[j]));
+      if(entry_error>.15) throw std::runtime_error("Planned trajectory start differs excessively from measured joints");
+      if(entry_error>.002) {
+        // Include the measured-to-planned connection in the same collision-
+        // checked, velocity-limited feedback executor; never jump to a stale
+        // planning-monitor start state at controller time zero.
+        const double connection=std::max(2.0,entry_error*20.0);
+        for(auto& point:path.points) point.time_from_start=rclcpp::Duration::from_seconds(
+          rclcpp::Duration(point.time_from_start).seconds()+connection);
+        trajectory_msgs::msg::JointTrajectoryPoint entry;
+        for(const auto& name:path.joint_names) entry.positions.push_back(measured_entry.getVariablePosition(name));
+        path.points.insert(path.points.begin(),entry);
+        RCLCPP_WARN(get_logger(),"PROCESS_ADMITTANCE_CHECKED_CONNECTION stage=%s max_joint_difference=%.6f connection_seconds=%.3f",
+          label.c_str(),entry_error,connection);
+      }
+      const double duration=rclcpp::Duration(path.points.back().time_from_start).seconds();
+      if (duration<=0) throw std::runtime_error("Invalid process-admittance trajectory duration");
+      RCLCPP_INFO(get_logger(),"PROCESS_ADMITTANCE_SEGMENT stage=%s joints=%zu nominal_duration=%.6f",
+        label.c_str(),path.joint_names.size(),duration);
+      auto interpolate=[&](double time) {
+        auto it=std::lower_bound(path.points.begin(),path.points.end(),time,
+          [](const auto& p,double t){return rclcpp::Duration(p.time_from_start).seconds()<t;});
+        if(it==path.points.begin()) return it->positions;
+        if(it==path.points.end()) return path.points.back().positions;
+        const auto& b=*it; const auto& a=*(it-1);
+        const double ta=rclcpp::Duration(a.time_from_start).seconds(),tb=rclcpp::Duration(b.time_from_start).seconds();
+        const double ratio=tb>ta?(time-ta)/(tb-ta):1.0;
+        auto q=a.positions;
+        for(std::size_t j=0;j<q.size();++j) q[j]+=(b.positions[j]-q[j])*ratio;
+        return q;
+      };
+      std::vector<const moveit::core::AttachedBody*> carried;
+      scene.getCurrentState().getAttachedBodies(carried);
+      bool both_active=true;
+      for(const auto& name:model->getJointModelGroup("both_arms")->getVariableNames())
+        both_active=both_active && std::find(path.joint_names.begin(),path.joint_names.end(),name)!=path.joint_names.end();
+      const bool rigid_grasp=both_active && !carried.empty();
+      auto planned_rigid_start=scene.getCurrentState();
+      planned_rigid_start.setVariablePositions(path.joint_names,interpolate(0.0)); planned_rigid_start.update();
+      // Contact tracking tolerance can leave the actual grasp different from
+      // the planned one. Preserve that measured grasp, and apply only the
+      // planned common translation; snapping back would squeeze the payload.
+      auto rigid_start=currentSeed(model);
+      rigid_start.update();
+      const Eigen::Vector3d planned_center=.5*(
+        planned_rigid_start.getGlobalLinkTransform("left_gripper_tcp").translation()+
+        planned_rigid_start.getGlobalLinkTransform("right_gripper_tcp").translation());
+      const Eigen::Vector3d measured_center=.5*(
+        rigid_start.getGlobalLinkTransform("left_gripper_tcp").translation()+
+        rigid_start.getGlobalLinkTransform("right_gripper_tcp").translation());
+      const Eigen::Isometry3d left_reference=rigid_start.getGlobalLinkTransform("left_gripper_tcp");
+      const Eigen::Isometry3d relative_grasp=left_reference.inverse()*rigid_start.getGlobalLinkTransform("right_gripper_tcp");
+      if(rigid_grasp) RCLCPP_INFO(get_logger(),"PROCESS_ADMITTANCE_RIGID_GRASP stage=%s preserve starting hand separation and level orientation",label.c_str());
+      for(double begin=0;begin<duration-1e-8;) {
+        const double end=duration-begin<.30?duration:begin+.25, dt=end-begin;
+        const auto wrench=processWrench(currentSeed(model));
+        std::array<double,6> residual{};
+        for(int i=0;i<6;++i) residual[i]=wrench[i]-baseline[i];
+        const auto previous=law;
+        law.advance(residual,dt);
+        std::array<double,6> grip_force{};
+        {
+          std::lock_guard<std::mutex> lock(data_mutex_);
+          grip_force[0]=-std::max(0.0,left_force_norm_-80.0);
+          grip_force[1]=-std::max(0.0,right_force_norm_-80.0);
+        }
+        grip_law.advance(grip_force,dt);
+        moveit_task_constructor_msgs::msg::Solution chunk;
+        scene.getPlanningSceneMsg(chunk.start_scene);
+        auto segment=original; segment.trajectory.joint_trajectory.points.clear();
+        segment.scene_diff=moveit_msgs::msg::PlanningScene{}; segment.scene_diff.is_diff=true;
+        auto endpoint=scene.getCurrentState();
+        for(int k=0;k<=4;++k) {
+          const double alpha=k/4.0, time=begin+dt*alpha;
+          auto state=scene.getCurrentState(); state.setVariablePositions(path.joint_names,interpolate(time)); state.update();
+          auto interpolated=law;
+          for(int i=0;i<6;++i) interpolated.position[i]=previous.position[i]+alpha*(law.position[i]-previous.position[i]);
+          if(rigid_grasp) {
+            // Joint interpolation alone can squeeze the payload between two
+            // otherwise valid endpoint grasps. Reproject every command onto
+            // one common object pose before adding the measured compliance.
+            auto left=state.getGlobalLinkTransform("left_gripper_tcp");
+            const auto right=state.getGlobalLinkTransform("right_gripper_tcp");
+            left.linear()=left_reference.rotation();
+            left.translation()=measured_center-planned_center+
+              .5*(left.translation()+right.translation()-left.rotation()*relative_grasp.translation());
+            const Eigen::Isometry3d right_target=left*relative_grasp;
+            pallet_placement::refineTcpPose(state,model->getJointModelGroup("left_arm"),"left_gripper_tcp",left);
+            pallet_placement::refineTcpPose(state,model->getJointModelGroup("right_arm"),"right_gripper_tcp",right_target);
+            state.update();
+          }
+          const auto nominal_state=state;
+          const double feasible_scale=offsetProcessState(state,path.joint_names,interpolated,&scene);
+          if(feasible_scale<1.0) ++projected_points;
+          bool changed=false;
+          for(const auto* tcp:{"left_gripper_tcp","right_gripper_tcp"}) {
+            const auto& before=nominal_state.getGlobalLinkTransform(tcp);
+            const auto& after=state.getGlobalLinkTransform(tcp);
+            const double displacement=(after.translation()-before.translation()).cwiseAbs().maxCoeff();
+            const double angle=Eigen::AngleAxisd(after.rotation()*before.rotation().transpose()).angle();
+            largest=std::max({largest,displacement,angle});
+            changed=changed || displacement>1e-8 || angle>1e-8;
+          }
+          if(changed) ++corrected_points;
+          // Closing jaws yield by at most 0.2 mm under high wrist load. Opening
+          // and verified floor unloading retain their dedicated release logic.
+          for(int hand=0;hand<2;++hand) {
+            const std::string finger=hand==0?"left_gripper_left_finger_joint":"gripper_left_finger_joint";
+            if(std::find(path.joint_names.begin(),path.joint_names.end(),finger)!=path.joint_names.end() &&
+               state.getVariablePosition(finger)>.035 && label.find("floor-supported")==std::string::npos) {
+              state.setVariablePosition(finger,state.getVariablePosition(finger)+
+                alpha*std::clamp(grip_law.position[hand],-.0002,0.0)); state.update();
+            }
+          }
+          if(!state.satisfiesBounds() || scene.isStateColliding(state)) {
+            collision_detection::CollisionRequest request; request.contacts=true; request.max_contacts=20;
+            collision_detection::CollisionResult collision;
+            scene.checkCollision(request,collision,state);
+            for(const auto& pair:collision.contacts)
+              RCLCPP_ERROR(get_logger(),"PROCESS_ADMITTANCE_COLLISION stage=%s pair=%s/%s begin=%.6f fraction=%.3f",
+                label.c_str(),pair.first.first.c_str(),pair.first.second.c_str(),begin,alpha);
+            const auto directory=get_parameter("process_debug_dir").as_string();
+            if(!directory.empty()) {
+              scene.setCurrentState(state); moveit_msgs::msg::PlanningScene snapshot;
+              scene.getPlanningSceneMsg(snapshot);
+              rclcpp::Serialization<moveit_msgs::msg::PlanningScene> serialization;
+              rclcpp::SerializedMessage bytes; serialization.serialize_message(&snapshot,&bytes);
+              const auto& buffer=bytes.get_rcl_serialized_message();
+              std::ofstream file(directory+"/process_collision.cdr",std::ios::binary);
+              file.write(reinterpret_cast<const char*>(buffer.buffer),buffer.buffer_length);
+            }
+            throw std::runtime_error("Corrected process-admittance trajectory rejected by collision/joint guard");
+          }
+          if(!columnClear(state,measuredWorldBase(),true))
+            throw std::runtime_error("Corrected process-admittance command violates table clearance");
+          trajectory_msgs::msg::JointTrajectoryPoint point;
+          for(const auto& name:path.joint_names) point.positions.push_back(state.getVariablePosition(name));
+          point.time_from_start=rclcpp::Duration::from_seconds(std::max(.10,dt)*alpha);
+          segment.trajectory.joint_trajectory.points.push_back(point); endpoint=state;
+        }
+        // Enforce joint velocity bounds on the actual corrected command,
+        // including the transition from the preceding measured endpoint.
+        auto& command_points=segment.trajectory.joint_trajectory.points;
+        const auto measured_start=currentSeed(model);
+        for(std::size_t j=0;j<path.joint_names.size();++j)
+          command_points.front().positions[j]=measured_start.getVariablePosition(path.joint_names[j]);
+        double command_stretch=1.0;
+        for(std::size_t k=1;k<command_points.size();++k) {
+          const double interval=rclcpp::Duration(command_points[k].time_from_start).seconds()-
+            rclcpp::Duration(command_points[k-1].time_from_start).seconds();
+          for(std::size_t j=0;j<path.joint_names.size();++j) {
+            const auto& bounds=model->getVariableBounds(path.joint_names[j]);
+            if(bounds.velocity_bounded_ && bounds.max_velocity_>0)
+              command_stretch=std::max(command_stretch,std::abs(command_points[k].positions[j]-command_points[k-1].positions[j])/
+                (.5*bounds.max_velocity_*interval));
+          }
+        }
+        if(command_stretch>10.0) {
+          for(std::size_t j=0;j<path.joint_names.size();++j)
+            RCLCPP_ERROR(get_logger(),"PROCESS_TRACKING joint=%s actual_start=%.7f nominal_start=%.7f first_target=%.7f stretch=%.3f",
+              path.joint_names[j].c_str(),command_points.front().positions[j],interpolate(begin)[j],command_points[1].positions[j],command_stretch);
+          throw std::runtime_error("Process-admittance tracking error requires excessive trajectory stretch");
+        }
+        for(auto& point:command_points)
+          point.time_from_start=rclcpp::Duration::from_seconds(
+            rclcpp::Duration(point.time_from_start).seconds()*command_stretch);
+        if(end>=duration-1e-8) segment.scene_diff=original.scene_diff;
+        segment.scene_diff.robot_state.joint_state=sensor_msgs::msg::JointState{};
+        segment.scene_diff.robot_state.is_diff=true;
+        chunk.sub_trajectory.push_back(segment);
+        const auto status=executeContinuousSolution(chunk,model);
+        if(!status) return status;
+        const auto settle_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+        bool settled=false;
+        double largest_tracking=0.0, largest_tcp_error=0.0;
+        auto desired_state=scene.getCurrentState();
+        desired_state.setVariablePositions(path.joint_names,command_points.back().positions); desired_state.update();
+        while(rclcpp::ok() && std::chrono::steady_clock::now()<settle_deadline) {
+          const auto actual=currentSeed(model); settled=true;
+          bool contact=false;
+          { std::lock_guard<std::mutex> lock(data_mutex_); contact=std::max(left_force_norm_,right_force_norm_)>20.0; }
+          largest_tracking=0.0; largest_tcp_error=0.0;
+          for(std::size_t j=0;j<path.joint_names.size();++j) {
+            const auto& name=path.joint_names[j];
+            const bool jaw=name.find("finger")!=std::string::npos;
+            const bool waist=name.find("waist")!=std::string::npos;
+            const double tolerance=jaw?.003:(waist?.0005:(contact?.01:.001));
+            const double error=std::abs(actual.getVariablePosition(name)-command_points.back().positions[j]);
+            largest_tracking=std::max(largest_tracking,error);
+            if(error>tolerance) settled=false;
+          }
+          for(const auto& side:{std::pair{"left_arm","left_gripper_tcp"},std::pair{"right_arm","right_gripper_tcp"}}) {
+            bool active=false;
+            for(const auto& name:model->getJointModelGroup(side.first)->getVariableNames())
+              active=active || std::find(path.joint_names.begin(),path.joint_names.end(),name)!=path.joint_names.end();
+            if(!active) continue;
+            const auto& expected=desired_state.getGlobalLinkTransform(side.second);
+            const auto& measured=actual.getGlobalLinkTransform(side.second);
+            const double error=(expected.translation()-measured.translation()).norm();
+            largest_tcp_error=std::max(largest_tcp_error,error);
+            if(error>(contact?.003:.001) ||
+              Eigen::AngleAxisd(expected.rotation()*measured.rotation().transpose()).angle()>.02) settled=false;
+          }
+          if(settled) break;
+          std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        if(!settled) {
+          RCLCPP_ERROR(get_logger(),"PROCESS_ADMITTANCE_TRACKING_STOP stage=%s max_joint_error=%.7f max_tcp_error=%.7f",
+            label.c_str(),largest_tracking,largest_tcp_error);
+          logWristLoad(label+" tracking_stop");
+          throw std::runtime_error("Process-admittance segment did not reach measured endpoint; do not replay");
+        }
+        scene.setPlanningSceneDiffMsg(segment.scene_diff);
+        auto updated=scene.getCurrentState();
+        updated.setVariablePositions(path.joint_names,segment.trajectory.joint_trajectory.points.back().positions);
+        updated.update(); scene.setCurrentState(updated); ++cycles;
+
+        if(cycles%40==0) RCLCPP_INFO(get_logger(),"PROCESS_ADMITTANCE_SAMPLE stage=%s cycles=%zu residual=[%.3f,%.3f,%.3f,%.3f,%.3f,%.3f] offset=[%.7f,%.7f,%.7f,%.7f,%.7f,%.7f]",
+          label.c_str(),cycles,residual[0],residual[1],residual[2],residual[3],residual[4],residual[5],
+          law.position[0],law.position[1],law.position[2],law.position[3],law.position[4],law.position[5]);
+        begin=end;
+      }
+    }
+    RCLCPP_INFO(get_logger(),"PROCESS_ADMITTANCE_END stage=%s cycles=%zu max_abs_offset=%.7f corrected_points=%zu projected_points=%zu",label.c_str(),cycles,largest,corrected_points,projected_points);
+    logWristLoad(label+" process_end");
+    RCLCPP_INFO(get_logger(),"PROCESS_ADMITTANCE_GRIP_END stage=%s requested_left_offset=%.7f requested_right_offset=%.7f",
+      label.c_str(),std::clamp(grip_law.position[0],-.0002,0.0),std::clamp(grip_law.position[1],-.0002,0.0));
+    return moveit_msgs::msg::MoveItErrorCodes::SUCCESS;
+  }
+
   moveit::core::MoveItErrorCode executeContinuousSolution(
     moveit_task_constructor_msgs::msg::Solution solution,
     const moveit::core::RobotModelConstPtr& model)
@@ -3702,8 +4555,28 @@ private:
     return moveit_msgs::msg::MoveItErrorCodes::TIMED_OUT;
   }
 
+  void verifyToolModel(const moveit::core::RobotModelConstPtr& model) const
+  {
+    moveit::core::RobotState state(model);
+    state.setToDefaultValues();
+    state.update();
+    for (const auto& pair : {std::pair{"left_gripper_base_link", "left_gripper_tcp"},
+                             std::pair{"gripper_base_link", "right_gripper_tcp"}}) {
+      const auto actual = model_tf_->lookupTransform(pair.first, pair.second, tf2::TimePointZero,
+                                                     tf2::durationFromSec(1.0));
+      const auto expected = state.getGlobalLinkTransform(pair.first).inverse() *
+                            state.getGlobalLinkTransform(pair.second);
+      const Eigen::Vector3d translation(actual.transform.translation.x,
+                                       actual.transform.translation.y,
+                                       actual.transform.translation.z);
+      if ((translation - expected.translation()).norm() > 0.0001)
+        throw std::runtime_error("Planning/Gazebo TCP geometry mismatch; use the scene's tote_finger_length before motion");
+    }
+  }
+
   bool planAndMaybeExecute(mtc::Task& task, bool execute, const std::string& label, bool reuse_plan = false)
   {
+    if (execute) verifyToolModel(task.getRobotModel());
     const auto max_solutions = static_cast<std::size_t>(
       std::max<int64_t>(1, get_parameter("max_solutions").as_int()));
     auto result = reuse_plan ? moveit::core::MoveItErrorCode(moveit_msgs::msg::MoveItErrorCodes::SUCCESS) :
@@ -3731,6 +4604,16 @@ private:
       for (const auto& candidate : task.solutions()) {
         audit = moveit_task_constructor_msgs::msg::Solution{};
         candidate->toMsg(audit);
+        if (label.rfind("slow floor seating ", 0) == 0) {
+          bool motion = false;
+          for (const auto& segment : audit.sub_trajectory) {
+            const auto& points = segment.trajectory.joint_trajectory.points;
+            if (points.size() < 2) continue;
+            for (std::size_t j = 0; j < points.front().positions.size(); ++j)
+              motion = motion || std::abs(points.back().positions[j] - points.front().positions[j]) > 1e-9;
+          }
+          if (!motion) throw std::runtime_error("Floor planner produced no motion; stop instead of repeating empty steps");
+        }
         if (!validateToolBodySolution(task, audit, label)) continue;
         selected = candidate;
         safe = true;
@@ -3775,7 +4658,9 @@ private:
       audit = original_audit;
       continuous = false;
     }
-    const auto exec_result = (continuous || get_parameter("strict_tool_body_guard").as_bool()) ?
+    const auto exec_result = get_parameter("process_admittance").as_bool() ?
+      executeProcessAdmittance(audit, task.getRobotModel(), label) :
+      (continuous || get_parameter("strict_tool_body_guard").as_bool()) ?
       executeContinuousSolution(std::move(audit), task.getRobotModel()) : task.execute(*selected);
     if (exec_result.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS) {
       RCLCPP_ERROR(
@@ -3822,9 +4707,35 @@ private:
     }
     auto center = worldPointInBase(world_center[0], world_center[1], world_center[2], currentOdom());
     if (get_parameter("place_on_floor_before_release").as_bool() && carried_handle_offset_ < 0.0) {
+      // A joint trajectory can report success just before the Gazebo model
+      // pose bridge publishes the tote's first lifted sample.  Wait briefly
+      // for physical confirmation, then derive the TCP offset from that fresh
+      // pose; never infer a successful grasp from the planned endpoint alone.
+      const auto settle_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+      while (world_center[2] < 0.274 && std::chrono::steady_clock::now() < settle_deadline) {
+        rclcpp::sleep_for(std::chrono::milliseconds(100));
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        const auto found = measured_boxes_.find(object_id);
+        if (found != measured_boxes_.end() &&
+            std::chrono::steady_clock::now() - measured_boxes_received_.at(object_id) <
+              std::chrono::seconds(1)) {
+          world_center = found->second;
+        }
+      }
+      if (world_center[2] < 0.274) {
+        RCLCPP_ERROR(get_logger(),
+          "PHYSICAL_PICK_CHECK failed: box_z=%.4f m, required >=0.2740 m after 2 s settling",
+          world_center[2]);
+        throw std::runtime_error("Tote is not physically lifted after grasp settling");
+      }
+      center = worldPointInBase(world_center[0], world_center[1], world_center[2], currentOdom());
       carried_handle_offset_ = 0.5 * (
         seed.getGlobalLinkTransform("left_gripper_tcp").translation().z() +
         seed.getGlobalLinkTransform("right_gripper_tcp").translation().z()) - center[2];
+      RCLCPP_INFO(get_logger(),
+        "PHYSICAL_PICK_CHECK box_z=%.4f m tcp_mean_z=%.4f m measured_handle_offset=%.4f m",
+        world_center[2], 0.5 * (seed.getGlobalLinkTransform("left_gripper_tcp").translation().z() +
+        seed.getGlobalLinkTransform("right_gripper_tcp").translation().z()), carried_handle_offset_);
       if (carried_handle_offset_ < 0.075 || carried_handle_offset_ > 0.125)
         throw std::runtime_error("Measured carried TCP height is outside the shallow-grasp range");
       RCLCPP_INFO(get_logger(), "Retain measured closed-gripper TCP height offset %.6f m", carried_handle_offset_);
@@ -3850,7 +4761,10 @@ private:
       seed.setVariablePosition("waist_pitch_joint", start_pitch + t * (pitch - start_pitch));
       seed.update();
       auto target = center;
-      target[0] += t * (std::min(center[0], 0.45) - center[0]);
+      const bool entering_place = currentOdom().y < -1.2 &&
+        std::abs(pitch-get_parameter("place_waist_pitch").as_double()) < 1e-6;
+      const double final_reach = entering_place ? get_parameter("place_carry_reach").as_double() : std::min(center[0], 0.45);
+      target[0] += t * (final_reach - center[0]);
       target[2] += t * (height - center[2]);
       geometry_msgs::msg::Pose left, right;
       graspTargetsWithOffsets(target, 0.0, carriedHandleOffset(),
@@ -3922,7 +4836,7 @@ private:
             cmd.linear.x = clamp(1.8 * (dx * std::cos(current.yaw) +
               dy * std::sin(current.yaw)), -0.08, 0.08);
             cmd.angular.z = clamp(2.0 * normalizeAngle(hold_target.yaw - current.yaw), -0.12, 0.12);
-            cmd_vel_pub_->publish(cmd);
+            publishGuardedBaseCommand(cmd);
           } catch (const std::exception&) {
             // Keep the extraction alive if one odom update is late; the next
             // cycle will retry without changing the arm trajectory.
@@ -3932,8 +4846,15 @@ private:
         cmd_vel_pub_->publish(geometry_msgs::msg::Twist());
       });
     }
-    const bool result = planAndMaybeExecute(
-      task, execute, (get_parameter("rear_side_pull").as_bool() ? "left-arm mirrored pre-extraction " : "right-arm pre-extraction ") + object_id);
+    bool result=false;
+    try {
+      result = planAndMaybeExecute(task, execute,
+        (get_parameter("rear_side_pull").as_bool() ? "left-arm mirrored pre-extraction " : "right-arm pre-extraction ") + object_id);
+    } catch (...) {
+      hold_running.store(false);
+      if(hold_thread.joinable()) hold_thread.join();
+      cmd_vel_pub_->publish(geometry_msgs::msg::Twist{}); throw;
+    }
     hold_running.store(false);
     if (hold_thread.joinable()) {
       hold_thread.join();
@@ -3965,7 +4886,7 @@ private:
             cmd.linear.x = clamp(1.8 * (dx * std::cos(current.yaw) +
               dy * std::sin(current.yaw)), -0.08, 0.08);
             cmd.angular.z = clamp(2.0 * normalizeAngle(hold_target.yaw - current.yaw), -0.2, 0.2);
-            cmd_vel_pub_->publish(cmd);
+            publishGuardedBaseCommand(cmd);
           } catch (const std::exception&) {
             cmd_vel_pub_->publish(geometry_msgs::msg::Twist());
           }
@@ -3983,10 +4904,55 @@ private:
     return ok;
   }
 
+  void recoverTableClearance(const std::string& object_id)
+  {
+    mtc::Task task;
+    task.stages()->setName("escape tabletop contact with fixed TCPs");
+    task.loadRobotModel(shared_from_this());
+    task.add(std::make_unique<mtc::stages::CurrentState>("stationary held tote"));
+    addGroundContactStage(task);
+    auto seed = currentSeed(task.getRobotModel());
+    const double start = seed.getVariablePosition("waist_up_down_joint");
+    if (start < 0.24 || start > 0.28)
+      throw std::runtime_error("Table escape requires the inspected near-contact waist posture");
+    const auto left = eigenToPose(seed.getGlobalLinkTransform("left_gripper_tcp"));
+    const auto right = eigenToPose(seed.getGlobalLinkTransform("right_gripper_tcp"));
+    // Only the existing waist/table pair may touch during a monotone upward
+    // escape. Both TCP poses stay fixed; no base or jaw motion is commanded.
+    auto escape = std::make_unique<mtc::stages::ModifyPlanningScene>("initial waist contact escape only");
+    escape->allowCollisions("destination_table", "waist_up_down_link", true);
+    escape->allowCollisions(object_id, "large_bin_floor", true);
+    task.add(std::move(escape));
+    auto planner = makeJointPlanner();
+    planner->setMaxVelocityScalingFactor(0.02);
+    planner->setMaxAccelerationScalingFactor(0.02);
+    for (int i = 1; i <= 16; ++i) {
+      const double lift = start + (0.28 - start) * i / 16.0;
+      seed.setVariablePosition("waist_up_down_joint", lift);
+      seed.update();
+      auto goal = solveDualArmGoal(left, right, seed, task.getRobotModel(), 0.15);
+      goal["waist_up_down_joint"] = lift;
+      goal["waist_pitch_joint"] = seed.getVariablePosition("waist_pitch_joint");
+      for (const auto& item : goal) seed.setVariablePosition(item.first, item.second);
+      seed.update();
+      auto move = std::make_unique<mtc::stages::MoveTo>("fixed TCP waist escape " + std::to_string(i), planner);
+      move->setGroup("pallet_upper_body");
+      move->setGoal(goal);
+      task.add(std::move(move));
+    }
+    auto strict = std::make_unique<mtc::stages::ModifyPlanningScene>("restore every robot-table collision check");
+    strict->allowCollisions("destination_table", false);
+    task.add(std::move(strict));
+    logWristLoad("before_table_contact_escape");
+    if (!planAndMaybeExecute(task, true, "fixed TCP tabletop escape"))
+      throw std::runtime_error("Could not clear tabletop contact; keep jaws closed");
+    logWristLoad("after_table_contact_escape");
+  }
+
   void seatToteOnBinFloor(const std::string& object_id, double target_x, double settled_z)
   {
     if (object_id != "pallet_box_r" + std::to_string(get_parameter("full_transfer_box_index").as_int() / 3) + "_c" + std::to_string(get_parameter("full_transfer_box_index").as_int() % 3))
-      throw std::runtime_error("Floor contact sensor does not match the selected tote");
+      throw std::runtime_error("Reaction estimator target does not match the selected tote");
     if (carried_handle_offset_ < 0.0) {
       mtc::Task model_task;
       model_task.loadRobotModel(shared_from_this());
@@ -3998,7 +4964,9 @@ private:
         seed.getGlobalLinkTransform("right_gripper_tcp").translation().z()) - center[2];
     }
     bool clamp_unloaded = false;
-    for (int step = 0; step <= 40; ++step) {
+    std::optional<Eigen::Isometry3d> left_world_reference, right_world_reference;
+    double reference_offset = 0.0, initial_box_height = 0.0;
+    for (int step = 0; step <= 100; ++step) {
       bool stable = true;
       double force = 0.0, z = 0.0, tilt = 0.0;
       const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(750);
@@ -4011,27 +4979,34 @@ private:
           if (!fresh) throw std::runtime_error("Cannot seat tote without fresh physical pose");
           z = measured_boxes_.at(object_id)[2];
           tilt = measured_box_tilt_ * 180.0 / kPi;
-          force = floor_contact_force_;
-          if (force > 300.0)
-            throw std::runtime_error("Bin-floor reaction exceeded 300 N; keep grippers closed");
+          if (!reaction_estimate_ready_ || now - reaction_estimate_received_ > std::chrono::milliseconds(250))
+            throw std::runtime_error("Floor admittance requires fresh wrist-derived support; keep jaws closed");
+          force = estimated_bottom_reaction_;
+          if (force > 300.0 || force < -30.0)
+            throw std::runtime_error("Estimated floor reaction " + std::to_string(force) + " N outside [-30, 300] N; keep grippers closed");
           if (std::abs(measured_boxes_.at(object_id)[0] - target_x) > 0.015 ||
               std::abs(measured_boxes_.at(object_id)[1] + 1.55) > 0.025 ||
               z < settled_z - 0.002 || tilt > 6.0 ||
               measured_grippers_[0] < 0.04 || measured_grippers_[1] < 0.04)
             throw std::runtime_error("Physical seating pose or closed-gripper check failed");
-          if (!(floor_contact_active_ && force >= 10.0 &&
-                now - floor_contact_received_ < std::chrono::milliseconds(250) &&
-                std::abs(z - settled_z) <= 0.0015 && tilt <= 0.5)) stable = false;
+          if (!pallet_placement::releaseReady(clamp_unloaded,
+                reaction_estimate_ready_ && now - reaction_estimate_received_ < std::chrono::milliseconds(250),
+                force, z - settled_z, tilt)) stable = false;
         }
         rclcpp::sleep_for(std::chrono::milliseconds(50));
       }
       if (stable) {
         RCLCPP_INFO(get_logger(),
-          "Floor support verified BEFORE opening: z=%.6f tilt=%.3f deg reaction=%.1f N; grippers not fully opened",
+          "Floor support verified BEFORE opening using wrist F/T estimate: z=%.6f tilt=%.3f deg reaction=%.1f N; grippers not fully opened",
           z, tilt, force);
+        {
+          std::lock_guard<std::mutex> lock(data_mutex_);
+          floor_support_verified_ = true;
+          logWristDetailsLocked("floor_supported_before_release");
+        }
         return;
       }
-      if (!clamp_unloaded && force >= 80.0) {
+      if (!clamp_unloaded && force >= 80.0 && std::abs(z - settled_z) <= 0.0015) {
         // Only reduce preload after the physical floor carries the tote.
         // Reduce each jaw by 2 mm past nominal wall contact (55 mm),
         // only after the floor carries the tote; full opening remains gated
@@ -4039,6 +5014,7 @@ private:
         // This lets a slightly tilted tote settle onto its support without
         // pushing the mobile base upwards or dropping from free space.
         RCLCPP_INFO(get_logger(), "Floor already supports %.1f N: partially unload jaws; full opening still prohibited", force);
+        logWristLoad("support_transfer_before_partial_unload");
         mtc::Task relax;
         relax.stages()->setName("floor-supported clamp preload reduction");
         relax.loadRobotModel(shared_from_this());
@@ -4058,14 +5034,12 @@ private:
         rclcpp::sleep_for(std::chrono::seconds(2));
         continue;
       }
-      if (step == 40) break;
-      // A recovery starts at the measured height, not at the original
-      // insertion height: never raise a floor-supported tote on restart.
-      // Do not drive a full 2 mm step into the rigid floor. Keep the
-      // coarse free-space descent, then approach support in 0.25 mm steps.
-      const double seating_step = z > settled_z + 0.003 ? 0.002 : 0.00025;
-      const double desired_z = std::max(settled_z - 0.00025,
-        std::min(z, settled_z + 0.020) - seating_step);
+      if (step == 100) break;
+      // Bidirectional vertical admittance. Excess pressure commands an upward
+      // wrist correction; full release requires a bounded support band after
+      // clamp unloading, never just a lower force threshold.
+      const double vertical_step = pallet_placement::verticalStep(force, z - settled_z);
+      const double desired_z = z + vertical_step;
       RCLCPP_INFO(get_logger(), "Floor seating step %d: actual_z=%.6f tilt=%.3f reaction=%.1f N target_z=%.6f",
                   step + 1, z, tilt, force, desired_z);
       mtc::Task task;
@@ -4077,15 +5051,66 @@ private:
       support->allowCollisions(object_id, "large_bin_floor", true);
       task.add(std::move(support));
       auto seed = currentSeed(task.getRobotModel());
-      const auto center = worldPointInBase(target_x, -1.55, desired_z, currentOdom());
-      geometry_msgs::msg::Pose left, right;
-      graspTargetsWithOffsets(center, 0.0, carriedHandleOffset(),
-                             get_parameter("place_grasp_x_offset").as_double(), left, right);
-      auto goal = solveDualArmGoal(left, right, seed, task.getRobotModel());
+      // Integrate a world-frame position reference instead of restarting at
+      // measured FK each cycle. Under load a finite tracking error otherwise
+      // cancels every tiny update and the requested motion never accumulates.
+      Eigen::Isometry3d base_world;
+      {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        if (!measured_base_pose_ || std::chrono::steady_clock::now() - measured_base_received_ > std::chrono::milliseconds(250))
+          throw std::runtime_error("Floor reference requires fresh physical base pose");
+        base_world = measured_base_transform_;
+      }
+      if (!left_world_reference) {
+        left_world_reference = base_world * seed.getGlobalLinkTransform("left_gripper_tcp");
+        right_world_reference = base_world * seed.getGlobalLinkTransform("right_gripper_tcp");
+        initial_box_height = z;
+      }
+      reference_offset = pallet_placement::integrateVerticalReference(
+        reference_offset, vertical_step, initial_box_height - settled_z);
+      auto left_world = *left_world_reference;
+      auto right_world = *right_world_reference;
+      left_world.translation().z() += reference_offset;
+      right_world.translation().z() += reference_offset;
+      const Eigen::Isometry3d left_tf = base_world.inverse() * left_world;
+      const Eigen::Isometry3d right_tf = base_world.inverse() * right_world;
+      const Eigen::Vector3d delta = 0.5 * (
+        (left_tf.translation() - seed.getGlobalLinkTransform("left_gripper_tcp").translation()) +
+        (right_tf.translation() - seed.getGlobalLinkTransform("right_gripper_tcp").translation()));
+      RCLCPP_INFO(get_logger(), "FLOOR_REFERENCE increment=%.9f accumulated=%.9f target_box_z=%.9f",
+        vertical_step, reference_offset, initial_box_height + reference_offset);
+      auto measured_start = std::make_unique<mtc::stages::ModifyPlanningScene>("synchronize measured microstep start");
+      measured_start->setCallback([seed](const planning_scene::PlanningScenePtr& scene, const mtc::PropertyMap&) {
+        // Preserve attachments/ACM, updating only the measured joint positions.
+        auto& state = scene->getCurrentStateNonConst();
+        state.setVariablePositions(seed.getVariablePositions());
+        state.update();
+      });
+      task.add(std::move(measured_start));
+      auto refined = seed;
+      pallet_placement::refineTcpPose(refined, task.getRobotModel()->getJointModelGroup("left_arm"),
+                                     "left_gripper_tcp", left_tf);
+      pallet_placement::refineTcpPose(refined, task.getRobotModel()->getJointModelGroup("right_arm"),
+                                     "right_gripper_tcp", right_tf);
+      std::map<std::string, double> goal;
+      for (const auto& name : task.getRobotModel()->getJointModelGroup("both_arms")->getActiveJointModelNames())
+        goal[name] = refined.getVariablePosition(name);
+      const auto left_move = refined.getGlobalLinkTransform("left_gripper_tcp").translation() -
+                             seed.getGlobalLinkTransform("left_gripper_tcp").translation();
+      const auto right_move = refined.getGlobalLinkTransform("right_gripper_tcp").translation() -
+                              seed.getGlobalLinkTransform("right_gripper_tcp").translation();
+      RCLCPP_INFO(get_logger(), "FLOOR_TCP_STEP requested=[%.9f,%.9f,%.9f] left=[%.9f,%.9f,%.9f] right=[%.9f,%.9f,%.9f]",
+        delta.x(), delta.y(), delta.z(), left_move.x(), left_move.y(), left_move.z(),
+        right_move.x(), right_move.y(), right_move.z());
       auto planner = makeJointPlanner();
       planner->setMaxVelocityScalingFactor(0.03);
       planner->setMaxAccelerationScalingFactor(0.03);
-      auto lower = std::make_unique<mtc::stages::MoveTo>("lower jointly held tote by 2 mm", planner);
+      planner->setProperty("goal_joint_tolerance", 1e-9);
+      planner->setProperty("max_step", 1e-5);
+      // TOTG's default minimum joint-angle change drops micrometre moves.
+      planner->setTimeParameterization(std::make_shared<trajectory_processing::TimeOptimalTrajectoryGeneration>(
+        1e-8, 0.02, 1e-9));
+      auto lower = std::make_unique<mtc::stages::MoveTo>("incremental vertical wrist admittance", planner);
       lower->setGroup("both_arms");
       lower->setGoal(goal);
       task.add(std::move(lower));
@@ -4102,6 +5127,8 @@ private:
   }
 
   double carried_handle_offset_{-1.0};
+  std::unique_ptr<tf2_ros::Buffer> model_tf_;
+  std::shared_ptr<tf2_ros::TransformListener> model_tf_listener_;
 
   void prepareEmptyGrasp(const BoxSpec& box, double lift, double pitch, bool execute)
   {
@@ -4110,16 +5137,45 @@ private:
     task.loadRobotModel(shared_from_this());
     task.add(std::make_unique<mtc::stages::CurrentState>("current extracted state"));
     addGroundContactStage(task);
+    // Empty arms must stay outside neighbouring open totes. Use solid
+    // envelopes only during this approach; inflated neighbours would overlap
+    // the attached target during the subsequent dense-pallet side pull.
+    moveit::planning_interface::PlanningSceneInterface psi;
+    const auto existing = psi.getObjects();
+    const auto base = currentOdom();
+    std::vector<BoxSpec> guarded_neighbors;
+    auto guard = std::make_unique<mtc::stages::ModifyPlanningScene>("avoid untouched tote interiors");
+    // Contact allowances from the previous pick persist in MoveIt's scene.
+    // Replacing geometry alone does not clear those ACM entries. Empty
+    // approaches permit no robot contact with any remaining source tote.
+    const auto& robot_links = task.getRobotModel()->getLinkModelNames();
+    guard->allowCollisions(box.id, robot_links, false);
+    for (const auto& neighbor : boxes_) {
+      if (neighbor.id == box.id || !existing.count(neighbor.id)) continue;
+      guard->allowCollisions(neighbor.id, robot_links, false);
+      auto obstacle = makeSimpleBoxObject(neighbor, base);
+      obstacle.primitives.clear();
+      obstacle.primitive_poses.clear();
+      appendWorldBox(obstacle, 0.310, 0.410, 0.158,
+        neighbor.x, neighbor.y, neighbor.z, 0.0, base);
+      guard->addObject(obstacle);
+      guarded_neighbors.push_back(neighbor);
+    }
+    task.add(std::move(guard));
     auto seed = currentSeed(task.getRobotModel());
     const auto center = worldPointInBase(box.x, box.y, box.z, currentOdom());
     geometry_msgs::msg::Pose left, right;
     // Keep tips well above the rim throughout waist motion, then let the
     // existing strict pick plan descend to its pregrasp and shallow grasp.
+    // From the upright home posture, stage both long fingers high before
+    // bending toward the tote.  After a perimeter pull the waist is already
+    // bent; keep the original low transition there because a high bilateral
+    // target exceeds the opposite arm's workspace at the outer pallet row.
+    const bool rear_lateral = get_parameter("rear_side_pull").as_bool() && box.col > 0;
     const double start_clearance =
-      seed.getVariablePosition("waist_up_down_joint") > 0.15 &&
-      seed.getVariablePosition("waist_pitch_joint") > -0.4 ? 0.61 : 0.26;
+      seed.getVariablePosition("waist_pitch_joint") > -0.4 ? 0.61 : (rear_lateral ? 0.34 : 0.26);
     auto approach_center = center;
-    const double start_x = start_clearance > 0.3 ? std::min(center[0], 0.45) : center[0];
+    const double start_x = start_clearance > 0.5 ? std::min(center[0], 0.45) : center[0];
     approach_center[0] = start_x;
     graspTargets(approach_center, start_clearance, left, right);
     auto goal = solveDualArmGoal(left, right, seed, task.getRobotModel());
@@ -4146,6 +5202,10 @@ private:
       move->setTimeout(get_parameter("stage_timeout").as_double());
       task.add(std::move(move));
     }
+    auto restore = std::make_unique<mtc::stages::ModifyPlanningScene>("restore tote shells after empty approach");
+    for (const auto& neighbor : guarded_neighbors)
+      restore->addObject(makeSimpleBoxObject(neighbor, base));
+    task.add(std::move(restore));
     if (!planAndMaybeExecute(task, execute, "empty long-finger coordinated approach"))
       throw std::runtime_error("Collision-checked empty torso-arm approach failed");
   }
@@ -4247,6 +5307,23 @@ private:
     throw std::runtime_error("Could not plan safe arms home after fresh searches; do not reset the waist");
   }
 
+  // Caller holds data_mutex_. Raw sensor axes: Fx/Fy/Fz in N, Tx/Ty/Tz in N m.
+  void logWristDetailsLocked(const std::string& stage)
+  {
+    if (!left_force_ready_ || !right_force_ready_) return;
+    const auto& l = left_wrench_message_;
+    const auto& r = right_wrench_message_;
+    RCLCPP_INFO(get_logger(),
+      "WRIST_FT_STAGE stage=%s sim_time=%.9f left_stamp=%.9f right_stamp=%.9f left=[%.6f,%.6f,%.6f,%.6f,%.6f,%.6f] right=[%.6f,%.6f,%.6f,%.6f,%.6f,%.6f] estimated_support=%.6f grippers=[%.6f,%.6f]",
+      stage.c_str(), get_clock()->now().seconds(),
+      rclcpp::Time(l.header.stamp).seconds(), rclcpp::Time(r.header.stamp).seconds(),
+      l.wrench.force.x, l.wrench.force.y, l.wrench.force.z,
+      l.wrench.torque.x, l.wrench.torque.y, l.wrench.torque.z,
+      r.wrench.force.x, r.wrench.force.y, r.wrench.force.z,
+      r.wrench.torque.x, r.wrench.torque.y, r.wrench.torque.z,
+      estimated_bottom_reaction_, measured_grippers_[0], measured_grippers_[1]);
+  }
+
   void logWristLoad(const std::string& context)
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
@@ -4256,15 +5333,23 @@ private:
         context.c_str());
       return;
     }
+    logWristDetailsLocked(context);
     RCLCPP_INFO(
       get_logger(),
       "%s: wrist force norms left=%.1f N right=%.1f N (ideal static share is about 73.6 N/arm)",
       context.c_str(), left_force_norm_, right_force_norm_);
   }
 
+  moveit::core::RobotModelConstPtr column_model_;
+  std::map<std::string, std::vector<Eigen::Vector3d>> column_points_;
+  std::vector<Eigen::Vector3d> lift_stage_visible_points_;
   mutable std::mutex data_mutex_;
   Pose2D odom_pose_;
+  Eigen::Isometry3d odom_transform_{Eigen::Isometry3d::Identity()};
+  std::chrono::steady_clock::time_point odom_received_{};
   bool odom_ready_{false};
+  geometry_msgs::msg::WrenchStamped left_wrench_message_, right_wrench_message_;
+  bool floor_support_verified_{false}, release_started_{false}, release_fully_open_{false};
   bool left_force_ready_{false};
   bool right_force_ready_{false};
   double left_force_norm_{0.0};
@@ -4272,8 +5357,19 @@ private:
   std::optional<geometry_msgs::msg::PoseStamped> latest_target_pose_;
   rclcpp::Time latest_target_received_{0, 0, RCL_ROS_TIME};
 
+  std::ofstream wrist_trace_;
+  double wrist_trace_last_{-1.0};
+  std::size_t wrist_trace_rows_{0};
+  std::string process_stage_{"initialization"};
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
-  rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr body_pub_;
+  rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr body_pub_, process_arm_pub_;
+  std::atomic_bool process_arm_active_{false};
+  std::mutex process_mutex_;
+  std::unique_ptr<moveit::core::RobotState> carry_nominal_;
+  pallet_placement::ProcessAdmittance carry_law_;
+  std::array<double,6> carry_reference_{};
+  double carry_last_update_{-1.0};
+  std::size_t carry_cycles_{0};
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr left_wrench_sub_;
   rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr right_wrench_sub_;
@@ -4295,10 +5391,10 @@ private:
   std::map<std::string, std::array<double, 3>> measured_boxes_;
   std::map<std::string, std::chrono::steady_clock::time_point> measured_boxes_received_;
   std::string attached_box_id_;
-  rclcpp::Subscription<ros_gz_interfaces::msg::Contacts>::SharedPtr floor_contacts_sub_;
-  bool floor_contact_active_{false};
-  double floor_contact_force_{0.0};
-  std::chrono::steady_clock::time_point floor_contact_received_;
+  rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr estimated_reaction_sub_;
+  bool reaction_estimate_ready_{false};
+  double estimated_bottom_reaction_{0.0};
+  std::chrono::steady_clock::time_point reaction_estimate_received_;
 };
 
 int main(int argc, char** argv)

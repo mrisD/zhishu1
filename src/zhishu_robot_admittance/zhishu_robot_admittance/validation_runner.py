@@ -35,19 +35,20 @@ class BoxPose:
 
 
 class GazeboPoseTracker:
-    """Read the actual carry_box pose from Gazebo Transport."""
+    """Read a selected model's actual pose from Gazebo Transport."""
 
-    def __init__(self):
+    def __init__(self, world_name="admittance_box", model_name="carry_box"):
         self._lock = threading.Lock()
         self._latest = None
         self._history = []
+        self.model_name = model_name
         self._process = subprocess.Popen(
             [
                 "gz",
                 "topic",
                 "-e",
                 "-t",
-                "/world/admittance_box/dynamic_pose/info",
+                f"/world/{world_name}/dynamic_pose/info",
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -91,7 +92,7 @@ class GazeboPoseTracker:
             depth += line.count("{") - line.count("}")
             if line == "}" and depth == 1:
                 section = None
-            if depth == 0 and name == "carry_box":
+            if depth == 0 and name == self.model_name:
                 pose = BoxPose(
                     time.monotonic(),
                     values.get(("position", "x"), 0.0),
@@ -113,7 +114,7 @@ class GazeboPoseTracker:
             if pose is not None:
                 return pose
             time.sleep(0.02)
-        raise RuntimeError("Timed out waiting for the Gazebo carry_box pose")
+        raise RuntimeError(f"Timed out waiting for the Gazebo {self.model_name} pose")
 
     def latest(self):
         with self._lock:
@@ -132,7 +133,7 @@ class GazeboPoseTracker:
 
 
 class ValidationRunner(Node):
-    """Publish and validate a 200 mm straight-line carry trajectory."""
+    """Publish and validate a configurable straight-line carry trajectory."""
 
     def __init__(self):
         super().__init__("admittance_validation_runner")
@@ -152,6 +153,16 @@ class ValidationRunner(Node):
         self.declare_parameter("cross_track_feedback_gain", 0.0)
         self.declare_parameter("cross_track_feedback_max_speed_mps", 0.020)
         self.declare_parameter("output_path", "")
+        self.declare_parameter("world_name", "admittance_box")
+        self.declare_parameter("model_name", "carry_box")
+        self.declare_parameter("stop_on_measured_distance", False)
+        self.declare_parameter("linear_distance_tolerance_m", 0.010)
+        self.require_reaction = bool(self.declare_parameter("require_reaction_estimate", False).value)
+        self.reaction_history = []
+        self.reaction_invalid = False
+        self.reaction_received_time = None
+        self.create_subscription(WrenchStamped, '/pallet_bin/estimated_bottom_reaction',
+                                 self._reaction_callback, 10)
         self.tare_client = self.create_client(Trigger, "/dual_arm_admittance/tare")
         self.enable_client = self.create_client(SetBool, "/dual_arm_admittance/enable")
         self.tf_buffer = Buffer()
@@ -163,6 +174,7 @@ class ValidationRunner(Node):
         self.command_history = {"left": [], "right": []}
         self.sim_time = None
         self.current_waist_pitch = None
+        self.current_waist_lift = None
         self.create_subscription(
             Clock, "/clock", self._clock_callback, qos_profile_sensor_data
         )
@@ -199,6 +211,14 @@ class ValidationRunner(Node):
         self.initial_tcp_distance = None
         self.max_tcp_distance_change = 0.0
 
+    def _reaction_callback(self, message):
+        value = float(message.wrench.force.z)
+        if message.header.frame_id != 'world' or not math.isfinite(value):
+            self.reaction_invalid = True
+            return
+        self.reaction_history.append(value)
+        self.reaction_received_time = self.sim_time
+
     def _wrench(self, side, message):
         values = (
             message.wrench.force.x,
@@ -232,6 +252,10 @@ class ValidationRunner(Node):
         self.sim_time = message.clock.sec + 1e-9 * message.clock.nanosec
 
     def _joint_states_callback(self, message):
+        if "waist_up_down_joint" in message.name:
+            index = message.name.index("waist_up_down_joint")
+            if index < len(message.position) and math.isfinite(message.position[index]):
+                self.current_waist_lift = float(message.position[index])
         if "waist_pitch_joint" in message.name:
             index = message.name.index("waist_pitch_joint")
             if index < len(message.position):
@@ -250,6 +274,8 @@ class ValidationRunner(Node):
                 min(self.sensor_counts.values()) >= 20
                 and self.sim_time is not None
                 and self.current_waist_pitch is not None
+                and self.current_waist_lift is not None
+                and (not self.require_reaction or len(self.reaction_history) >= 20)
             ):
                 return
         raise RuntimeError("Force/torque sensors did not provide 20 samples")
@@ -298,30 +324,56 @@ class ValidationRunner(Node):
         line_start=None,
         cross_track_gain=0.0,
         cross_track_max_speed=0.020,
+        measured_distance_target=None,
     ):
         if self.sim_time is None:
             raise RuntimeError("Simulation clock is unavailable")
         start = self.sim_time
         next_tick = start
-        wall_deadline = time.monotonic() + max(10.0, 5.0 * duration)
+        last_sim_time = start
+        last_progress_wall = time.monotonic()
         while True:
             rclpy.spin_once(self, timeout_sec=0.005)
             now = self.sim_time
+            if getattr(self, 'require_reaction', False) and (
+                self.reaction_received_time is None or now - self.reaction_received_time > 0.10
+                or self.reaction_invalid
+            ):
+                raise RuntimeError("Wrist-derived bottom reaction estimate is invalid or stale")
+            if now > last_sim_time:
+                last_sim_time = now
+                last_progress_wall = time.monotonic()
             elapsed = now - start
-            if elapsed >= duration:
+            if measured_distance_target is None and elapsed >= duration:
                 break
-            if time.monotonic() >= wall_deadline:
-                raise RuntimeError("Simulation clock stopped while publishing profile")
+            if measured_distance_target is not None:
+                if elapsed > max(10.0, 5.0 * duration):
+                    raise RuntimeError("Measured-distance target was not reached")
+                pose = pose_tracker.latest()
+                if pose is None or time.monotonic() - pose.sample_time > 0.5:
+                    raise RuntimeError("Gazebo box pose feedback is stale")
+                progress = (1.0 if peak >= 0.0 else -1.0) * (
+                    axis_value(pose, axis) - axis_value(line_start, axis))
+                if progress >= measured_distance_target - 0.001:
+                    break
+            if time.monotonic() - last_progress_wall > 5.0:
+                raise RuntimeError("Simulation clock did not advance for 5 wall seconds")
             if now < next_tick:
                 continue
             if axis is None:
                 speed = 0.0
             elif elapsed < ramp:
                 speed = peak * elapsed / ramp
-            elif elapsed > duration - ramp:
+            elif measured_distance_target is None and elapsed > duration - ramp:
                 speed = peak * max(0.0, duration - elapsed) / ramp
             else:
                 speed = peak
+            if measured_distance_target is not None:
+                # Reduce speed over the final 10 mm. Keep half the requested
+                # speed so Servo's small-step IK tolerance does not stall the
+                # approach before the measured target is reached.
+                remaining = measured_distance_target - progress
+                speed *= max(0.5, min(1.0, remaining / 0.010))
             message = TwistStamped()
             message.header.stamp.sec = int(now)
             message.header.stamp.nanosec = int((now - int(now)) * 1e9)
@@ -351,9 +403,14 @@ class ValidationRunner(Node):
             next_tick += 0.01
 
     def publish_waist_profile(self, duration, distance, ramp=0.5):
-        if self.current_waist_pitch is None:
+        if distance == 0.0:
+            return
+        if self.current_waist_pitch is None or self.current_waist_lift is None:
             raise RuntimeError("Current waist_pitch_joint state is unavailable")
         waist_pitch = self.current_waist_pitch
+        waist_lift = self.current_waist_lift
+        if not 0.0 <= waist_lift + distance <= 0.3:
+            raise RuntimeError("Requested waist motion exceeds its [0, 0.3] m limit")
         deadline = time.monotonic() + 5.0
         while self.body_publisher.get_subscription_count() == 0:
             if time.monotonic() >= deadline:
@@ -374,7 +431,7 @@ class ValidationRunner(Node):
             elapsed = min(index * sample_period, duration)
             point = JointTrajectoryPoint()
             point.positions = [
-                trapezoid_position(elapsed, duration, peak, ramp),
+                waist_lift + trapezoid_position(elapsed, duration, peak, ramp),
                 waist_pitch,
                 0.0,
                 0.0,
@@ -439,7 +496,10 @@ def quaternion_to_rpy(pose):
 def main(args=None):
     rclpy.init(args=args)
     runner = ValidationRunner()
-    tracker = GazeboPoseTracker()
+    tracker = GazeboPoseTracker(
+        str(runner.get_parameter("world_name").value),
+        str(runner.get_parameter("model_name").value),
+    )
     enabled = False
     try:
         runner.wait_ready()
@@ -485,9 +545,17 @@ def main(args=None):
             raise RuntimeError(
                 "cross_track_feedback_max_speed_mps must be finite and positive"
             )
-        if arm_distance >= requested_distance:
-            raise RuntimeError("arm_linear_distance_m must be below linear_distance_m")
+        if arm_distance > requested_distance:
+            raise RuntimeError("arm_linear_distance_m must not exceed linear_distance_m")
         waist_distance = requested_distance - arm_distance
+        measured_stop = bool(runner.get_parameter("stop_on_measured_distance").value)
+        distance_tolerance = float(runner.get_parameter("linear_distance_tolerance_m").value)
+        if not math.isfinite(distance_tolerance) or distance_tolerance <= 0.0:
+            raise RuntimeError("linear_distance_tolerance_m must be finite and positive")
+        if measured_stop and waist_distance > 1e-9:
+            raise RuntimeError("Measured-distance stopping requires arm-only motion")
+        if linear_axis != "z" and waist_distance > 1e-9:
+            raise RuntimeError("Waist contribution is only supported for the z axis")
         if waist_distance > 0.3:
             raise RuntimeError("Requested waist contribution exceeds its 0.3 m limit")
         line_ramp = 0.5
@@ -505,6 +573,7 @@ def main(args=None):
             line_start=start,
             cross_track_gain=cross_track_gain,
             cross_track_max_speed=cross_track_max_speed,
+            measured_distance_target=requested_distance if measured_stop else None,
         )
         line_end = tracker.latest()
         runner.publish_profile(0.5)
@@ -535,6 +604,8 @@ def main(args=None):
             "box_final_xyz_m": [final.x, final.y, final.z],
             "linear_axis": linear_axis,
             "requested_linear_distance_m": requested_distance,
+            "stop_on_measured_distance": measured_stop,
+            "linear_distance_tolerance_m": distance_tolerance,
             "commanded_arm_distance_m": arm_distance,
             "commanded_waist_distance_m": waist_distance,
             "cross_track_feedback_gain": cross_track_gain,
@@ -568,9 +639,9 @@ def main(args=None):
             "right_servo_command_samples": len(runner.command_history["right"]),
         }
         checks = {
-            "straight_line_200_plus_minus_10_mm": 0.190
+            "straight_line_within_requested_tolerance": requested_distance - distance_tolerance
             <= metrics["linear_axis_displacement_m"]
-            <= 0.210,
+            <= requested_distance + distance_tolerance,
             "linear_cross_track_error_at_most_5_mm": metrics[
                 "max_linear_cross_track_error_m"
             ]
@@ -586,6 +657,14 @@ def main(args=None):
             "sensor_data_finite": not metrics["sensor_nonfinite"],
         }
         report = {"passed": all(checks.values()), "checks": checks, "metrics": metrics}
+        if runner.require_reaction:
+            checks['wrist_reaction_estimate_valid'] = not runner.reaction_invalid and len(runner.reaction_history) >= 20
+            metrics['bottom_reaction_estimate_source'] = 'two wrist F/T sensors, tool gravity compensated, quasi-static'
+            metrics['bottom_reaction_estimate_samples'] = len(runner.reaction_history)
+            metrics['bottom_reaction_estimate_mean_n'] = sum(runner.reaction_history) / len(runner.reaction_history)
+            metrics['bottom_reaction_estimate_min_n'] = min(runner.reaction_history)
+            metrics['bottom_reaction_estimate_max_n'] = max(runner.reaction_history)
+            report['passed'] = all(checks.values())
         serialized = json.dumps(report, ensure_ascii=False, indent=2)
         output_path = str(runner.get_parameter("output_path").value)
         if output_path:

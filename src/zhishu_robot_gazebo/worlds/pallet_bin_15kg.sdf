@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <sdf version="1.9">
   <world name="pallet_bin_15kg">
+    <plugin filename="gz-sim-forcetorque-system" name="gz::sim::systems::ForceTorque"/>
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics">
       <engine><filename>gz-physics-dartsim-plugin</filename></engine>
     </plugin>
@@ -72,11 +73,7 @@
       <!-- Restore the first tote to its default CAD centre, inset from the pallet edge. -->
       <pose>0.704355 -0.400617 0.224000 0 0 0</pose>
       <link name="box_link">
-        <sensor name="tote_bottom_contact" type="contact">
-          <always_on>true</always_on><update_rate>50</update_rate>
-          <topic>/pallet_bin/tote_bottom_contacts</topic>
-          <contact><collision>bottom</collision></contact>
-        </sensor>
+
         <inertial>
           <mass>15.0</mass>
           <inertia><ixx>0.22738</ixx><iyy>0.13988</iyy><izz>0.31250</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>

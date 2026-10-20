@@ -107,8 +107,6 @@ def main():
         replacement = copy.deepcopy(reference)
         replacement.set('name', name)
         replacement.find('pose').text = original.find('pose').text
-        replacement.find('link/sensor/topic').text = (
-            f'/world/pallet_bin_15kg/model/{name}/link/box_link/sensor/tote_bottom_contact/contact')
         world.remove(original)
         world.append(replacement)
     if args.middle_only:

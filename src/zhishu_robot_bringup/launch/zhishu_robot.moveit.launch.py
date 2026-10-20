@@ -3,6 +3,8 @@ from datetime import datetime
 import os
 from pathlib import Path
 import re
+import yaml
+import tempfile
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -13,6 +15,7 @@ from launch.actions import (
     RegisterEventHandler,
     SetLaunchConfiguration,
     SetEnvironmentVariable,
+    TimerAction,
 )
 from launch.event_handlers import OnProcessExit, OnProcessStart
 from launch.conditions import IfCondition, UnlessCondition
@@ -67,6 +70,28 @@ def _configure_native_log_directory(context):
     ]
 
 
+def _check_memlock_limit(context):
+    """Report old terminal limits before starting locked-memory controllers."""
+    from launch.logging import get_logger
+    import resource
+
+    logger = get_logger("zhishu_robot_bringup.memlock")
+    soft, hard = resource.getrlimit(resource.RLIMIT_MEMLOCK)
+    if hard == resource.RLIM_INFINITY:
+        if soft != resource.RLIM_INFINITY:
+            resource.setrlimit(resource.RLIMIT_MEMLOCK, (hard, hard))
+        logger.info("memlock soft=unlimited hard=unlimited")
+    else:
+        logger.warning(
+            f"memlock soft={soft} hard={hard} bytes: this terminal has a finite "
+            "locked-memory limit. Controllers may fail to configure or create "
+            "threads. Run sudo bash "
+            "$(ros2 pkg prefix --share zhishu_robot_bringup)/scripts/fix_memlock.sh "
+            "once, then verify new services report unlimited."
+        )
+    return []
+
+
 def generate_launch_description():
     session_started_at = datetime.now().strftime("%H-%M-%S")
     left_arm_use_fake_hardware = LaunchConfiguration("left_arm_use_fake_hardware")
@@ -108,11 +133,13 @@ def generate_launch_description():
     enable_log_recorder = LaunchConfiguration("enable_log_recorder")
     enable_kernel_ethercat_log = LaunchConfiguration("enable_kernel_ethercat_log")
     enable_commander = LaunchConfiguration("enable_commander")
+    enable_servo = LaunchConfiguration("enable_servo")
     log_root = LaunchConfiguration("log_root")
     log_session = LaunchConfiguration("log_session")
     log_max_file_size_mb = LaunchConfiguration("log_max_file_size_mb")
     log_min_severity = LaunchConfiguration("log_min_severity")
     use_rviz = LaunchConfiguration("use_rviz")
+    rviz_start_delay = LaunchConfiguration("rviz_start_delay")
     rviz_config_file = LaunchConfiguration("rviz_config_file")
     handeye_target_enabled = LaunchConfiguration("handeye_target_enabled")
     initial_positions_file = LaunchConfiguration("initial_positions_file")
@@ -164,6 +191,42 @@ def generate_launch_description():
     )
 
     moveit_all_params = moveit_config.to_dict()
+
+    def configure_servo_mode(context):
+        enabled = IfCondition(enable_servo).evaluate(context)
+        package = "zhishu_robot_bringup" if enabled else "zhishu_robot_moveit_config"
+        filename = "moveit_controllers_servo.yaml" if enabled else "moveit_controllers.yaml"
+        path = os.path.join(get_package_share_directory(package), "config", filename)
+        # MoveIt config YAML is a dictionary, not a ROS --params-file.
+        # Wrap it so rcl applies the overrides to move_group.
+        with open(path, encoding="utf-8") as stream:
+            controllers = yaml.safe_load(stream)
+        with tempfile.NamedTemporaryFile(mode="w", prefix="zhishu_moveit_controllers_",
+                                         suffix=".yaml", delete=False) as stream:
+            yaml.safe_dump({"/**": {"ros__parameters": controllers}}, stream, sort_keys=False)
+            parameter_file = stream.name
+        return [SetLaunchConfiguration("selected_moveit_controllers", parameter_file)]
+
+    def servo_nodes(context):
+        share = get_package_share_directory("quest_dual_arm_teleop")
+        nodes = []
+        for side, hardware in (("left", enable_left_arm_hardware),
+                               ("right", enable_right_arm_hardware)):
+            if not IfCondition(hardware).evaluate(context):
+                continue
+            with open(os.path.join(share, "config", side + "_servo.yaml"), encoding="utf-8") as stream:
+                params = yaml.safe_load(stream)
+            nodes.append(Node(
+                package="moveit_servo", executable="servo_node", name=side + "_servo",
+                output="screen", parameters=[
+                    {"moveit_servo": params}, moveit_config.robot_description,
+                    moveit_config.robot_description_semantic,
+                    moveit_config.robot_description_kinematics,
+                    moveit_config.joint_limits, {"use_sim_time": False},
+                ],
+            ))
+        return nodes
+
 
     # ==============================
     # Central file logger
@@ -318,6 +381,7 @@ def generate_launch_description():
         output="screen",
         parameters=[
             moveit_all_params,
+            LaunchConfiguration("selected_moveit_controllers"),
             {"use_sim_time": False},
             {"allow_trajectory_execution": True},
             {"moveit_manage_controllers": True},
@@ -354,6 +418,10 @@ def generate_launch_description():
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
+        prefix=[PathJoinSubstitution([
+            FindPackagePrefix("zhishu_robot_bringup"), "lib", "zhishu_robot_bringup",
+            "rviz_with_fixes.sh",
+        ])],
         name="rviz2",
         output="screen",
         arguments=["-d", rviz_config_file],
@@ -369,7 +437,17 @@ def generate_launch_description():
     # ==============================
     # 启动顺序
     # ==============================
+    def arm_controller_chain(context):
+        return [left_arm_controller_spawner if IfCondition(enable_servo).evaluate(context)
+                else dual_arm_controller_spawner]
+
     return LaunchDescription([
+        OpaqueFunction(function=_check_memlock_limit),
+        DeclareLaunchArgument(
+            "ros_domain_id", default_value="168",
+            description="Dedicated robot DDS domain; Qt and diagnostic terminals must use the same ID",
+        ),
+        SetEnvironmentVariable("ROS_DOMAIN_ID", LaunchConfiguration("ros_domain_id")),
         # Hardware mode and components
         DeclareLaunchArgument(
             "left_arm_use_fake_hardware",
@@ -430,9 +508,17 @@ def generate_launch_description():
 
         # Control and visualization nodes
         DeclareLaunchArgument(
+            "enable_servo", default_value="false",
+            description="Start arm Servo nodes and use independent arm controllers (no Quest input)",
+        ),
+        DeclareLaunchArgument(
             "enable_commander",
             default_value="false",
             description="Start the Commander ROS bridge after move_group starts",
+        ),
+        DeclareLaunchArgument(
+            "rviz_start_delay", default_value="5.0",
+            description="Delay RViz after move_group starts to allow model and scene initialization",
         ),
         DeclareLaunchArgument(
             "use_rviz",
@@ -520,6 +606,7 @@ def generate_launch_description():
             ),
         ),
         OpaqueFunction(function=_configure_native_log_directory),
+        OpaqueFunction(function=configure_servo_mode),
         log_recorder_node,
         kernel_ethercat_logger,
         robot_state_publisher,
@@ -531,7 +618,7 @@ def generate_launch_description():
         RegisterEventHandler(
             OnProcessExit(
                 target_action=joint_state_broadcaster_spawner,
-                on_exit=[dual_arm_controller_spawner],
+                on_exit=[OpaqueFunction(function=arm_controller_chain)],
             ),
             condition=IfCondition(arm_only_mode),
         ),
@@ -580,11 +667,23 @@ def generate_launch_description():
             condition=IfCondition(left_arm_only_mode),
         ),
 
+        # Servo owns independent arm controllers; never activate the overlapping dual controller.
+        RegisterEventHandler(
+            OnProcessExit(target_action=left_arm_controller_spawner,
+                          on_exit=[right_arm_controller_spawner]),
+            condition=IfCondition(AndSubstitution(enable_servo, both_arm_hardware_enabled)),
+        ),
+        RegisterEventHandler(
+            OnProcessExit(target_action=right_arm_controller_spawner,
+                          on_exit=[left_gripper_controller_spawner]),
+            condition=IfCondition(AndSubstitution(enable_servo, both_arm_hardware_enabled)),
+        ),
+
         # Combined path: torso/head does not suppress the dual-arm chain.
         RegisterEventHandler(
             OnProcessExit(
                 target_action=torso_head_controller_spawner,
-                on_exit=[dual_arm_controller_spawner],
+                on_exit=[OpaqueFunction(function=arm_controller_chain)],
             ),
             condition=IfCondition(both_arm_hardware_enabled),
         ),
@@ -629,14 +728,17 @@ def generate_launch_description():
         ),
 
         RegisterEventHandler(
-            OnProcessStart(target_action=move_group_node, on_start=[commander_node])
+            OnProcessStart(target_action=move_group_node, on_start=[
+                commander_node,
+                OpaqueFunction(function=servo_nodes, condition=IfCondition(enable_servo)),
+            ])
         ),
 
         # Start RViz only after the selected controller chain reaches move_group.
         RegisterEventHandler(
             OnProcessStart(
                 target_action=move_group_node,
-                on_start=[rviz_node],
+                on_start=[TimerAction(period=rviz_start_delay, actions=[rviz_node])],
             )
         ),
     ])
