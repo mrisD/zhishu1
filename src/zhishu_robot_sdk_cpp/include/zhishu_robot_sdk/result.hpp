@@ -4,6 +4,8 @@
 #include <string>
 #include <utility>
 
+#include "zhishu_robot_sdk/visibility_control.h"
+
 namespace zhishu_robot_sdk
 {
 
@@ -21,7 +23,7 @@ enum class ErrorCode
   kInternalError,
 };
 
-const char * toString(ErrorCode code) noexcept;
+ZHISHU_ROBOT_SDK_PUBLIC const char * toString(ErrorCode code) noexcept;
 
 struct Result
 {

@@ -13,12 +13,13 @@
 #include <vector>
 
 #include "zhishu_robot_sdk/result.hpp"
+#include "zhishu_robot_sdk/visibility_control.h"
 #include "zhishu_robot_sdk/coordinate_frames.hpp"
 
 namespace zhishu_robot_sdk
 {
 
-class Commander
+class ZHISHU_ROBOT_SDK_PUBLIC Commander
 {
 public:
   using MoveGroupInterface = moveit::planning_interface::MoveGroupInterface;

@@ -67,10 +67,10 @@ TEST(CommanderStatusContractTest, ErrorCodesMatchRosMessageConstants)
 
 TEST(VersionTest, HeaderMatchesPackageMinorRelease)
 {
-  EXPECT_STREQ(kSdkVersion, "0.3.0");
+  EXPECT_STREQ(kSdkVersion, "0.3.1");
   EXPECT_EQ(kSdkVersionMajor, 0);
   EXPECT_EQ(kSdkVersionMinor, 3);
-  EXPECT_EQ(kSdkVersionPatch, 0);
+  EXPECT_EQ(kSdkVersionPatch, 1);
 }
 
 }  // namespace

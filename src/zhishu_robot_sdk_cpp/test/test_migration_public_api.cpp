@@ -35,6 +35,6 @@ TEST(MigrationApiTest, PublicUmbrellaHeaderExportsExistingTypes)
   const Result result = Result::success("migration");
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(result.code, ErrorCode::kSuccess);
-  EXPECT_EQ(std::string(zhishu_robot_sdk::kSdkVersion), "0.3.0");
+  EXPECT_EQ(std::string(zhishu_robot_sdk::kSdkVersion), "0.3.1");
 }
 }  // namespace

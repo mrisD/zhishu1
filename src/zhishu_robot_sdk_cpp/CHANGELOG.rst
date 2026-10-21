@@ -2,6 +2,16 @@
 Changelog for package zhishu_robot_sdk_cpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.3.1 (2026-10-21)
+------------------
+* Add public-library symbol visibility macros and normalized robot status / IO types.
+* Add placeholder APIs for speed scaling, tool/workobject CRUD, version/error query, and IO access.
+* Strengthen synchronous and asynchronous SDK input validation for joint vectors, Cartesian poses,
+  named targets and gripper positions.
+* Report incomplete joint feedback as ``kNotReady`` rather than a successful state snapshot.
+* Remove a duplicate MoveIt target-clear call.
+* Keep new Excel/vendor-inspired feature APIs as explicit ``kNotReady`` stubs.
+
 0.3.0 (2026-09-10)
 ------------------
 * Add true ``left_gripper_tcp`` / ``right_gripper_tcp`` pose APIs with RobotModel-based rigid transform conversion to the arm IK tips.

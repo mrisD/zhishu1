@@ -1,5 +1,20 @@
 cmake_minimum_required(VERSION 3.8)
-project(zhishu_robot_sdk_cpp)
+project(zhishu_robot_sdk_cpp VERSION 0.3.1)
+
+# Keep CMake project version and package.xml version in lockstep. The public
+# version.hpp is checked by unit tests, so a stale version fails early.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/package.xml" _sdk_package_xml)
+string(REGEX MATCH
+  "<version>[ \t\r\n]*([^<]+)[ \t\r\n]*</version>"
+  _sdk_package_version_match "${_sdk_package_xml}")
+set(_sdk_package_version "${CMAKE_MATCH_1}")
+if(NOT "${_sdk_package_version}" STREQUAL "${PROJECT_VERSION}")
+  message(FATAL_ERROR
+    "SDK version mismatch: CMake project=${PROJECT_VERSION}, package.xml=${_sdk_package_version}")
+endif()
+unset(_sdk_package_xml)
+unset(_sdk_package_version_match)
+unset(_sdk_package_version)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -33,6 +48,7 @@ add_library(zhishu_robot_sdk SHARED
   src/motion_handle.cpp
   src/result.cpp
   src/robot_sdk.cpp
+  src/robot_sdk_extensions.cpp
 )
 target_include_directories(zhishu_robot_sdk
   PUBLIC
@@ -47,7 +63,10 @@ ament_target_dependencies(zhishu_robot_sdk
   tf2 tf2_ros moveit_core
 )
 target_link_libraries(zhishu_robot_sdk Threads::Threads Eigen3::Eigen yaml-cpp)
-target_compile_definitions(zhishu_robot_sdk PRIVATE SILENCE_DEPRECATION_WARNINGS)
+target_compile_definitions(zhishu_robot_sdk PRIVATE
+  SILENCE_DEPRECATION_WARNINGS
+  ZHISHU_ROBOT_SDK_BUILDING_DLL
+)
 
 add_executable(commander_node src/commander_node.cpp)
 target_link_libraries(commander_node zhishu_robot_sdk)
@@ -96,7 +115,13 @@ install(
   DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
-install(FILES README.md CHANGELOG.rst SDK_FRAMES.md DESTINATION share/${PROJECT_NAME})
+install(FILES README.md CHANGELOG.rst SDK_FRAMES.md SDK_EXCEL_API_CONTRACT.md SDK_ACCEPTANCE.md DESTINATION share/${PROJECT_NAME})
+install(
+  DIRECTORY test/
+  DESTINATION share/${PROJECT_NAME}/test
+  FILES_MATCHING PATTERN "*.launch.py" PATTERN "*.yaml"
+)
+install(PROGRAMS scripts/validate_sdk_acceptance.sh DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
@@ -119,6 +144,16 @@ if(BUILD_TESTING)
   if(TARGET test_sdk_types)
     target_link_libraries(test_sdk_types zhishu_robot_sdk)
     ament_target_dependencies(test_sdk_types zhishu_robot_interfaces)
+  endif()
+
+  ament_add_gtest(test_robot_sdk_extended_api test/test_robot_sdk_extended_api.cpp)
+  if(TARGET test_robot_sdk_extended_api)
+    target_link_libraries(test_robot_sdk_extended_api zhishu_robot_sdk)
+  endif()
+
+  ament_add_gtest(test_sdk_acceptance_contract test/test_sdk_acceptance_contract.cpp)
+  if(TARGET test_sdk_acceptance_contract)
+    target_link_libraries(test_sdk_acceptance_contract zhishu_robot_sdk)
   endif()
 
   ament_add_gtest(

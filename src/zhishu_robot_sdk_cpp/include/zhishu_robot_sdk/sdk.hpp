@@ -5,6 +5,9 @@
 #include "zhishu_robot_sdk/motion_handle.hpp"
 #include "zhishu_robot_sdk/result.hpp"
 #include "zhishu_robot_sdk/robot_sdk.hpp"
+#include "zhishu_robot_sdk/robot_io.hpp"
+#include "zhishu_robot_sdk/robot_status.hpp"
+#include "zhishu_robot_sdk/visibility_control.h"
 #include "zhishu_robot_sdk/version.hpp"
 
 #endif  // ZHISHU_ROBOT_SDK__SDK_HPP_

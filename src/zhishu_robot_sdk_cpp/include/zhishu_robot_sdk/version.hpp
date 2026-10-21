@@ -6,8 +6,8 @@ namespace zhishu_robot_sdk
 
 inline constexpr int kSdkVersionMajor = 0;
 inline constexpr int kSdkVersionMinor = 3;
-inline constexpr int kSdkVersionPatch = 0;
-inline constexpr char kSdkVersion[] = "0.3.0";
+inline constexpr int kSdkVersionPatch = 1;
+inline constexpr char kSdkVersion[] = "0.3.1";
 
 }  // namespace zhishu_robot_sdk
 

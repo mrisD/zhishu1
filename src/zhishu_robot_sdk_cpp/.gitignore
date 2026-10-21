@@ -1,0 +1,13 @@
+# Python-generated cache
+__pycache__/
+*.py[cod]
+
+# Local ROS 2 / colcon artifacts
+build/
+install/
+log/
+
+# Editor / OS artifacts
+.vscode/
+.idea/
+.DS_Store

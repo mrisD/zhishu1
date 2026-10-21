@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>zhishu_robot_sdk_cpp</name>
-  <version>0.3.0</version>
+  <version>0.3.1</version>
   <description>Independent C++ MoveIt SDK migrated from zhishu_robot_commander_cpp.</description>
   <maintainer email="zhu_liang@ota-os.com">zhul</maintainer>
   <license>Apache-2.0</license>

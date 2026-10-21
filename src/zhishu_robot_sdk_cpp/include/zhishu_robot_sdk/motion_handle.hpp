@@ -10,6 +10,7 @@
 #include <string>
 
 #include "zhishu_robot_sdk/result.hpp"
+#include "zhishu_robot_sdk/visibility_control.h"
 
 namespace zhishu_robot_sdk
 {
@@ -25,8 +26,8 @@ enum class MotionStatus
   kCancelled,
 };
 
-const char * toString(MotionStatus status) noexcept;
-bool isTerminal(MotionStatus status) noexcept;
+ZHISHU_ROBOT_SDK_PUBLIC const char * toString(MotionStatus status) noexcept;
+ZHISHU_ROBOT_SDK_PUBLIC bool isTerminal(MotionStatus status) noexcept;
 
 struct MotionSnapshot
 {
@@ -53,7 +54,7 @@ struct MotionState
 
 class RobotSdk;
 
-class MotionHandle
+class ZHISHU_ROBOT_SDK_PUBLIC MotionHandle
 {
 public:
   MotionHandle() = default;

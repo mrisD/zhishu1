@@ -1,19 +1,22 @@
 # zhishu_robot_sdk_cpp — 独立 C++ SDK 迁移版
 
 本包从 `zhishu_robot_commander_cpp` **完整复制**原有 C++ SDK、节点、配置、测试和示例。
-原包保持不变；新包单独编译 `libzhishu_robot_sdk.so`，不链接原包的库。
+原包保持不变；新包单独编译 `libzhishu_robot_sdk.so`，不链接原包的库。对外统一只保留
+`zhishu_robot_sdk::RobotSdk` 一个 SDK 类，原有运动接口与 Excel 工作流接口集中在同一类中。
 
 ## 兼容性与隔离
 
 - **包名**：`zhishu_robot_sdk_cpp`
 - **公共头文件**：`#include <zhishu_robot_sdk/sdk.hpp>`
 - **命名空间**：`zhishu_robot_sdk`
-- **现有核心类**：`zhishu_robot_sdk::RobotSdk` / `zhishu_robot_sdk::Commander`
+- **核心类**：唯一对外 SDK `zhishu_robot_sdk::RobotSdk`；内部运动规划类 `zhishu_robot_sdk::Commander`
 - **编译目标**：`zhishu_robot_sdk`；库文件 `libzhishu_robot_sdk.so`
 - **新桥接节点**：`/zhishu_robot_sdk_commander`，旧节点 `/zhishu_robot_commander` 不受影响
 - **依赖**：ROS 2 Jazzy、MoveIt 2、`zhishu_robot_interfaces` 等原包已使用的公共运行服务
 
-迁移的目标是原有接口功能平移，**未**实现此前规划的 `RobotClient`、扫码、轨迹录制/回放或电吸新接口；这些将在迁移通过后独立开发。
+对外只保留一个 `zhishu_robot_sdk::RobotSdk` 类。原有运动 API 与新增 Excel 工作流 API 在该类中统一声明；新增工作流（Jog、轨迹录制/回放、扫码、电吸、IO 等）目前仍是空框架，返回 `kNotReady`，后续逐项接入现有 Commander 和 ROS 2 服务。
+
+自动化构建、测试、动态库依赖与 Fake Hardware 验收流程见 [SDK_ACCEPTANCE.md](SDK_ACCEPTANCE.md)。
 
 ## 构建
 

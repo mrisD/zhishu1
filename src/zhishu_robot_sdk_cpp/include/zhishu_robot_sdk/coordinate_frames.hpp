@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "zhishu_robot_sdk/visibility_control.h"
+
 namespace zhishu_robot_sdk
 {
 // Empty tool means the API's documented default: tool0 for pose, gripper TCP
@@ -16,7 +18,7 @@ struct MotionFrames
   std::string wobj{"wobj0"};
 };
 
-class CoordinateFrames
+class ZHISHU_ROBOT_SDK_PUBLIC CoordinateFrames
 {
 public:
   void loadFile(const std::string & path);
