@@ -48,6 +48,7 @@ struct MotionState
   MotionStatus status{MotionStatus::kQueued};
   Result result{Result::failure(ErrorCode::kNotReady, "motion has not completed")};
   bool cancel_requested{false};
+  bool cancel_callback_running{false};
   std::function<void()> cancel_callback;
 };
 }  // namespace detail
@@ -64,6 +65,8 @@ public:
   MotionStatus status() const;
   MotionSnapshot snapshot() const;
   bool done() const;
+  // Requests cancellation; returns false when unavailable/already requested or
+  // the stop callback fails. Wait for the operation to reach its terminal state.
   bool cancel();
   Result result() const;
   Result wait() const;

@@ -4,6 +4,10 @@ Changelog for package zhishu_robot_sdk_cpp
 
 0.3.1 (2026-10-21)
 ------------------
+* Serialize motion admission and worker reaping under concurrent sync/async calls.
+* Complete cancellation only after its stop callback returns; handle callback failure without escaping.
+* Isolate optional feedback failures from required joints and reject gripper bounds before queueing.
+* Add deterministic motion-task tests and a separate GenericSystem concurrency regression consumer.
 * Add public-library symbol visibility macros and normalized robot status / IO types.
 * Add placeholder APIs for speed scaling, tool/workobject CRUD, version/error query, and IO access.
 * Strengthen synchronous and asynchronous SDK input validation for joint vectors, Cartesian poses,

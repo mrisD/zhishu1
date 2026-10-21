@@ -1,4 +1,5 @@
 #include "zhishu_robot_sdk/motion_handle.hpp"
+#include "motion_task.hpp"
 
 #include <utility>
 
@@ -76,25 +77,7 @@ bool MotionHandle::done() const
 
 bool MotionHandle::cancel()
 {
-  if (!state_) {
-    return false;
-  }
-
-  std::function<void()> callback;
-  {
-    std::lock_guard<std::mutex> lock(state_->mutex);
-    if (isTerminal(state_->status) || state_->cancel_requested) {
-      return false;
-    }
-    state_->cancel_requested = true;
-    state_->status = MotionStatus::kCancelling;
-    callback = state_->cancel_callback;
-  }
-  state_->condition.notify_all();
-  if (callback) {
-    callback();
-  }
-  return true;
+  return detail::requestCancellation(state_);
 }
 
 Result MotionHandle::result() const

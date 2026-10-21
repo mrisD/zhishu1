@@ -18,6 +18,15 @@
 
 自动化构建、测试、动态库依赖与 Fake Hardware 验收流程见 [SDK_ACCEPTANCE.md](SDK_ACCEPTANCE.md)。
 
+## 代码目录
+
+- `include/zhishu_robot_sdk/`：SDK 公共头文件。
+- `src/`：SDK 内部实现和 Commander 桥接节点，包括任务状态机 `motion_task.hpp/.cpp`。
+- `test/`：单元测试、仿真回归测试、SDK 示例、循环测试，以及测试共用的 `stability_pdo_recording.hpp/.cpp`。
+
+示例和循环测试的可执行程序名称、安装位置及启动命令保持不变；它们仍默认编译，
+单元测试和仿真回归测试程序由 `BUILD_TESTING` 控制。
+
 ## 构建
 
 ```bash

@@ -36,3 +36,29 @@ Verify that `robot_state_publisher`, `ros2_control_node`, the controller spawner
 ## Known feature status
 
 The following public APIs remain placeholders and return `kNotReady`: software Jog/teaching, trajectory sampling and JSON persistence, trajectory playback, scan Topic/Service monitoring, user Home persistence, speed-scale setter/getter, coordinate-frame CRUD, IO, controller version/error mapping, and vacuum. A passing build/test gate does not mean these features are implemented.
+
+## Concurrency and feedback regressions
+
+The registered `test_motion_task` tests exercise queued cancellation, completion while a stop
+callback is still running, stop-callback failure, and backend exceptions. A task becomes
+terminal only after the operation and its pending stop callback have finished. Failed stop
+requests return false and do not forge a cancelled result.
+
+With `BUILD_TESTING=ON`, a separate `sdk_simulation_regression` executable is built. After
+starting only GenericSystem in an isolated domain, run:
+
+```bash
+ROS_DOMAIN_ID=169 ROS_LOCALHOST_ONLY=1 ros2 launch zhishu_robot_sdk_cpp sdk_simulation_regression.launch.py
+```
+
+This checks rejected inputs, 800 concurrent sync/async calls with a nonexistent named target,
+and required-joint feedback when one optional TCP is unavailable. It intentionally sends no
+valid motion target and is separate from hardware-independent CTest. Follow it with the joint
+loop in the same GenericSystem domain for motion regression.
+
+SDK motion admission and worker reaping are serialized. Busy calls still return `kBusy`;
+accepted synchronous motion does not hold the admission lock while executing. Gripper targets
+outside `[0, 0.06]` metres, including NaN/infinity, are rejected before worker creation. Optional
+feedback failures only clear their own validity flags; required joint feedback retains its
+separate result. State reads retain the existing Commander locking behavior and are not a
+guarantee of a simultaneous or real-time snapshot.

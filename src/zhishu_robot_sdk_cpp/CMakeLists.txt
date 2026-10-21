@@ -46,6 +46,7 @@ add_library(zhishu_robot_sdk SHARED
   src/coordinate_frames.cpp
   src/pose_math.cpp
   src/motion_handle.cpp
+  src/motion_task.cpp
   src/result.cpp
   src/robot_sdk.cpp
   src/robot_sdk_extensions.cpp
@@ -77,23 +78,23 @@ ament_target_dependencies(commander_node
   zhishu_robot_interfaces
 )
 
-add_executable(sdk_example src/sdk_example.cpp)
+add_executable(sdk_example test/sdk_example.cpp)
 target_link_libraries(sdk_example zhishu_robot_sdk)
 ament_target_dependencies(sdk_example rclcpp)
 
-add_executable(sdk_torso_head_example src/sdk_torso_head_example.cpp)
+add_executable(sdk_torso_head_example test/sdk_torso_head_example.cpp)
 target_link_libraries(sdk_torso_head_example zhishu_robot_sdk)
 ament_target_dependencies(sdk_torso_head_example rclcpp)
 
-add_executable(sdk_named_pose_loop src/sdk_named_pose_loop.cpp)
+add_executable(sdk_named_pose_loop test/sdk_named_pose_loop.cpp)
 target_link_libraries(sdk_named_pose_loop zhishu_robot_sdk)
 ament_target_dependencies(sdk_named_pose_loop rclcpp std_srvs)
-target_sources(sdk_named_pose_loop PRIVATE src/stability_pdo_recording.cpp)
+target_sources(sdk_named_pose_loop PRIVATE test/stability_pdo_recording.cpp)
 
-add_executable(sdk_joint_ethercat_loop src/sdk_joint_loop.cpp)
+add_executable(sdk_joint_ethercat_loop test/sdk_joint_loop.cpp)
 target_link_libraries(sdk_joint_ethercat_loop zhishu_robot_sdk)
 ament_target_dependencies(sdk_joint_ethercat_loop rclcpp std_srvs)
-target_sources(sdk_joint_ethercat_loop PRIVATE src/stability_pdo_recording.cpp)
+target_sources(sdk_joint_ethercat_loop PRIVATE test/stability_pdo_recording.cpp)
 
 install(
   DIRECTORY include/
@@ -125,6 +126,15 @@ install(PROGRAMS scripts/validate_sdk_acceptance.sh DESTINATION lib/${PROJECT_NA
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  add_executable(sdk_simulation_regression test/sdk_simulation_regression.cpp)
+  target_link_libraries(sdk_simulation_regression zhishu_robot_sdk Threads::Threads)
+  ament_target_dependencies(sdk_simulation_regression rclcpp)
+  install(TARGETS sdk_simulation_regression DESTINATION lib/${PROJECT_NAME})
+  ament_add_gtest(test_motion_task test/test_motion_task.cpp)
+  if(TARGET test_motion_task)
+    target_include_directories(test_motion_task PRIVATE src)
+    target_link_libraries(test_motion_task zhishu_robot_sdk Threads::Threads)
+  endif()
   ament_add_gtest(test_coordinate_frames test/test_coordinate_frames.cpp)
   if(TARGET test_coordinate_frames)
     target_link_libraries(test_coordinate_frames zhishu_robot_sdk Eigen3::Eigen)
@@ -159,10 +169,10 @@ if(BUILD_TESTING)
   ament_add_gtest(
     test_stability_pdo_recording
     test/test_stability_pdo_recording.cpp
-    src/stability_pdo_recording.cpp
+    test/stability_pdo_recording.cpp
   )
   if(TARGET test_stability_pdo_recording)
-    target_include_directories(test_stability_pdo_recording PRIVATE src)
+    target_include_directories(test_stability_pdo_recording PRIVATE test)
     ament_target_dependencies(test_stability_pdo_recording rclcpp std_srvs)
   endif()
 endif()

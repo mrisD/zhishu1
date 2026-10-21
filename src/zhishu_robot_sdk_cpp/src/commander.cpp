@@ -31,6 +31,15 @@ constexpr double kGripperMaximum = 0.06;
 constexpr char kLeftGripperJoint[] = "left_gripper_left_finger_joint";
 constexpr char kRightGripperJoint[] = "gripper_left_finger_joint";
 
+geometry_msgs::msg::PoseStamped checkedCurrentPose(
+  Commander::MoveGroupInterface & group, const std::string & link)
+{
+  if (!group.getRobotModel()->hasLinkModel(link)) {
+    throw std::invalid_argument("pose feedback link is not in the robot model: " + link);
+  }
+  return group.getCurrentPose(link);
+}
+
 bool succeeded(const moveit::core::MoveItErrorCode & code)
 {
   return code == moveit::core::MoveItErrorCode::SUCCESS;
@@ -659,25 +668,25 @@ std::vector<double> Commander::getBothGrippersJoints() const
 geometry_msgs::msg::PoseStamped Commander::getLeftArmPose(const std::string & link) const
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
-  return left_arm_->getCurrentPose(link.empty() ? options_.left_end_effector_link : link);
+  return checkedCurrentPose(*left_arm_, link.empty() ? options_.left_end_effector_link : link);
 }
 
 geometry_msgs::msg::PoseStamped Commander::getRightArmPose(const std::string & link) const
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
-  return right_arm_->getCurrentPose(link.empty() ? options_.right_end_effector_link : link);
+  return checkedCurrentPose(*right_arm_, link.empty() ? options_.right_end_effector_link : link);
 }
 
 geometry_msgs::msg::PoseStamped Commander::getLeftTcpPose() const
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
-  return left_arm_->getCurrentPose(options_.left_tcp_link);
+  return checkedCurrentPose(*left_arm_, options_.left_tcp_link);
 }
 
 geometry_msgs::msg::PoseStamped Commander::getRightTcpPose() const
 {
   std::lock_guard<std::mutex> lock(command_mutex_);
-  return right_arm_->getCurrentPose(options_.right_tcp_link);
+  return checkedCurrentPose(*right_arm_, options_.right_tcp_link);
 }
 
 void Commander::stop()

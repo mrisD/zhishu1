@@ -1,4 +1,5 @@
 #include "zhishu_robot_sdk/robot_sdk.hpp"
+#include "motion_task.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -36,7 +37,8 @@ bool validPoseFeedback(const geometry_msgs::msg::PoseStamped & pose)
   const auto & p = pose.pose.position;
   const auto & q = pose.pose.orientation;
   const double norm = std::hypot(std::hypot(q.x, q.y), std::hypot(q.z, q.w));
-  return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) &&
+  return !pose.header.frame_id.empty() &&
+         std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) &&
          std::isfinite(q.x) && std::isfinite(q.y) && std::isfinite(q.z) &&
          std::isfinite(q.w) && std::isfinite(norm) && norm > 1e-9;
 }
@@ -105,10 +107,23 @@ Result validateNonEmptyName(const std::string & name, const char * label)
   }
   return Result::success();
 }
+
+Result validateGripperTarget(double position)
+{
+  if (!std::isfinite(position) || position < kOpenGripperPosition ||
+    position > kClosedGripperPosition)
+  {
+    return Result::failure(ErrorCode::kInvalidArgument, "gripper position must be in [0, 0.06] m");
+  }
+  return Result::success();
+}
 }
 
 struct RobotSdk::Impl
 {
+  // Serialize admission and worker reaping, without holding this mutex while
+  // an accepted synchronous operation executes.
+  std::mutex admission_mutex;
   // Reserved for future trajectory recording/playback, scan, and IO state.
 };
 
@@ -300,9 +315,8 @@ Result RobotSdk::moveGripper(GripperGroup group, double position)
   if (!isValidGripperGroup(group)) {
     return Result::failure(ErrorCode::kInvalidArgument, "invalid gripper group");
   }
-  if (!std::isfinite(position)) {
-    return Result::failure(ErrorCode::kInvalidArgument, "gripper position must be finite");
-  }
+  const auto validation = validateGripperTarget(position);
+  if (!validation.ok()) {return validation;}
 
   if (group == GripperGroup::kBoth) {
     return moveBothGrippers(position, position);
@@ -355,9 +369,10 @@ Result RobotSdk::MoveAbsJ(ArmGroup arm, const std::vector<double> & joints_rad,
 
 Result RobotSdk::moveBothGrippers(double left_position, double right_position)
 {
-  if (!std::isfinite(left_position) || !std::isfinite(right_position)) {
-    return Result::failure(ErrorCode::kInvalidArgument, "gripper positions must be finite");
-  }
+  const auto left_validation = validateGripperTarget(left_position);
+  if (!left_validation.ok()) {return left_validation;}
+  const auto right_validation = validateGripperTarget(right_position);
+  if (!right_validation.ok()) {return right_validation;}
 
   return runSynchronous(
     "both_grippers.move",
@@ -555,9 +570,8 @@ MotionHandle RobotSdk::moveGripperAsync(GripperGroup group, double position)
   if (!isValidGripperGroup(group)) {
     return rejectedHandle("gripper.move", Result::failure(ErrorCode::kInvalidArgument, "invalid gripper group"));
   }
-  if (!std::isfinite(position)) {
-    return rejectedHandle("gripper.move", Result::failure(ErrorCode::kInvalidArgument, "gripper position must be finite"));
-  }
+  const auto validation = validateGripperTarget(position);
+  if (!validation.ok()) {return rejectedHandle("gripper.move", validation);}
 
   if (group == GripperGroup::kBoth) {
     return moveBothGrippersAsync(position, position);
@@ -578,10 +592,10 @@ MotionHandle RobotSdk::moveGripperAsync(GripperGroup group, double position)
 
 MotionHandle RobotSdk::moveBothGrippersAsync(double left_position, double right_position)
 {
-  if (!std::isfinite(left_position) || !std::isfinite(right_position)) {
-    return rejectedHandle("both_grippers.move", Result::failure(
-      ErrorCode::kInvalidArgument, "gripper positions must be finite"));
-  }
+  const auto left_validation = validateGripperTarget(left_position);
+  if (!left_validation.ok()) {return rejectedHandle("both_grippers.move", left_validation);}
+  const auto right_validation = validateGripperTarget(right_position);
+  if (!right_validation.ok()) {return rejectedHandle("both_grippers.move", right_validation);}
 
   return submit(
     "both_grippers.move",
@@ -645,28 +659,11 @@ RobotState RobotSdk::readState() const
   RobotState state;
   try {
     state.left_arm_joints = commander_->getLeftArmJoints();
+    state.left_arm_joints_valid = validJointFeedback(state.left_arm_joints, kSingleArmJointCount);
     state.right_arm_joints = commander_->getRightArmJoints();
+    state.right_arm_joints_valid = validJointFeedback(state.right_arm_joints, kSingleArmJointCount);
     state.torso_head_joints = commander_->getTorsoHeadJoints();
-    state.left_gripper_joints = commander_->getLeftGripperJoints();
-    state.right_gripper_joints = commander_->getRightGripperJoints();
-    state.left_arm_pose = commander_->getLeftArmPose();
-    state.right_arm_pose = commander_->getRightArmPose();
-    state.left_tcp_pose = commander_->getLeftTcpPose();
-    state.right_tcp_pose = commander_->getRightTcpPose();
-
-    state.left_arm_joints_valid = validJointFeedback(
-      state.left_arm_joints, kSingleArmJointCount);
-    state.right_arm_joints_valid = validJointFeedback(
-      state.right_arm_joints, kSingleArmJointCount);
-    state.torso_head_joints_valid = validJointFeedback(
-      state.torso_head_joints, kTorsoHeadJointCount);
-    state.left_gripper_joints_valid = validOptionalJointFeedback(state.left_gripper_joints);
-    state.right_gripper_joints_valid = validOptionalJointFeedback(state.right_gripper_joints);
-    state.left_arm_pose_valid = validPoseFeedback(state.left_arm_pose);
-    state.right_arm_pose_valid = validPoseFeedback(state.right_arm_pose);
-    state.left_tcp_pose_valid = validPoseFeedback(state.left_tcp_pose);
-    state.right_tcp_pose_valid = validPoseFeedback(state.right_tcp_pose);
-
+    state.torso_head_joints_valid = validJointFeedback(state.torso_head_joints, kTorsoHeadJointCount);
     if (!state.left_arm_joints_valid || !state.right_arm_joints_valid ||
       !state.torso_head_joints_valid)
     {
@@ -676,17 +673,42 @@ RobotState RobotSdk::readState() const
         "3 torso/head joints, all finite");
       return state;
     }
-    state.result = Result::success(
-      "required arm and torso/head joint feedback is valid; optional feedback validity is "
-      "reported in RobotState flags");
   } catch (const std::exception & error) {
     state.result = Result::failure(ErrorCode::kNotReady, error.what());
+    return state;
   }
+
+  // Optional feedback has independent failure domains. Missing TCP geometry,
+  // for example, must not invalidate successfully read required joints.
+  const auto read_optional = [](auto && getter, auto & output, bool & valid, auto && validate) {
+      try {
+        output = getter();
+        valid = validate(output);
+      } catch (const std::exception &) {
+        valid = false;
+      }
+    };
+  read_optional([&]() {return commander_->getLeftGripperJoints();},
+    state.left_gripper_joints, state.left_gripper_joints_valid, validOptionalJointFeedback);
+  read_optional([&]() {return commander_->getRightGripperJoints();},
+    state.right_gripper_joints, state.right_gripper_joints_valid, validOptionalJointFeedback);
+  read_optional([&]() {return commander_->getLeftArmPose();},
+    state.left_arm_pose, state.left_arm_pose_valid, validPoseFeedback);
+  read_optional([&]() {return commander_->getRightArmPose();},
+    state.right_arm_pose, state.right_arm_pose_valid, validPoseFeedback);
+  read_optional([&]() {return commander_->getLeftTcpPose();},
+    state.left_tcp_pose, state.left_tcp_pose_valid, validPoseFeedback);
+  read_optional([&]() {return commander_->getRightTcpPose();},
+    state.right_tcp_pose, state.right_tcp_pose_valid, validPoseFeedback);
+  state.result = Result::success(
+    "required arm and torso/head joint feedback is valid; optional feedback validity is "
+    "reported in RobotState flags");
   return state;
 }
 
 Result RobotSdk::runSynchronous(const std::string & operation_name, Operation operation)
 {
+  std::unique_lock<std::mutex> admission(impl_->admission_mutex);
   reapFinishedWorker();
   {
     std::lock_guard<std::mutex> lock(task_mutex_);
@@ -696,6 +718,7 @@ Result RobotSdk::runSynchronous(const std::string & operation_name, Operation op
     }
     synchronous_busy_ = true;
   }
+  admission.unlock();
 
   Result result;
   try {
@@ -715,6 +738,7 @@ Result RobotSdk::runSynchronous(const std::string & operation_name, Operation op
 
 MotionHandle RobotSdk::submit(std::string operation_name, Operation operation)
 {
+  std::lock_guard<std::mutex> admission(impl_->admission_mutex);
   std::thread finished;
   {
     std::lock_guard<std::mutex> lock(task_mutex_);
@@ -752,41 +776,9 @@ MotionHandle RobotSdk::submit(std::string operation_name, Operation operation)
   try {
     worker_ = std::thread(
       [commander = commander_, state, operation = std::move(operation)]() mutable {
-        {
-          std::lock_guard<std::mutex> state_lock(state->mutex);
-          if (state->cancel_requested) {
-            state->status = MotionStatus::kCancelled;
-            state->result = Result::failure(
-              ErrorCode::kCancelled, "motion cancelled before execution");
-            state->condition.notify_all();
-            return;
-          }
-          state->status = MotionStatus::kRunning;
-        }
-        state->condition.notify_all();
-
-        Result operation_result;
-        try {
-          operation_result = operation(*commander);
-        } catch (const std::exception & error) {
-          operation_result = Result::failure(ErrorCode::kInternalError, error.what());
-        } catch (...) {
-          operation_result = Result::failure(
-            ErrorCode::kInternalError, "unknown SDK exception");
-        }
-
-        {
-          std::lock_guard<std::mutex> state_lock(state->mutex);
-          if (state->cancel_requested) {
-            state->status = MotionStatus::kCancelled;
-            state->result = Result::failure(ErrorCode::kCancelled, "motion cancelled");
-          } else {
-            state->status = operation_result.ok() ?
-              MotionStatus::kSucceeded : MotionStatus::kFailed;
-            state->result = std::move(operation_result);
-          }
-        }
-        state->condition.notify_all();
+        detail::executeMotionTask(state, [&operation, &commander]() {
+            return operation(*commander);
+          });
       });
   } catch (const std::exception & error) {
     std::lock_guard<std::mutex> state_lock(state->mutex);
