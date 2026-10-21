@@ -1,0 +1,8 @@
+# No calibration or simulation data is loaded by default.
+# tool0: each arm's flange (identity). wobj0: base_link (identity).
+# TCP APIs retain the configured URDF gripper TCP default when tool is omitted.
+version: 1
+tools:
+  left: {}
+  right: {}
+workobjects: {}

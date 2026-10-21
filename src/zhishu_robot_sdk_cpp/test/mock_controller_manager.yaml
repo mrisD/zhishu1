@@ -1,0 +1,7 @@
+# Test-only scheduler overrides; do not reuse production realtime CPU settings.
+controller_manager:
+  ros__parameters:
+    update_rate: 100
+    lock_memory: false
+    thread_priority: 0
+    cpu_affinity: 0
