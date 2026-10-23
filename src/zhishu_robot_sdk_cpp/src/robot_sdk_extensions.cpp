@@ -1,6 +1,10 @@
 #include "zhishu_robot_sdk/robot_sdk.hpp"
+#include "home_pose.hpp"
 
+#include <exception>
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 namespace zhishu_robot_sdk
 {
@@ -72,12 +76,67 @@ Result RobotSdk::stopJog()
 
 Result RobotSdk::setHomePose()
 {
-  return notImplemented("setHomePose");
+  const auto path = detail::resolvedHomePosePath(options_.home_pose_file);
+  if (path.empty()) {
+    return Result::failure(
+      ErrorCode::kNotReady,
+      "cannot resolve the unified home pose file; set RobotSdkOptions::home_pose_file or HOME");
+  }
+
+  // Reading both poses inside the synchronous task keeps the capture out of an active motion
+  // and stores one instant of both arms, never two unrelated snapshots.
+  return runSynchronous(
+    "both_arms.set_home",
+    [path](Commander & commander) -> Result {
+      detail::HomePose home;
+      try {
+        home.left = commander.getLeftArmPose();
+        home.right = commander.getRightArmPose();
+      } catch (const std::exception & error) {
+        return Result::failure(
+          ErrorCode::kNotReady,
+          std::string("cannot read the current left/right arm poses: ") + error.what());
+      }
+      home.captured_at = detail::utcNowIso8601();
+
+      std::string error;
+      if (!detail::writeHomePoseFile(path, home, error)) {
+        return Result::failure(ErrorCode::kInternalError, error);
+      }
+      return Result::success("unified dual-arm home pose saved to " + path);
+    });
 }
 
 Result RobotSdk::moveHome()
 {
-  return notImplemented("moveHome");
+  const auto path = detail::resolvedHomePosePath(options_.home_pose_file);
+  bool saved_exists = false;
+  if (!path.empty()) {
+    std::error_code inspection_error;
+    saved_exists = std::filesystem::exists(path, inspection_error);
+    if (inspection_error) {
+      return Result::failure(
+        ErrorCode::kNotReady,
+        "cannot inspect the saved home pose " + path + ": " + inspection_error.message());
+    }
+  }
+
+  if (!saved_exists) {
+    // No unified record yet: use the built-in SRDF posture. A saved pose is never mixed with the
+    // named-target posture of the other arm.
+    return moveNamed(ArmGroup::kBoth, detail::kHomeNamedTarget);
+  }
+
+  detail::HomePose home;
+  std::string error;
+  if (!detail::readHomePoseFile(path, home, error)) {
+    // A corrupt record is reported, not silently replaced by the built-in posture.
+    return Result::failure(ErrorCode::kInvalidArgument, "saved home pose is unusable: " + error);
+  }
+
+  // Replays the same dual-arm planning/execution path as moveBothPoses(), including its
+  // validation, synchronized result and busy/cancel handling.
+  return moveBothPoses(home.left, home.right);
 }
 
 Result RobotSdk::startTrajectoryRecording(const RecordingOptions &)

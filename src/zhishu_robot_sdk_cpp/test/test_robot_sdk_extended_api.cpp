@@ -13,6 +13,7 @@ namespace
 static_assert(std::is_constructible_v<RobotSdk, const rclcpp::Node::SharedPtr &>);
 static_assert(std::is_constructible_v<RobotSdk, const rclcpp::Node::SharedPtr &, const RobotSdkOptions &>);
 static_assert(std::is_same_v<decltype(std::declval<RobotSdk &>().connect()), Result>);
+static_assert(std::is_same_v<decltype(std::declval<RobotSdk &>().setHomePose()), Result>);
 static_assert(std::is_same_v<decltype(std::declval<RobotSdk &>().moveHome()), Result>);
 static_assert(std::is_same_v<decltype(std::declval<RobotSdk &>().startTrajectoryRecording()), Result>);
 static_assert(std::is_same_v<decltype(std::declval<RobotSdk &>().playTrajectory("x")), Result>);

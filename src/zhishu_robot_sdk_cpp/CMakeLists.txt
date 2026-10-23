@@ -44,6 +44,7 @@ unset(CMAKE_WARN_DEPRECATED)
 add_library(zhishu_robot_sdk SHARED
   src/commander.cpp
   src/coordinate_frames.cpp
+  src/home_pose.cpp
   src/pose_math.cpp
   src/motion_handle.cpp
   src/motion_task.cpp
@@ -123,6 +124,7 @@ install(
   FILES_MATCHING PATTERN "*.launch.py" PATTERN "*.yaml"
 )
 install(PROGRAMS scripts/validate_sdk_acceptance.sh DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS scripts/Back_Home.py DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
@@ -159,6 +161,14 @@ if(BUILD_TESTING)
   ament_add_gtest(test_robot_sdk_extended_api test/test_robot_sdk_extended_api.cpp)
   if(TARGET test_robot_sdk_extended_api)
     target_link_libraries(test_robot_sdk_extended_api zhishu_robot_sdk)
+  endif()
+
+  # The unified Home record is an internal-format contract; keep it testable without ROS.
+  ament_add_gtest(test_home_pose test/test_home_pose.cpp)
+  if(TARGET test_home_pose)
+    target_include_directories(test_home_pose PRIVATE src)
+    target_link_libraries(test_home_pose zhishu_robot_sdk)
+    ament_target_dependencies(test_home_pose geometry_msgs)
   endif()
 
   ament_add_gtest(test_sdk_acceptance_contract test/test_sdk_acceptance_contract.cpp)

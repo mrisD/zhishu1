@@ -110,7 +110,8 @@ struct RobotSdkOptions
 
   /// Empty uses $HOME/.ros/zhishu_robot_sdk_cpp/trajectories.
   std::string trajectory_directory;
-  /// Empty uses $HOME/.ros/zhishu_robot_sdk_cpp/home_pose.json.
+  /// Empty uses $HOME/.ros/zhishu_robot_sdk_cpp/home_pose.json. The file holds one unified
+  /// dual-arm Home record: both end-effector poses captured at the same instant, JSON version 1.
   std::string home_pose_file;
 
   /// Configurable default scan endpoint names. Empty means the caller must provide a name
@@ -239,13 +240,16 @@ struct VacuumStatus
 /// Contract for the newly added workflow APIs:
 /// - connect()/disconnect() will check/release SDK communication only; they never switch motor power.
 /// - Software Jog/teaching uses bounded MoveIt increments; physical-button drag is reserved.
-/// - setHomePose()/moveHome() manage one unified dual-arm joint pose.
+/// - setHomePose()/moveHome() manage one unified dual-arm Home captured as two end-effector
+///   poses at a single instant; moveHome() replays it through moveBothPoses() and falls back to
+///   the SRDF named target both_arms_home only when no unified record exists.
 /// - Trajectory JSON preserves AR3 fields dof, hz, arm, name, created, points_data; each point
 ///   contains t (seconds) and q (joint positions in radians). Left/right use separate files.
 /// - speed_percent is a percentage in [0, 100], not the original AR3 raw speed number.
 /// - Scan Topic uses std_msgs/msg/String and Scan Service uses std_srvs/srv/Trigger; names are configurable.
-/// - Newly added workflow and vendor-inspired APIs remain placeholders returning kNotReady/defaults.
-///   The pre-existing motion APIs retain their existing implementations.
+/// - Remaining new workflow and vendor-inspired APIs are still placeholders returning
+///   kNotReady/defaults. The pre-existing motion APIs, including the Home pose APIs, are
+///   implemented.
 
 class ZHISHU_ROBOT_SDK_PUBLIC RobotSdk
 {
@@ -354,7 +358,8 @@ public:
   Result jogJoints(ArmGroup arm, const std::vector<double> & delta_rad);
   Result stopJog();
 
-  // 4-5. Unified dual-arm home pose.
+  // 4-5. Unified dual-arm home pose. moveHome() replays the saved unified record through
+  // moveBothPoses(); without a saved record it uses the built-in both_arms_home group state.
   Result setHomePose();
   Result moveHome();
 

@@ -22,11 +22,20 @@ This document freezes the public API contract for the 12 unique feature rows in
 
 ## 3. Unified dual-arm Home
 
-- `setHomePose()` is intended to save the current left/right 7-joint positions as one unified 14-joint Home pose; the two arms must share one capture time and one file.
-- `moveHome()` is intended to use the saved unified pose when one exists; if no user-saved pose exists, it falls back to the configured SRDF named target `both_arms_home`.
-- It must never silently combine one arm's saved pose with the other arm's SRDF pose.
-- The storage path can be set through `RobotSdkOptions::home_pose_file`.
-- Current status: both functions remain placeholders returning `ErrorCode::kNotReady`; the behavior above is the acceptance contract, not an implemented capability.
+- `setHomePose()` captures the current left and right end-effector poses (arm tips
+  `L_hand_link` / `R_hand_link`) at one instant into a single unified Home record. Both arms
+  always come from that one capture and one file.
+- `moveHome()` replays the saved record through `moveBothPoses()`. If no unified record exists it
+  falls back to the configured SRDF named target `both_arms_home`.
+- It must never silently combine one arm's saved pose with the other arm's SRDF pose; a saved but
+  unreadable record is reported as an error instead of being replaced by the fallback.
+- The record is JSON version 1 with `captured_at` and the `left` / `right` end-effector poses
+  (`frame_id`, `position`, `orientation`). The storage path can be set through
+  `RobotSdkOptions::home_pose_file` and defaults to
+  `$HOME/.ros/zhishu_robot_sdk_cpp/home_pose.json`.
+- Current status: implemented. The `test_home_pose` unit test covers the record format and file
+  handling; motion execution still needs a live MoveIt/controller backend. The Python
+  `Back_Home.py` program replays the same record through the `both_arms/pose_command` topic.
 
 ## 4. Recording and AR3-compatible JSON
 
@@ -102,17 +111,18 @@ validity flags for optional gripper and pose feedback. `SdkStatus::ready` is fal
 probe is implemented; it is never inferred from a non-null Commander pointer. `Commander::clearTargets()`
 clears target state for arms, torso/head and grippers.
 
-`robot_sdk.hpp` declares the unified `RobotSdk` class and its Excel workflows/common extension APIs; the
-`robot_sdk_extensions.cpp` functions are linkable placeholders returning `ErrorCode::kNotReady` or an explicit
-default status. The separate wrapper class has been removed so callers use only `RobotSdk`. No new Jog,
-trajectory recording/playback, scan transport, IO backend, coordinate CRUD or vacuum hardware behavior is
-implemented yet. Existing `RobotSdk` movement functions remain implemented.
+`robot_sdk.hpp` declares the unified `RobotSdk` class and its Excel workflows/common extension APIs. Most
+`robot_sdk_extensions.cpp` functions are still linkable placeholders returning `ErrorCode::kNotReady` or an
+explicit default status; the unified dual-arm Home pair (`setHomePose()` / `moveHome()`) is implemented on top
+of `moveBothPoses()` plus the internal `home_pose` record module. The separate wrapper class has been removed so
+callers use only `RobotSdk`. No new Jog, trajectory recording/playback, scan transport, IO backend, coordinate
+CRUD or vacuum hardware behavior is implemented yet. Existing `RobotSdk` movement functions remain implemented.
 
 ## 12. Acceptance gates
 
 1. Configure-time version gate: CMake project version, `package.xml`, and `version.hpp` must all be `0.3.1` for this source snapshot. CMake fails if `package.xml` differs from the CMake project version; unit tests verify the public version constants.
-2. Unit/API gate: all registered gtests must pass. This includes public API compile checks, version/type contracts, coordinate transforms, pose math, and stability-recording unit tests.
+2. Unit/API gate: all registered gtests must pass. This includes public API compile checks, version/type contracts, coordinate transforms, pose math, unified Home record handling, and stability-recording unit tests.
 3. Binary gate: `libzhishu_robot_sdk.so` must exist after build, resolve runtime dependencies (`ldd` has no `not found` entries), and export `RobotSdk` symbols.
 4. Fake-hardware smoke gate: run the installed `test/commander_fake_validation.launch.py` in a dedicated ROS domain. Verify that only `mock_components/GenericSystem` is configured and that the MoveIt/Commander stack starts without sending motion commands. Stop it with Ctrl-C after checking logs.
 5. Real-hardware gate: do not run stability loops or motion tests until Fake Hardware passes, joint/group names and limits are confirmed, E-stop and motor-power procedures are available, and a human operator approves the test. This patch does not claim real-hardware validation.
-6. Feature gate: Excel workflow APIs (Jog, recording/playback, scan, Home persistence, IO and vacuum) still return `kNotReady` until their backends are implemented. Tests must not count placeholder APIs as implemented functionality.
+6. Feature gate: Excel workflow APIs (Jog, recording/playback, scan, IO and vacuum) still return `kNotReady` until their backends are implemented. Tests must not count placeholder APIs as implemented functionality. The unified dual-arm Home pair is implemented and covered by `test_home_pose`; its motion path is still validated only through the existing dual-arm motion tests.

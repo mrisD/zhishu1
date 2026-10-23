@@ -35,7 +35,9 @@ Verify that `robot_state_publisher`, `ros2_control_node`, the controller spawner
 
 ## Known feature status
 
-The following public APIs remain placeholders and return `kNotReady`: software Jog/teaching, trajectory sampling and JSON persistence, trajectory playback, scan Topic/Service monitoring, user Home persistence, speed-scale setter/getter, coordinate-frame CRUD, IO, controller version/error mapping, and vacuum. A passing build/test gate does not mean these features are implemented.
+The following public APIs remain placeholders and return `kNotReady`: software Jog/teaching, trajectory sampling and JSON persistence, trajectory playback, scan Topic/Service monitoring, speed-scale setter/getter, coordinate-frame CRUD, IO, controller version/error mapping, and vacuum. A passing build/test gate does not mean these features are implemented.
+
+The unified dual-arm Home pair is implemented: `setHomePose()` writes one unified Home record and `moveHome()` replays it through `moveBothPoses()`, falling back to the built-in `both_arms_home` group state when no record exists. The registered `test_home_pose` test covers the record format and file handling only; it sends no motion, so the Home motion path still depends on the existing dual-arm motion coverage.
 
 ## Concurrency and feedback regressions
 
