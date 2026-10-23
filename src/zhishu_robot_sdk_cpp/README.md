@@ -440,6 +440,27 @@ auto moved = robot.moveHome();
 记录文件本身就是语言无关的约定：其它工具（Python、上位机、测试脚本）只要按上面的 JSON
 格式读写 `home_pose.json`，就能采样或复用同一份 Home；本包当前只提供 C++ 接口。
 
+自带的 `sdk_home_example` 用于仿真/真机前的预检、采点与回 Home（默认不运动）：
+
+```bash
+# 预检：打印记录文件路径、会走哪条路径、状态是否有效（不运动）
+ros2 run zhishu_robot_sdk_cpp sdk_home_example --ros-args -p mode:=check
+
+# 采点：把双臂当前末端姿态写成统一记录（会读位姿，不运动）
+ros2 run zhishu_robot_sdk_cpp sdk_home_example --ros-args \
+  -p mode:=save -p execute_motion:=true
+
+# 回 Home：有记录走 moveBothPoses()，无记录走内置 both_arms_home
+ros2 run zhishu_robot_sdk_cpp sdk_home_example --ros-args \
+  -p mode:=move -p execute_motion:=true
+
+# 可选参数：home_pose_file（默认 $HOME/.ros/zhishu_robot_sdk_cpp/home_pose.json）、
+# timeout_sec（默认 60，超时会调用 cancelActiveMotion()）、
+# commander.velocity_scaling / commander.acceleration_scaling 等
+```
+
+退出码：`0` 成功（含未使能运动的预检）、`1` 请求失败或超时、`2` 参数错误。
+
 旧接口仍可使用：
 
 ```cpp

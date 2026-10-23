@@ -83,6 +83,11 @@ add_executable(sdk_example test/sdk_example.cpp)
 target_link_libraries(sdk_example zhishu_robot_sdk)
 ament_target_dependencies(sdk_example rclcpp)
 
+# Unified dual-arm Home pre-flight / capture / replay, no motion unless execute_motion:=true.
+add_executable(sdk_home_example test/sdk_home_example.cpp)
+target_link_libraries(sdk_home_example zhishu_robot_sdk)
+ament_target_dependencies(sdk_home_example rclcpp)
+
 add_executable(sdk_torso_head_example test/sdk_torso_head_example.cpp)
 target_link_libraries(sdk_torso_head_example zhishu_robot_sdk)
 ament_target_dependencies(sdk_torso_head_example rclcpp)
@@ -110,7 +115,7 @@ install(
   INCLUDES DESTINATION include
 )
 install(
-  TARGETS commander_node sdk_example sdk_torso_head_example sdk_named_pose_loop sdk_joint_ethercat_loop
+  TARGETS commander_node sdk_example sdk_home_example sdk_torso_head_example sdk_named_pose_loop sdk_joint_ethercat_loop
   DESTINATION lib/${PROJECT_NAME}
 )
 install(
