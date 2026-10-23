@@ -34,8 +34,7 @@ This document freezes the public API contract for the 12 unique feature rows in
   `RobotSdkOptions::home_pose_file` and defaults to
   `$HOME/.ros/zhishu_robot_sdk_cpp/home_pose.json`.
 - Current status: implemented. The `test_home_pose` unit test covers the record format and file
-  handling; motion execution still needs a live MoveIt/controller backend. The Python
-  `Back_Home.py` program replays the same record through the `both_arms/pose_command` topic.
+  handling; motion execution still needs a live MoveIt/controller backend.
 
 ## 4. Recording and AR3-compatible JSON
 

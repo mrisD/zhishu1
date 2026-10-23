@@ -14,7 +14,7 @@
 - **新桥接节点**：`/zhishu_robot_sdk_commander`，旧节点 `/zhishu_robot_commander` 不受影响
 - **依赖**：ROS 2 Jazzy、MoveIt 2、`zhishu_robot_interfaces` 等原包已使用的公共运行服务
 
-对外只保留一个 `zhishu_robot_sdk::RobotSdk` 类。原有运动 API 与新增 Excel 工作流 API 在该类中统一声明；统一双臂 Home 已实现（`setHomePose` / `moveHome`，并附带 Python 版 `Back_Home.py`），其余新增工作流（Jog、轨迹录制/回放、扫码、电吸、IO 等）目前仍是空框架，返回 `kNotReady`，后续逐项接入现有 Commander 和 ROS 2 服务。
+对外只保留一个 `zhishu_robot_sdk::RobotSdk` 类。原有运动 API 与新增 Excel 工作流 API 在该类中统一声明；统一双臂 Home 已实现（`setHomePose` / `moveHome`），其余新增工作流（Jog、轨迹录制/回放、扫码、电吸、IO 等）目前仍是空框架，返回 `kNotReady`，后续逐项接入现有 Commander 和 ROS 2 服务。
 
 自动化构建、测试、动态库依赖与 Fake Hardware 验收流程见 [SDK_ACCEPTANCE.md](SDK_ACCEPTANCE.md)。
 
@@ -78,7 +78,7 @@ Python SDK 本次未迁移。
 
 - 左/右臂：命名目标、7 关节目标、Hand 位姿目标、真实夹爪 TCP 位姿目标、笛卡尔目标
 - 双臂：命名目标、14 关节目标、左右末端双目标同步规划
-- 回 Home：统一双臂 Home 记录（`setHomePose` / `moveHome`）和 Python 版 `Back_Home.py`
+- 回 Home：统一双臂 Home 记录（`setHomePose` / `moveHome`）
 - 头腰：命名目标、3 关节目标和当前关节角度读取
 - 夹爪：左/右独立控制、双夹爪同步控制和打开/关闭快捷命令
 - C++ SDK 动态库：`libzhishu_robot_sdk.so`
@@ -415,9 +415,9 @@ auto both = robot.moveBothTcpPoses(left_tcp_target, right_tcp_target);
 
 对应异步接口为 `moveTcpPoseAsync()` / `moveBothTcpPosesAsync()`。
 
-### 回 Home：setHomePose / moveHome（Back_Home）
+### 回 Home：setHomePose / moveHome
 
-`Back_Home` 用一条统一记录让双臂同时回到 Home 姿态，不再分别读取左右臂各自的历史位置：
+对应 Excel 中的 `Back_Home`（回 Home）：用一条统一记录让双臂同时回到 Home 姿态，不再分别读取左右臂各自的历史位置：
 
 ```cpp
 // 记录当前双臂末端姿态（L_hand_link / R_hand_link），两臂共用一次采样时间与一个文件。
@@ -437,21 +437,8 @@ auto moved = robot.moveHome();
 - `setHomePose()` 在 SDK 侧同步任务中执行：已有运动时返回 `kBusy`，避免采样到运动中
   的姿态；仍应在机器人静止时调用。
 
-安装后可直接运行 Python 版回 Home 程序，默认只检查目标、不发送运动：
-
-```bash
-ros2 run zhishu_robot_sdk_cpp Back_Home.py
-ros2 run zhishu_robot_sdk_cpp Back_Home.py --ros-args -p execute_motion:=true
-```
-
-`Back_Home.py` 与 C++ 的 `moveHome()` 使用同一份记录：存在记录时向
-`/zhishu_robot_sdk_commander/both_arms/pose_command` 发布两臂末端位姿（即
-`moveBothPoses` 路径），否则向 `both_arms/named_target` 发布 `both_arms_home`。可用参数：
-`execute_motion`（默认 `false`）、`target_name`（默认 `both_arms_home`）、
-`home_pose_file`、`timeout_sec`、`discovery_timeout_sec` 和 `commander_namespace`
-（默认 `/zhishu_robot_sdk_commander`）。程序根据 `status_structured` 上
-`both_arms/pose_command` 或 `both_arms/named_target` 的结果决定退出码：0 成功（含未使能
-运动时的预检）、1 运动失败、2 配置或环境错误。
+记录文件本身就是语言无关的约定：其它工具（Python、上位机、测试脚本）只要按上面的 JSON
+格式读写 `home_pose.json`，就能采样或复用同一份 Home；本包当前只提供 C++ 接口。
 
 旧接口仍可使用：
 

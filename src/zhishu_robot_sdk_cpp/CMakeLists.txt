@@ -124,7 +124,6 @@ install(
   FILES_MATCHING PATTERN "*.launch.py" PATTERN "*.yaml"
 )
 install(PROGRAMS scripts/validate_sdk_acceptance.sh DESTINATION lib/${PROJECT_NAME})
-install(PROGRAMS scripts/Back_Home.py DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)

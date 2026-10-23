@@ -9,8 +9,6 @@ Changelog for package zhishu_robot_sdk_cpp
   built-in ``both_arms_home`` group state when no record exists.
 * Add the internal ``home_pose`` record module with atomic writes and strict validation, covered by
   the new ``test_home_pose`` unit test.
-* Add the ``Back_Home.py`` rclpy program that replays the same record through the Commander topic
-  bridge and stays in no-motion mode unless ``execute_motion:=true`` is set.
 * Serialize motion admission and worker reaping under concurrent sync/async calls.
 * Complete cancellation only after its stop callback returns; handle callback failure without escaping.
 * Isolate optional feedback failures from required joints and reject gripper bounds before queueing.

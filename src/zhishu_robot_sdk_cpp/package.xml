@@ -26,7 +26,6 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>moveit_configs_utils</exec_depend>
-  <exec_depend>rclpy</exec_depend>
   <exec_depend>zhishu_robot_moveit_config</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
