@@ -91,6 +91,14 @@ Result RobotSdk::setHomePose()
       detail::HomePose home;
       try {
         home.joints = commander.getBothArmsJoints();
+        if (home.joints.size() != detail::kUnifiedHomeJointCount) {
+          // Without live feedback the poses would silently be zeros; refuse to write that.
+          return Result::failure(
+            ErrorCode::kNotReady,
+            "current arm joint state is unavailable (" + std::to_string(home.joints.size()) +
+            " of " + std::to_string(detail::kUnifiedHomeJointCount) +
+            "); in simulation also set use_sim_time:=true");
+        }
         home.left = commander.getLeftArmPose();
         home.right = commander.getRightArmPose();
       } catch (const std::exception & error) {

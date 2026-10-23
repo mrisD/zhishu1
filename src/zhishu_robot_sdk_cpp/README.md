@@ -438,7 +438,7 @@ auto moved = robot.moveHome();
   `kInvalidArgument`，不会把一侧保存姿态与另一侧的命名姿态静默拼接。写入失败返回
   `kInternalError`。
 - `setHomePose()` 在 SDK 侧同步任务中执行：已有运动时返回 `kBusy`，避免采样到运动中
-  的姿态；仍应在机器人静止时调用。
+  的姿态；关节反馈不完整时返回 `kNotReady`，不会写出全零记录。仍应在机器人静止时调用。
 
 记录文件本身就是语言无关的约定：其它工具（Python、上位机、测试脚本）只要按上面的 JSON
 格式读写 `home_pose.json`，就能采样或复用同一份 Home；本包当前只提供 C++ 接口。
@@ -464,6 +464,15 @@ ros2 run zhishu_robot_sdk_cpp sdk_home_example --ros-args \
 ```
 
 退出码：`0` 成功（含未使能运动的预检）、`1` 请求失败或超时、`2` 参数错误。
+
+> **Gazebo 里必须加 `-p use_sim_time:=true`**，否则节点用系统时间、读不到仿真里的
+> 关节/位姿反馈（表现为 `state ... valid=false` 或 `setHomePose()` 返回 `kNotReady`）。
+> Fake Hardware 用系统时间，不需要这个参数。示例：
+>
+> ```bash
+> ros2 run zhishu_robot_sdk_cpp sdk_home_example --ros-args \
+>   -p use_sim_time:=true -p mode:=move -p execute_motion:=true
+> ```
 
 旧接口仍可使用：
 

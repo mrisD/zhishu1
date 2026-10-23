@@ -10,6 +10,8 @@ Changelog for package zhishu_robot_sdk_cpp
   ``moveBothPoses()`` and no record falls back to the built-in ``both_arms_home`` group state.
 * Add the internal ``home_pose`` record module with atomic writes and strict validation, covered by
   the new ``test_home_pose`` unit test.
+* Refuse to capture a Home record when arm joint feedback is incomplete (``kNotReady``) instead of
+  writing an all-zero record; document that Gazebo runs need ``use_sim_time:=true``.
 * Add ``sdk_home_example`` for Home pre-flight checks, capture and replay; it stays in no-motion
   mode unless ``execute_motion:=true`` is set.
 * Serialize motion admission and worker reaping under concurrent sync/async calls.
