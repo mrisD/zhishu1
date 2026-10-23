@@ -116,4 +116,7 @@ ros2 run zhishu_robot_sdk_cpp sdk_home_example --ros-args -p mode:=move -p execu
   0.001 rad 解到 0.33 rad。因此以 `joints` 为权威数据；位姿仅作兼容与校验。
 - Gazebo 日志里的 `libEGL warning: failed to create dri2 screen` / `ZINK` 是回落软件渲染的提示，
   不影响显示，帧率一般。
-- Gitee 镜像 `DloveYY/zhishu1` 停在 `c203cbf`，`e9946a6` 之后的提交只在 GitHub `mrisD/zhishu1`。
+- 镜像状态：GitHub `mrisD/zhishu1` 与 Gitee `DloveYY/zhishu1` 均已同步到本报告所在提交
+  （`c2db045`）；后续每个提交需要分别 `git push github jazzy` 和 `git push gitee jazzy`。
+- Jetson 工作区 `/home/dky/Documents/zhishu1-jazzy` 没有 `.git`，当前靠文件同步（本次用 tar 覆盖）；
+  需要长期维护时建议在该目录 `git init` 并跟踪 Gitee 远端。
