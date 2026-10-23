@@ -39,7 +39,7 @@ Verify that `robot_state_publisher`, `ros2_control_node`, the controller spawner
 
 The following public APIs remain placeholders and return `kNotReady`: software Jog/teaching, trajectory sampling and JSON persistence, trajectory playback, scan Topic/Service monitoring, speed-scale setter/getter, coordinate-frame CRUD, IO, controller version/error mapping, and vacuum. A passing build/test gate does not mean these features are implemented.
 
-The unified dual-arm Home pair is implemented: `setHomePose()` writes one unified Home record and `moveHome()` replays it through `moveBothPoses()`, falling back to the built-in `both_arms_home` group state when no record exists. The registered `test_home_pose` test covers the record format and file handling only; it sends no motion, so the Home motion path still depends on the existing dual-arm motion coverage.
+The unified dual-arm Home pair is implemented: `setHomePose()` writes one unified Home record (14 arm joints plus both end-effector poses) and `moveHome()` replays the joints through `moveJoints()` so the posture matches exactly, falling back to `moveBothPoses()` for legacy pose-only records and to the built-in `both_arms_home` group state when no record exists. The registered `test_home_pose` test covers the record format and file handling only; it sends no motion. Motion was validated on Fake Hardware, where the joints return to the captured posture; Gazebo and real-hardware runs remain separate gates.
 
 ## Concurrency and feedback regressions
 

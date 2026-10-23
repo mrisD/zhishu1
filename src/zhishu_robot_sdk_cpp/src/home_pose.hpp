@@ -3,7 +3,9 @@
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 
+#include <cstddef>
 #include <string>
+#include <vector>
 
 namespace zhishu_robot_sdk
 {
@@ -14,12 +16,20 @@ namespace detail
 /// built-in fallback; a saved arm pose is never paired with this posture for the other arm.
 inline constexpr const char * kHomeNamedTarget = "both_arms_home";
 
-/// One unified dual-arm Home captured at a single instant. Both end-effector poses always come
-/// from the same capture and therefore from the same file.
+/// Joint count of the unified dual-arm Home: left arm seven joints, then right arm seven.
+inline constexpr std::size_t kUnifiedHomeJointCount = 14;
+
+/// One unified dual-arm Home captured at a single instant. Joints and end-effector poses always
+/// come from the same capture and therefore from the same file.
 struct HomePose
 {
   /// UTC capture time in ISO 8601 form; informational only.
   std::string captured_at;
+
+  /// Left seven joints followed by right seven joints, in the both_arms group order. Empty in a
+  /// legacy record written before joints were stored; moveHome() then falls back to the poses.
+  std::vector<double> joints;
+
   geometry_msgs::msg::PoseStamped left;
   geometry_msgs::msg::PoseStamped right;
 };
@@ -33,12 +43,13 @@ std::string resolvedHomePosePath(const std::string & configured_path);
 /// Current UTC time as ``YYYY-MM-DDTHH:MM:SSZ``.
 std::string utcNowIso8601();
 
-/// Serialize a unified Home record as JSON. Rejects missing frames, non-finite values and a
-/// zero quaternion instead of writing an unusable file.
+/// Serialize a unified Home record as JSON. Joints may be empty or exactly 14 finite values.
+/// Rejects missing frames, non-finite values and a zero quaternion instead of writing an
+/// unusable file.
 bool encodeHomePose(const HomePose & home, std::string & json, std::string & error);
 
-/// Parse a record written by encodeHomePose(). Any malformed or non-finite record is rejected;
-/// a partially valid record is never reported as success.
+/// Parse a record written by encodeHomePose(). A missing "joints" block is accepted as a legacy
+/// pose-only record; malformed or non-finite joints are rejected.
 bool decodeHomePose(const std::string & json, HomePose & home, std::string & error);
 
 /// Write through a temporary sibling file so an interrupted save never leaves a partial Home.

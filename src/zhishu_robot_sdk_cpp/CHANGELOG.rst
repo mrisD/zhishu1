@@ -4,9 +4,10 @@ Changelog for package zhishu_robot_sdk_cpp
 
 0.3.1 (2026-10-21)
 ------------------
-* Implement the unified dual-arm Home pair: ``setHomePose()`` writes one JSON Home record with both
-  end-effector poses, and ``moveHome()`` replays it through ``moveBothPoses()``, falling back to the
-  built-in ``both_arms_home`` group state when no record exists.
+* Implement the unified dual-arm Home pair: ``setHomePose()`` writes one JSON Home record with the
+  14 arm joints and both end-effector poses, and ``moveHome()`` replays the joints through
+  ``moveJoints()`` so the posture matches exactly; legacy pose-only records use
+  ``moveBothPoses()`` and no record falls back to the built-in ``both_arms_home`` group state.
 * Add the internal ``home_pose`` record module with atomic writes and strict validation, covered by
   the new ``test_home_pose`` unit test.
 * Add ``sdk_home_example`` for Home pre-flight checks, capture and replay; it stays in no-motion

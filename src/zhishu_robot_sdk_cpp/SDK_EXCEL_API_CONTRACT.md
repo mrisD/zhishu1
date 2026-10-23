@@ -22,19 +22,24 @@ This document freezes the public API contract for the 12 unique feature rows in
 
 ## 3. Unified dual-arm Home
 
-- `setHomePose()` captures the current left and right end-effector poses (arm tips
-  `L_hand_link` / `R_hand_link`) at one instant into a single unified Home record. Both arms
-  always come from that one capture and one file.
-- `moveHome()` replays the saved record through `moveBothPoses()`. If no unified record exists it
-  falls back to the configured SRDF named target `both_arms_home`.
-- It must never silently combine one arm's saved pose with the other arm's SRDF pose; a saved but
+- `setHomePose()` captures the current 14 arm joints (`both_arms` group order) and the left/right
+  end-effector poses (arm tips `L_hand_link` / `R_hand_link`) at one instant into a single unified
+  Home record. Both arms always come from that one capture and one file.
+- `moveHome()` replays the saved 14 joints through `moveJoints()` so the posture is identical.
+  A legacy record without a `joints` block falls back to `moveBothPoses()`; with no unified record
+  it falls back to the configured SRDF named target `both_arms_home`.
+- Replaying end-effector poses alone does not reproduce the posture of a redundant 7-DOF arm: the
+  IK branch depends on the seed and can keep the tip within 0.1 mm while changing the elbow by
+  tenths of a radian. The joints are therefore the authoritative part of the record.
+- It must never silently combine one arm's saved state with the other arm's SRDF state; a saved but
   unreadable record is reported as an error instead of being replaced by the fallback.
-- The record is JSON version 1 with `captured_at` and the `left` / `right` end-effector poses
-  (`frame_id`, `position`, `orientation`). The storage path can be set through
-  `RobotSdkOptions::home_pose_file` and defaults to
+- The record is JSON version 1 with `captured_at`, optional `joints` (`left` 7 + `right` 7) and the
+  `left` / `right` end-effector poses (`frame_id`, `position`, `orientation`). The storage path can
+  be set through `RobotSdkOptions::home_pose_file` and defaults to
   `$HOME/.ros/zhishu_robot_sdk_cpp/home_pose.json`.
 - Current status: implemented. The `test_home_pose` unit test covers the record format and file
-  handling; motion execution still needs a live MoveIt/controller backend.
+  handling; motion execution is validated on Fake Hardware (joints return to the captured
+  posture). Gazebo/real-hardware validation remains a separate gate.
 
 ## 4. Recording and AR3-compatible JSON
 

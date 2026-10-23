@@ -420,17 +420,20 @@ auto both = robot.moveBothTcpPoses(left_tcp_target, right_tcp_target);
 对应 Excel 中的 `Back_Home`（回 Home）：用一条统一记录让双臂同时回到 Home 姿态，不再分别读取左右臂各自的历史位置：
 
 ```cpp
-// 记录当前双臂末端姿态（L_hand_link / R_hand_link），两臂共用一次采样时间与一个文件。
+// 记录当前 14 个手臂关节 + 双臂末端姿态（L_hand_link / R_hand_link），共用一次采样与一个文件。
 auto saved = robot.setHomePose();
-// 双臂同时规划并执行，回到该记录；没有记录时使用 SRDF 内置的 both_arms_home。
+// 优先按 14 关节回放（构型完全一致）；没有记录时使用 SRDF 内置的 both_arms_home。
 auto moved = robot.moveHome();
 ```
 
 - 记录默认写入 `$HOME/.ros/zhishu_robot_sdk_cpp/home_pose.json`，可用
   `RobotSdkOptions::home_pose_file` 修改。文件为 JSON version 1，包含 `captured_at`、
-  `left` 和 `right` 两个末端位姿（`frame_id`、`position`、`orientation`）。
-- `moveHome()` 通过 `moveBothPoses()` 重放该记录，因此沿用与普通双臂位姿目标相同的
-  校验、同步结果、任务互斥与取消行为。
+  `joints`（`left` 7 个 + `right` 7 个，`both_arms` 组顺序）以及 `left` / `right` 两个末端
+  位姿（`frame_id`、`position`、`orientation`）。
+- `moveHome()` 优先用 `moveJoints()` 回放这 14 个关节，**关节构型与保存时完全一致**；
+  只有单靠位姿的旧记录（没有 `joints` 字段）才用 `moveBothPoses()`。位姿路径只保证末端
+  位姿一致，7 自由度冗余臂可能解出不同构型（仿真实测：末端差 <0.1 mm，但肘部可从
+  0.001 rad 解到 0.33 rad）。
 - 没有记录时回退到 SRDF 的 `both_arms_home`；记录存在但无法解析时直接返回
   `kInvalidArgument`，不会把一侧保存姿态与另一侧的命名姿态静默拼接。写入失败返回
   `kInternalError`。
@@ -446,11 +449,12 @@ auto moved = robot.moveHome();
 # 预检：打印记录文件路径、会走哪条路径、状态是否有效（不运动）
 ros2 run zhishu_robot_sdk_cpp sdk_home_example --ros-args -p mode:=check
 
-# 采点：把双臂当前末端姿态写成统一记录（会读位姿，不运动）
+# 采点：把当前 14 关节 + 双臂末端姿态写成统一记录（不运动）
 ros2 run zhishu_robot_sdk_cpp sdk_home_example --ros-args \
   -p mode:=save -p execute_motion:=true
 
-# 回 Home：有记录走 moveBothPoses()，无记录走内置 both_arms_home
+# 回 Home：有记录走 moveJoints（14 关节，构型一致）；旧位姿记录走 moveBothPoses；
+# 无记录走内置 both_arms_home
 ros2 run zhishu_robot_sdk_cpp sdk_home_example --ros-args \
   -p mode:=move -p execute_motion:=true
 

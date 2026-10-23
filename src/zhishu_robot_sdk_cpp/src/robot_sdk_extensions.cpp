@@ -83,19 +83,20 @@ Result RobotSdk::setHomePose()
       "cannot resolve the unified home pose file; set RobotSdkOptions::home_pose_file or HOME");
   }
 
-  // Reading both poses inside the synchronous task keeps the capture out of an active motion
-  // and stores one instant of both arms, never two unrelated snapshots.
+  // Reading joints and poses inside the synchronous task keeps the capture out of an active
+  // motion and stores one instant of both arms, never two unrelated snapshots.
   return runSynchronous(
     "both_arms.set_home",
     [path](Commander & commander) -> Result {
       detail::HomePose home;
       try {
+        home.joints = commander.getBothArmsJoints();
         home.left = commander.getLeftArmPose();
         home.right = commander.getRightArmPose();
       } catch (const std::exception & error) {
         return Result::failure(
           ErrorCode::kNotReady,
-          std::string("cannot read the current left/right arm poses: ") + error.what());
+          std::string("cannot read the current arm joints/poses: ") + error.what());
       }
       home.captured_at = detail::utcNowIso8601();
 
@@ -103,7 +104,7 @@ Result RobotSdk::setHomePose()
       if (!detail::writeHomePoseFile(path, home, error)) {
         return Result::failure(ErrorCode::kInternalError, error);
       }
-      return Result::success("unified dual-arm home pose saved to " + path);
+      return Result::success("unified dual-arm home record saved to " + path);
     });
 }
 
@@ -132,6 +133,12 @@ Result RobotSdk::moveHome()
   if (!detail::readHomePoseFile(path, home, error)) {
     // A corrupt record is reported, not silently replaced by the built-in posture.
     return Result::failure(ErrorCode::kInvalidArgument, "saved home pose is unusable: " + error);
+  }
+
+  // Joint replay reproduces the captured posture exactly; a legacy pose-only record falls back
+  // to the dual-arm pose path. Neither branch mixes a saved arm with the built-in posture.
+  if (home.joints.size() == detail::kUnifiedHomeJointCount) {
+    return moveJoints(ArmGroup::kBoth, home.joints);
   }
 
   // Replays the same dual-arm planning/execution path as moveBothPoses(), including its

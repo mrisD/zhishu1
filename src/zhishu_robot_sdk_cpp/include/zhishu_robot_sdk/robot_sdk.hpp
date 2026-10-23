@@ -111,7 +111,8 @@ struct RobotSdkOptions
   /// Empty uses $HOME/.ros/zhishu_robot_sdk_cpp/trajectories.
   std::string trajectory_directory;
   /// Empty uses $HOME/.ros/zhishu_robot_sdk_cpp/home_pose.json. The file holds one unified
-  /// dual-arm Home record: both end-effector poses captured at the same instant, JSON version 1.
+  /// dual-arm Home record (JSON version 1): the 14 arm joints plus both end-effector poses
+  /// captured at the same instant.
   std::string home_pose_file;
 
   /// Configurable default scan endpoint names. Empty means the caller must provide a name
@@ -240,9 +241,10 @@ struct VacuumStatus
 /// Contract for the newly added workflow APIs:
 /// - connect()/disconnect() will check/release SDK communication only; they never switch motor power.
 /// - Software Jog/teaching uses bounded MoveIt increments; physical-button drag is reserved.
-/// - setHomePose()/moveHome() manage one unified dual-arm Home captured as two end-effector
-///   poses at a single instant; moveHome() replays it through moveBothPoses() and falls back to
-///   the SRDF named target both_arms_home only when no unified record exists.
+/// - setHomePose()/moveHome() manage one unified dual-arm Home captured as the 14 arm joints
+///   plus two end-effector poses at a single instant. moveHome() replays the joints through
+///   moveJoints() so the posture is identical, falls back to moveBothPoses() for legacy
+///   pose-only records, and uses the SRDF named target both_arms_home only when no record exists.
 /// - Trajectory JSON preserves AR3 fields dof, hz, arm, name, created, points_data; each point
 ///   contains t (seconds) and q (joint positions in radians). Left/right use separate files.
 /// - speed_percent is a percentage in [0, 100], not the original AR3 raw speed number.
@@ -358,8 +360,9 @@ public:
   Result jogJoints(ArmGroup arm, const std::vector<double> & delta_rad);
   Result stopJog();
 
-  // 4-5. Unified dual-arm home pose. moveHome() replays the saved unified record through
-  // moveBothPoses(); without a saved record it uses the built-in both_arms_home group state.
+  // 4-5. Unified dual-arm Home. moveHome() replays the saved 14 joints through moveJoints() so
+  // the posture matches exactly; legacy pose-only records use moveBothPoses(), and no record at
+  // all uses the built-in both_arms_home group state.
   Result setHomePose();
   Result moveHome();
 

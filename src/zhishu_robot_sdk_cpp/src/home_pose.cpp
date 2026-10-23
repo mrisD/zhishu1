@@ -20,6 +20,15 @@ namespace detail
 namespace
 {
 constexpr int kHomePoseVersion = 1;
+constexpr std::size_t kSingleArmJointCount = 7;
+
+bool allFinite(const std::vector<double> & values)
+{
+  for (const double value : values) {
+    if (!std::isfinite(value)) {return false;}
+  }
+  return true;
+}
 
 bool validPose(
   const geometry_msgs::msg::PoseStamped & pose, const char * label, std::string & error)
@@ -89,6 +98,21 @@ void appendPose(
       << "    \"orientation\": {\"x\": " << orientation.x << ", \"y\": " << orientation.y
       << ", \"z\": " << orientation.z << ", \"w\": " << orientation.w << "}\n"
       << "  }" << (last ? "\n" : ",\n");
+}
+
+void appendJoints(std::ostringstream & out, const std::vector<double> & joints)
+{
+  out << "  \"joints\": {\n    \"left\": [";
+  for (std::size_t i = 0; i < kSingleArmJointCount; ++i) {
+    if (i != 0) {out << ", ";}
+    out << joints[i];
+  }
+  out << "],\n    \"right\": [";
+  for (std::size_t i = 0; i < kSingleArmJointCount; ++i) {
+    if (i != 0) {out << ", ";}
+    out << joints[kSingleArmJointCount + i];
+  }
+  out << "]\n  },\n";
 }
 
 bool decodePose(
@@ -175,6 +199,12 @@ bool encodeHomePose(const HomePose & home, std::string & json, std::string & err
   if (!validPose(home.left, "left", error) || !validPose(home.right, "right", error)) {
     return false;
   }
+  if (!home.joints.empty() &&
+    (home.joints.size() != kUnifiedHomeJointCount || !allFinite(home.joints)))
+  {
+    error = "home pose joints must be empty or 14 finite values";
+    return false;
+  }
 
   // JSON is a subset of YAML, so the file is written as plain JSON and parsed with yaml-cpp.
   std::ostringstream out;
@@ -182,6 +212,9 @@ bool encodeHomePose(const HomePose & home, std::string & json, std::string & err
   out << "{\n"
       << "  \"version\": " << kHomePoseVersion << ",\n"
       << "  \"captured_at\": \"" << escaped(home.captured_at) << "\",\n";
+  if (!home.joints.empty()) {
+    appendJoints(out, home.joints);
+  }
   appendPose(out, "left", home.left, false);
   appendPose(out, "right", home.right, true);
   out << "}\n";
@@ -215,6 +248,39 @@ bool decodeHomePose(const std::string & json, HomePose & home, std::string & err
   }
 
   HomePose decoded;
+  const auto joints = root["joints"];
+  if (joints) {
+    if (!joints.IsMap()) {
+      error = "home pose \"joints\" must be a mapping";
+      return false;
+    }
+    const auto left_joints = joints["left"];
+    const auto right_joints = joints["right"];
+    if (!left_joints || !left_joints.IsSequence() ||
+      left_joints.size() != kSingleArmJointCount ||
+      !right_joints || !right_joints.IsSequence() ||
+      right_joints.size() != kSingleArmJointCount)
+    {
+      error = "home pose \"joints\" requires 7 left and 7 right values";
+      return false;
+    }
+    try {
+      decoded.joints.reserve(kUnifiedHomeJointCount);
+      for (std::size_t i = 0; i < kSingleArmJointCount; ++i) {
+        decoded.joints.push_back(left_joints[i].as<double>());
+      }
+      for (std::size_t i = 0; i < kSingleArmJointCount; ++i) {
+        decoded.joints.push_back(right_joints[i].as<double>());
+      }
+    } catch (const std::exception &) {
+      error = "home pose \"joints\" contains a missing or non-numeric value";
+      return false;
+    }
+    if (!allFinite(decoded.joints)) {
+      error = "home pose \"joints\" contains NaN or infinity";
+      return false;
+    }
+  }
   if (!decodePose(root["left"], "left", decoded.left, error)) {
     return false;
   }

@@ -107,7 +107,7 @@ int main(int argc, char ** argv)
       mode.c_str(), execute_motion ? "true" : "false", timeout_sec);
     RCLCPP_INFO(node->get_logger(), "home record: %s (%s)",
       resolved_home.empty() ? "<unresolved: HOME is not set>" : resolved_home.c_str(),
-      record_exists ? "present -> moveHome() replays it through moveBothPoses()" :
+      record_exists ? "present -> moveHome() replays the saved 14 joints (pose fallback)" :
       "absent -> moveHome() uses the built-in both_arms_home");
 
     if (mode == "check") {

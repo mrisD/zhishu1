@@ -30,9 +30,23 @@ HomePose validHome()
 {
   HomePose home;
   home.captured_at = "2026-10-21T00:00:00Z";
+  home.joints = {
+    0.0, 0.0, 0.0, 0.001, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.001, 0.0, 0.0, 0.0};
   home.left = armPose(0.25);
   home.right = armPose(-0.25);
   return home;
+}
+
+std::string recordWithJoints(const std::string & joints_block)
+{
+  return "{\"version\": 1, \"captured_at\": \"2026-10-21T00:00:00Z\", \"joints\": " +
+         joints_block +
+         ","
+         " \"left\": {\"frame_id\": \"base_link\", \"position\": {\"x\": 0.35, \"y\": 0.25, "
+         "\"z\": 0.75}, \"orientation\": {\"x\": 0, \"y\": 0, \"z\": 0, \"w\": 1}},"
+         " \"right\": {\"frame_id\": \"base_link\", \"position\": {\"x\": 0.35, \"y\": -0.25, "
+         "\"z\": 0.75}, \"orientation\": {\"x\": 0, \"y\": 0, \"z\": 0, \"w\": 1}}}";
 }
 
 TEST(HomePoseTest, EncodeDecodeRoundTrip)
@@ -43,16 +57,83 @@ TEST(HomePoseTest, EncodeDecodeRoundTrip)
   ASSERT_TRUE(encodeHomePose(home, json, error)) << error;
   EXPECT_NE(json.find("\"version\": 1"), std::string::npos);
   EXPECT_NE(json.find("base_link"), std::string::npos);
+  EXPECT_NE(json.find("\"joints\""), std::string::npos);
 
   HomePose decoded;
   ASSERT_TRUE(decodeHomePose(json, decoded, error)) << error;
   EXPECT_EQ(decoded.captured_at, home.captured_at);
+  ASSERT_EQ(decoded.joints.size(), home.joints.size());
+  for (std::size_t i = 0; i < home.joints.size(); ++i) {
+    EXPECT_DOUBLE_EQ(decoded.joints[i], home.joints[i]) << "joint " << i;
+  }
   EXPECT_EQ(decoded.left.header.frame_id, "base_link");
   EXPECT_EQ(decoded.right.header.frame_id, "base_link");
   EXPECT_DOUBLE_EQ(decoded.left.pose.position.y, 0.25);
   EXPECT_DOUBLE_EQ(decoded.right.pose.position.y, -0.25);
   EXPECT_DOUBLE_EQ(decoded.left.pose.position.z, 0.75);
   EXPECT_DOUBLE_EQ(decoded.left.pose.orientation.w, 1.0);
+}
+
+TEST(HomePoseTest, EncodeRejectsUnusableJoints)
+{
+  std::string json;
+  std::string error;
+
+  auto home = validHome();
+  home.joints.pop_back();
+  EXPECT_FALSE(encodeHomePose(home, json, error));
+  EXPECT_FALSE(error.empty());
+
+  home = validHome();
+  home.joints[3] = std::nan("");
+  EXPECT_FALSE(encodeHomePose(home, json, error));
+  EXPECT_FALSE(error.empty());
+}
+
+TEST(HomePoseTest, DecodeRejectsBadJointBlocks)
+{
+  HomePose decoded;
+  std::string error;
+
+  // Only six values for the left arm.
+  EXPECT_FALSE(decodeHomePose(
+    recordWithJoints(
+      "{\"left\": [0, 0, 0, 0, 0, 0], "
+      "\"right\": [0, 0, 0, 0, 0, 0, 0]}"), decoded, error));
+  // Non-finite joint value.
+  EXPECT_FALSE(decodeHomePose(
+    recordWithJoints(
+      "{\"left\": [0, 0, 0, 1e999, 0, 0, 0], "
+      "\"right\": [0, 0, 0, 0, 0, 0, 0]}"), decoded, error));
+  // Joints must be a mapping, not an array.
+  EXPECT_FALSE(decodeHomePose(
+    recordWithJoints("[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"), decoded, error));
+  // An empty joints mapping is not a valid 14-joint block.
+  EXPECT_FALSE(decodeHomePose(recordWithJoints("{}"), decoded, error));
+
+  ASSERT_TRUE(decodeHomePose(
+    recordWithJoints(
+      "{\"left\": [0, 0, 0, 0.001, 0, 0, 0], "
+      "\"right\": [0, 0, 0, 0.001, 0, 0, 0]}"), decoded, error)) << error;
+  ASSERT_EQ(decoded.joints.size(), 14u);
+  EXPECT_DOUBLE_EQ(decoded.joints[3], 0.001);
+  EXPECT_DOUBLE_EQ(decoded.joints[10], 0.001);
+}
+
+TEST(HomePoseTest, DecodeAcceptsLegacyPoseOnlyRecord)
+{
+  const std::string legacy =
+    "{\"version\": 1, \"captured_at\": \"2026-10-21T00:00:00Z\","
+    " \"left\": {\"frame_id\": \"base_link\", \"position\": {\"x\": 0.35, \"y\": 0.25, "
+    "\"z\": 0.75}, \"orientation\": {\"x\": 0, \"y\": 0, \"z\": 0, \"w\": 1}},"
+    " \"right\": {\"frame_id\": \"base_link\", \"position\": {\"x\": 0.35, \"y\": -0.25, "
+    "\"z\": 0.75}, \"orientation\": {\"x\": 0, \"y\": 0, \"z\": 0, \"w\": 1}}}";
+
+  HomePose decoded;
+  std::string error;
+  ASSERT_TRUE(decodeHomePose(legacy, decoded, error)) << error;
+  EXPECT_TRUE(decoded.joints.empty());
+  EXPECT_DOUBLE_EQ(decoded.left.pose.position.y, 0.25);
 }
 
 TEST(HomePoseTest, EncodeRejectsUnusablePoses)
