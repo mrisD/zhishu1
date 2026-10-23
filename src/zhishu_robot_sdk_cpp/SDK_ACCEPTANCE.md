@@ -19,8 +19,10 @@ The package installs `test/commander_fake_validation.launch.py` plus its YAML fi
 ```bash
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
-ros2 launch zhishu_robot_sdk_cpp test/commander_fake_validation.launch.py
+ros2 launch zhishu_robot_sdk_cpp commander_fake_validation.launch.py
 ```
+
+`ros2 launch <package> <file>` only matches the file's basename inside the package share directory, so a path such as `test/commander_fake_validation.launch.py` fails with "was not found in the share directory". Use the installed basename, or pass the absolute path of the installed launch file.
 
 Verify that `robot_state_publisher`, `ros2_control_node`, the controller spawners, `move_group`, and the SDK Commander start without startup errors. This launch does not send motion automatically. Stop with Ctrl-C after checking startup logs. If the installed launch file cannot resolve its fixture YAMLs or any node fails, record the complete launch output and treat the smoke test as failed.
 
